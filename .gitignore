@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+test-results/
+playwright-report/
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+*.blend1
+
+__pycache__/
+*.pyc

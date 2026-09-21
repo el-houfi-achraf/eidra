@@ -1,0 +1,190 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "url": "assets/fixtures/laboratory_reliquary_a_lod0.glb",
+      "bytes": 1540,
+      "sha256": "6a7c5482e29b37d9d5a04129687e9f7cc6d8be266de47a6ad5711050616d2bf7"
+    },
+    {
+      "url": "audio/abilities/dash.ogg",
+      "bytes": 5178,
+      "sha256": "6e7fe1c298d59a456d0fe00d4e33ae2d87325b73d683c74b3a5623cc0989714b"
+    },
+    {
+      "url": "audio/abilities/dash.wav",
+      "bytes": 13274,
+      "sha256": "6c3c5fedacaffd370b94757c717c44a7cd0843d9fdfbe38cc3cde1a35928795d"
+    },
+    {
+      "url": "audio/abilities/remanence.ogg",
+      "bytes": 7255,
+      "sha256": "df1f676170b05bff4d13469233f8a125d73dba2156807244e5176bfe060d69bc"
+    },
+    {
+      "url": "audio/abilities/remanence.wav",
+      "bytes": 79424,
+      "sha256": "3786b2d5039071097b6dbacf05cf6632910d392994b2537dfa68651d41c8700d"
+    },
+    {
+      "url": "audio/ambient/nhalis.ogg",
+      "bytes": 122828,
+      "sha256": "d9494b9e81aed562d68c8ae27ffa3f302f5bcb47fa17cc2de0174c0c480bfaf0"
+    },
+    {
+      "url": "audio/ambient/nhalis.wav",
+      "bytes": 1058444,
+      "sha256": "3b83b0386882d8cef7d4275213c077d3e7c1ec857302ea2755d3f90d0c2ec541"
+    },
+    {
+      "url": "audio/boss/obedience.ogg",
+      "bytes": 42859,
+      "sha256": "582c031a09ea7c17e9d80c5e13e84d67e55530072b35fd689a9286a7b0eb66df"
+    },
+    {
+      "url": "audio/boss/obedience.wav",
+      "bytes": 1058444,
+      "sha256": "d42022127a33d0a27adf8a2414e1c9347b9603e32015e2078e3cc590e66b91f3"
+    },
+    {
+      "url": "audio/combat/heavy.ogg",
+      "bytes": 5587,
+      "sha256": "9e7c35691a219260c29fb7b8d4055cea7097fa298570e2ab71bbf4a5383dcf16"
+    },
+    {
+      "url": "audio/combat/heavy.wav",
+      "bytes": 17684,
+      "sha256": "a65d411581b88fb22b516f8b32d6978a62e6bf3e0b93eb6068d82d69e3860f8b"
+    },
+    {
+      "url": "audio/combat/hurt.ogg",
+      "bytes": 5355,
+      "sha256": "b4b07b70e619956a9837b9d29a422416d5a4a79079df62f19ae5fd12cb4b061f"
+    },
+    {
+      "url": "audio/combat/hurt.wav",
+      "bytes": 15478,
+      "sha256": "f0b50db9e1cf8c81edbd7dcc42b234820d3df17afe10831a27c52db1d294cb2c"
+    },
+    {
+      "url": "audio/combat/impact.ogg",
+      "bytes": 4575,
+      "sha256": "bc3d974c264860f5c7d38e2929473b8546caf1b7826df9fcf8b5ee8eeaebfb97"
+    },
+    {
+      "url": "audio/combat/impact.wav",
+      "bytes": 8864,
+      "sha256": "002e9af0de9eaead3e695311b3a89c43de223291f7b6a6cef060fd83997768d2"
+    },
+    {
+      "url": "audio/combat/parry.ogg",
+      "bytes": 4772,
+      "sha256": "061f923190caa85e709291264b94bb404df9de219ba87adf51bd0a5f5c81a818"
+    },
+    {
+      "url": "audio/combat/parry.wav",
+      "bytes": 28708,
+      "sha256": "53fee5073f7f88cf310460e645f14cae4ee9348b06ac2b6f0b938140936b675d"
+    },
+    {
+      "url": "audio/combat/slash.ogg",
+      "bytes": 4680,
+      "sha256": "43e62918468479fa6c598f6d891cae5f09b452af3ebdc8e57fe587168350231a"
+    },
+    {
+      "url": "audio/combat/slash.wav",
+      "bytes": 9746,
+      "sha256": "2e9f14fb3cce33985d37c9f97fd685e55d6776164f328e0f6c64005f4dcd39df"
+    },
+    {
+      "url": "audio/footsteps/jump.ogg",
+      "bytes": 3823,
+      "sha256": "e97d244269ca7374d802befb8d68443eb216aeca2f3ad4f718bdf388114aece2"
+    },
+    {
+      "url": "audio/footsteps/jump.wav",
+      "bytes": 7982,
+      "sha256": "66292b6d1c2114d16dc33d274a4e30cba4beaef52950a54f9f313ec16a283440"
+    },
+    {
+      "url": "audio/footsteps/stone.ogg",
+      "bytes": 4232,
+      "sha256": "bb11ca5600a082ce3e4e0811455ec5f4632b67e783888ff603e336e04c39d366"
+    },
+    {
+      "url": "audio/footsteps/stone.wav",
+      "bytes": 5336,
+      "sha256": "ade74bcc48f161527ad251d80a1a077cb9a3332d08a6fde03da7e342dd28b295"
+    },
+    {
+      "url": "audio/music/awakening.ogg",
+      "bytes": 38551,
+      "sha256": "b913d9e60d920b4855c2d1398bb3871bb7c1f2aecc38cb3b2744abd9b578cc7b"
+    },
+    {
+      "url": "audio/music/awakening.wav",
+      "bytes": 1058444,
+      "sha256": "56ad963677daf25a14aaae6ac4805a4ecc6b3cdbf697f93f9b93c2c92b65895b"
+    },
+    {
+      "url": "audio/ui/anchor.ogg",
+      "bytes": 6835,
+      "sha256": "3d8698d4525db96507683f52e23023b2717506aeaabc46eb21c9ce25242c7278"
+    },
+    {
+      "url": "audio/ui/anchor.wav",
+      "bytes": 70604,
+      "sha256": "8011fc6e1b01d5dbbb26dad185f7d057790065e9deebeca77eb27de62ef7e0a5"
+    },
+    {
+      "url": "audio/ui/release.ogg",
+      "bytes": 9436,
+      "sha256": "3338d8fdc614b20aaaa1e094472d9796c76b6522afdb64eb7d3f83b2ee7d9354"
+    },
+    {
+      "url": "audio/ui/release.wav",
+      "bytes": 132344,
+      "sha256": "db9923e6749b46020f35bd9dc824b3049ffb4ecd01e4d924fe8eabfff5d32a0d"
+    },
+    {
+      "url": "decoders/LICENSE-babylon.md",
+      "bytes": 9226,
+      "sha256": "9362ea9ea17cb221a20cbbd63f404710834cc273d2a9a7b60314fd68ab702cd6"
+    },
+    {
+      "url": "decoders/LICENSE-meshoptimizer.md",
+      "bytes": 1079,
+      "sha256": "f03037ca7bad1e3eb7f4a63fa6084a8baabd5ba30d3c239a9a7f35705d873e26"
+    },
+    {
+      "url": "decoders/glslang.js",
+      "bytes": 16030,
+      "sha256": "c3a3c2a47284b16b60293fa08a5842fbe8689ac617edc857ab6cb8134a590db4"
+    },
+    {
+      "url": "decoders/glslang.wasm",
+      "bytes": 943680,
+      "sha256": "d79453e0803ebcdf3753c6b1d8d51543b52fed96f7f0d4aec94acd847e225169"
+    },
+    {
+      "url": "decoders/meshopt_decoder.js",
+      "bytes": 29400,
+      "sha256": "fedf06f101ff2ba59d66335578230b7e8f5fac5057dee084be64c67444ac6c12"
+    },
+    {
+      "url": "decoders/twgsl.js",
+      "bytes": 74555,
+      "sha256": "b4f1f66263b801210f955f74aa71f1939be647ce0fd80ea5befd12a78499d5ff"
+    },
+    {
+      "url": "decoders/twgsl.wasm",
+      "bytes": 1702916,
+      "sha256": "a434c2decdbb38caadf5f486d806384a1543554828c983c77922b2d92579914c"
+    },
+    {
+      "url": "favicon.svg",
+      "bytes": 254,
+      "sha256": "a903b980b52532d6fd0ce206ad0a43e3965f45122cd1cc4b6a8e7f2fbbe9a036"
+    }
+  ]
+}

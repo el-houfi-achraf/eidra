@@ -1,0 +1,10 @@
+node_modules
+dist
+package-lock.json
+test-results
+playwright-report
+public/assets
+CHANGELOG.md
+
+public/decoders
+public/asset-manifest.json
