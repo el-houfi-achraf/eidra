@@ -2,6 +2,8 @@ import { AdvancedDynamicTexture } from '@babylonjs/gui/2D/advancedDynamicTexture
 import { Rectangle } from '@babylonjs/gui/2D/controls/rectangle';
 import { TextBlock } from '@babylonjs/gui/2D/controls/textBlock';
 import { Control } from '@babylonjs/gui/2D/controls/control';
+import { Ellipse } from '@babylonjs/gui/2D/controls/ellipse';
+import { Image } from '@babylonjs/gui/2D/controls/image';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import type { Scene } from '@babylonjs/core/scene';
 import type { GameSession } from '../core/GameSession';
@@ -20,6 +22,45 @@ interface EnemyBar {
   fill: Rectangle;
 }
 const HEALTH_WIDTH = 260;
+/** Eidra's cracked ceramic mask, painted once on a canvas so the HUD needs no image file. */
+function maskEmblem(): string {
+  const canvas = document.createElement('canvas');
+  canvas.width = 88;
+  canvas.height = 104;
+  const g = canvas.getContext('2d');
+  if (!g) return '';
+  g.scale(2, 2);
+  g.lineWidth = 2;
+  g.strokeStyle = '#050b0c';
+  g.fillStyle = '#efe8d4';
+  g.beginPath();
+  g.moveTo(22, 2);
+  g.bezierCurveTo(36, 2, 42, 14, 41, 27);
+  g.bezierCurveTo(40, 41, 31, 50, 22, 50);
+  g.bezierCurveTo(13, 50, 4, 41, 3, 27);
+  g.bezierCurveTo(2, 14, 8, 2, 22, 2);
+  g.fill();
+  g.stroke();
+  g.fillStyle = '#8effdb';
+  for (const eye of [
+    [7, 22, 19, 26, 18, 30, 9, 28],
+    [37, 22, 25, 26, 26, 30, 35, 28],
+  ]) {
+    g.beginPath();
+    g.moveTo(eye[0]!, eye[1]!);
+    for (let i = 2; i < eye.length; i += 2) g.lineTo(eye[i]!, eye[i + 1]!);
+    g.fill();
+  }
+  g.strokeStyle = '#3a3a35';
+  g.lineWidth = 1.6;
+  g.beginPath();
+  g.moveTo(30, 5);
+  g.lineTo(27, 13);
+  g.lineTo(31, 19);
+  g.lineTo(27, 26);
+  g.stroke();
+  return canvas.toDataURL('image/png');
+}
 /** Babylon GUI heads-up display. It reads the session and never changes it. */
 export class Hud {
   private texture: AdvancedDynamicTexture;
@@ -31,6 +72,10 @@ export class Hud {
   private shards: TextBlock;
   private ticks: Rectangle[] = [];
   private resonance: { frame: Rectangle; fill: Rectangle }[] = [];
+  private vessel: Ellipse;
+  private vesselFill: Rectangle;
+  private vesselMask: Image;
+  private vesselPulse = 0;
   private boss: Rectangle;
   private bossFill: Rectangle;
   private bossChip: Rectangle;
@@ -54,10 +99,44 @@ export class Hud {
     container.height = '110px';
     container.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     container.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    container.left = '40px';
+    container.left = '124px';
     container.top = '26px';
     container.thickness = 0;
     this.texture.addControl(container);
+    // Mask vessel: the resonance gauge rises like light inside Eidra's mask.
+    this.vessel = new Ellipse('resonance-vessel');
+    this.vessel.width = '78px';
+    this.vessel.height = '78px';
+    this.vessel.thickness = 2;
+    this.vessel.color = '#c9a55f';
+    this.vessel.background = '#07161add';
+    this.vessel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    this.vessel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this.vessel.left = '34px';
+    this.vessel.top = '18px';
+    this.texture.addControl(this.vessel);
+    this.vesselFill = new Rectangle('resonance-light');
+    this.vesselFill.width = 1;
+    this.vesselFill.height = 0;
+    this.vesselFill.thickness = 0;
+    this.vesselFill.background = '#4fc6a6cc';
+    this.vesselFill.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+    this.vessel.addControl(this.vesselFill);
+    for (let i = 1; i < 3; i++) {
+      const tick = new Rectangle('resonance-tick');
+      tick.width = 0.8;
+      tick.height = '1px';
+      tick.thickness = 0;
+      tick.background = '#c9a55f66';
+      tick.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+      tick.top = `${-(i / 3) * 74}px`;
+      this.vessel.addControl(tick);
+    }
+    this.vesselMask = new Image('emblem-mask', maskEmblem());
+    this.vesselMask.width = '44px';
+    this.vesselMask.height = '52px';
+    this.vesselMask.stretch = Image.STRETCH_UNIFORM;
+    this.vessel.addControl(this.vesselMask);
     const text = (name: string, value: string, size: number, color: string): TextBlock => {
       const block = new TextBlock(name, value);
       block.fontSize = size;
@@ -269,6 +348,16 @@ export class Hud {
     this.energy.width = Math.max(0.001, session.abilities.energy / 100);
     this.vitals.text = `${Math.ceil(actor.health)} / ${actor.maxHealth}`;
     const resonance = session.focus.resonance;
+    // The vessel fills with resonance; its ring glows once a Recueillement is affordable.
+    this.vesselFill.height = Math.min(1, resonance / focusData.capacity);
+    const ready = session.focus.segments > 0;
+    this.vesselPulse += dt * (session.focus.channeling ? 12 : 3);
+    this.vessel.color = session.focus.channeling ? '#d8fff1' : ready ? '#e7c983' : '#8c7a55';
+    this.vessel.shadowColor = ready ? '#8effdb' : 'transparent';
+    this.vessel.shadowBlur = ready ? 10 + Math.sin(this.vesselPulse) * 4 : 0;
+    const scale = session.focus.channeling ? 1.06 + Math.sin(this.vesselPulse) * 0.03 : 1;
+    this.vessel.scaleX = this.vessel.scaleY = scale;
+    this.vesselMask.alpha = session.actor.health / session.actor.maxHealth < 0.3 ? 0.65 : 1;
     this.resonance.forEach(({ frame, fill }, i) => {
       const amount = Math.max(0, Math.min(1, (resonance - i * focusData.cost) / focusData.cost));
       fill.alpha = amount >= 1 ? 1 : amount * 0.45;
