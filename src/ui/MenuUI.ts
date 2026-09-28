@@ -1,8 +1,10 @@
 import type { Settings } from '../config/settings';
-import { InputAction, actionLabels, defaultBindings } from '../player/InputAction';
+import { InputAction, actionLabels, defaultBindings, keyLabel } from '../player/InputAction';
 import type { SaveData } from '../save/SaveManager';
-import type { GameSession } from '../core/GameSession';
+import type { GameSession, TitleKind } from '../core/GameSession';
 import { chunks } from '../../game-data/zones/laboratory';
+import { offeringData } from '../../game-data/items/offerings';
+import { focusData } from '../../game-data/abilities/abilities';
 export interface MenuActions {
   start: (slot: number) => void;
   load: (save: SaveData) => void;
@@ -12,20 +14,74 @@ export interface MenuActions {
   save: () => void;
   advance: () => void;
   respawn: () => void;
+  offer: () => void;
 }
 const mark =
   '<svg viewBox="0 0 48 64" aria-hidden="true"><path d="M24 3 44 32 24 61 4 32Z M24 13 35 32 24 51 13 32Z M24 3V20 M24 44V61"/></svg>';
+const escape = (text: string): string =>
+  text.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c,
+  );
+export type Label = (action: InputAction) => string;
 export class MenuUI {
   private root: HTMLElement;
   private messageTimer = 0;
   private captionTimer = 0;
+  private titleTimer = 0;
+  private bannerTimer = 0;
+  private typeTimer = 0;
+  private typing: { element: HTMLElement; text: string; shown: number } | null = null;
   private returnTo: () => void = () => undefined;
   private keyCapture: ((e: KeyboardEvent) => void) | null = null;
+  private reducedMotion = false;
   constructor(private actions: MenuActions) {
     this.root = document.getElementById('interface')!;
   }
   private bind(id: string, handler: () => void): void {
     this.root.querySelector(`#${id}`)?.addEventListener('click', handler);
+  }
+  /** Lazily created overlay outside the swapped menu root, so it survives state changes. */
+  private overlay(id: string, className: string): HTMLElement {
+    let el = document.getElementById(id);
+    if (!el) {
+      el = document.createElement('div');
+      el.id = id;
+      el.className = className;
+      el.setAttribute('role', 'status');
+      el.setAttribute('aria-live', 'polite');
+      document.body.append(el);
+    }
+    return el;
+  }
+  setReducedMotion(value: boolean): void {
+    this.reducedMotion = value;
+  }
+  /** Cinematic card for a new area, a boss introduction or a victory. */
+  title(kind: TitleKind, title: string, subtitle: string): void {
+    const el = this.overlay('title-card', 'title-card');
+    // An area name never interrupts a boss introduction or a victory card.
+    if (kind === 'area' && el.classList.contains('show') && !el.classList.contains('area')) return;
+    el.className = `title-card ${kind}`;
+    el.innerHTML = `<span class="title-rule-left"></span><p class="title-eyebrow">${escape(subtitle)}</p><h2>${escape(title)}</h2><span class="title-ornament" aria-hidden="true">◇</span>`;
+    // Restart the animation even when two cards follow each other.
+    void el.offsetWidth;
+    el.classList.add('show');
+    window.clearTimeout(this.titleTimer);
+    this.titleTimer = window.setTimeout(
+      () => el.classList.remove('show'),
+      kind === 'area' ? 3200 : 3800,
+    );
+  }
+  /** Large banner when a memory power is recovered, with its control prompt. */
+  abilityBanner(name: string, description: string, key: string): void {
+    const el = this.overlay('ability-banner', 'ability-banner');
+    el.innerHTML = `<p class="eyebrow">NOUVEAU POUVOIR</p><h2>${escape(name)}</h2><p>${escape(description)}</p><p class="banner-key"><kbd>${escape(key)}</kbd></p>`;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+    window.clearTimeout(this.bannerTimer);
+    this.bannerTimer = window.setTimeout(() => el.classList.remove('show'), 5200);
   }
   caption(text: string): void {
     let el = document.getElementById('audio-caption');
@@ -77,44 +133,83 @@ export class MenuUI {
   }
   playing(): void {
     this.root.innerHTML =
-      '<div class="ingame"><div class="zone-label"><span class="tiny">LABORATOIRE DE L’ÉVEIL</span><p id="zone-name"></p></div><div id="objective" class="objective"></div><div id="interaction" class="interaction"></div><div id="abilities" class="ability-dock"></div><div class="journal-hint">TAB <span>Carte & souvenirs</span> &nbsp; ESC <span>Pause</span></div></div>';
+      '<div class="ingame"><div class="zone-label"><span class="tiny">LABORATOIRE DE L’ÉVEIL</span><p id="zone-name"></p></div><div id="objective" class="objective"></div><div id="interaction" class="interaction"></div><div id="abilities" class="ability-dock"></div><div id="journal-hint" class="journal-hint"></div></div>';
   }
-  update(session: GameSession, labels: Record<InputAction, string>): void {
+  update(session: GameSession, label: Label): void {
     const zone = this.root.querySelector('#zone-name');
-    if (zone) zone.textContent = session.zoneName;
+    if (zone && zone.textContent !== session.zoneName) zone.textContent = session.zoneName;
     const obj = this.root.querySelector('#objective');
-    if (obj) obj.textContent = session.quests.objective(session.narrative.flags);
-    const interaction = this.root.querySelector('#interaction');
-    if (interaction) {
-      interaction.textContent = session.interaction;
+    const objective = session.quests.objective(session.narrative.flags);
+    if (obj && obj.textContent !== `◇ ${objective}`) obj.textContent = `◇ ${objective}`;
+    const interaction = this.root.querySelector<HTMLElement>('#interaction');
+    if (interaction && interaction.dataset.text !== session.interaction) {
+      interaction.dataset.text = session.interaction;
+      const [key, ...rest] = session.interaction.split(' · ');
+      interaction.innerHTML = rest.length
+        ? `<kbd>${escape(key ?? '')}</kbd><span>${escape(rest.join(' · '))}</span>`
+        : `<span>${escape(session.interaction)}</span>`;
       interaction.classList.toggle('visible', Boolean(session.interaction));
     }
+    const hint = this.root.querySelector<HTMLElement>('#journal-hint');
+    const hintText = `${label(InputAction.Map)}|${label(InputAction.Pause)}`;
+    if (hint && hint.dataset.text !== hintText) {
+      hint.dataset.text = hintText;
+      hint.innerHTML = `<kbd>${escape(label(InputAction.Map))}</kbd><span>Carte & souvenirs</span><kbd>${escape(label(InputAction.Pause))}</kbd><span>Pause</span>`;
+    }
     const abilities = this.root.querySelector('#abilities');
-    if (abilities) {
-      const entries: [
-        [InputAction, string, string],
-        [InputAction, string, string],
-        [InputAction, string, string],
-      ] = [
-        [InputAction.Dash, 'dash', 'Élan'],
-        [InputAction.Remanence, 'remanence', 'Rémanence'],
-        [InputAction.Echo, 'memory-step', 'Memory Step'],
-      ];
-      const signature = entries
+    if (!abilities) return;
+    const entries: [InputAction, string, string, boolean, boolean][] = [
+      [InputAction.Heal, 'heal', 'Recueillement', true, session.focus.segments > 0],
+      [
+        InputAction.Dash,
+        'dash',
+        'Élan',
+        session.abilities.unlocked.has('dash'),
+        session.player.motion.dashCooldown === 0,
+      ],
+      [
+        InputAction.Remanence,
+        'remanence',
+        'Rémanence',
+        session.abilities.unlocked.has('remanence'),
+        session.abilities.energy >= 10,
+      ],
+      [
+        InputAction.Echo,
+        'memory-step',
+        'Memory Step',
+        session.abilities.unlocked.has('memory-step'),
+        session.abilities.echoCooldown === 0 && session.abilities.energy >= 25,
+      ],
+    ];
+    const signature = entries.map(([a, , , unlocked]) => `${label(a)}${unlocked}`).join();
+    if (abilities.getAttribute('data-signature') !== signature) {
+      abilities.setAttribute('data-signature', signature);
+      abilities.innerHTML = entries
         .map(
-          ([a, id]) =>
-            `${labels[a]}${session.abilities.unlocked.has(id as 'dash')}${id === 'remanence' && session.abilities.remanence}`,
+          ([action, id, name, unlocked]) =>
+            `<div class="ability ${unlocked ? '' : 'locked'}" data-ability="${id}"><kbd>${escape(label(action))}<i class="cooldown"></i></kbd><span>${name}</span></div>`,
         )
-        .join();
-      if (abilities.getAttribute('data-signature') !== signature) {
-        abilities.setAttribute('data-signature', signature);
-        abilities.innerHTML = entries
-          .map(
-            ([action, id, label]) =>
-              `<div class="ability ${session.abilities.unlocked.has(id as 'dash') ? '' : 'locked'} ${id === 'remanence' && session.abilities.remanence ? 'active' : ''}"><kbd>${labels[action].replace('Key', '').replace('Left', '')}</kbd><span>${label}</span></div>`,
-          )
-          .join('');
-      }
+        .join('');
+    }
+    // Per-frame state changes only toggle classes and a CSS variable.
+    for (const [, id, , unlocked, ready] of entries) {
+      const el = abilities.querySelector<HTMLElement>(`[data-ability="${id}"]`);
+      if (!el) continue;
+      el.classList.toggle('ready', unlocked && ready);
+      el.classList.toggle(
+        'active',
+        (id === 'remanence' && session.abilities.remanence) ||
+          (id === 'heal' && session.focus.channeling),
+      );
+      const cooldown =
+        id === 'memory-step'
+          ? session.abilities.echoCooldown / 8
+          : id === 'heal'
+            ? 1 - Math.min(1, session.focus.resonance / focusData.cost)
+            : 0;
+      const value = unlocked ? Math.max(0, Math.min(1, cooldown)).toFixed(2) : '0';
+      if (el.style.getPropertyValue('--cool') !== value) el.style.setProperty('--cool', value);
     }
   }
   pause(settings: Settings): void {
@@ -137,11 +232,11 @@ export class MenuUI {
     )
       .map(
         (action) =>
-          `<button class="binding" data-action="${action}"><span>${actionLabels[action]}</span><kbd>${(settings.bindings[action] ?? defaultBindings[action]).replace('Key', '').replace('Left', '')}</kbd></button>`,
+          `<button class="binding" data-action="${action}"><span>${actionLabels[action]}</span><kbd>${escape(keyLabel(settings.bindings[action] ?? defaultBindings[action]))}</kbd></button>`,
       )
       .join(
         '',
-      )}</div><p class="muted small">Manette : A saut · X attaque · B esquive · Y Rémanence · LB parade · RB Écho · RT interaction · LT charge · Start pause.</p></div></div></section>`;
+      )}</div><p class="muted small">Manette : A saut · X attaque (bas + X en l’air : plongée) · B esquive · Y Rémanence · LB parade · RB Écho · RT interaction, maintenir pour se recueillir · LT charge · Start pause.</p></div></div></section>`;
     for (const key of [
       'master',
       'music',
@@ -219,10 +314,51 @@ export class MenuUI {
       this.keyCapture = null;
     }
   }
-  dialogue(session: GameSession): void {
-    this.root.innerHTML = `<div class="cinematic-bars"></div><section class="dialogue"><p class="eyebrow">${session.narrative.speaker}</p><p class="dialogue-line"></p><button id="advance" class="text-button">Continuer <kbd>E / A</kbd> →</button></section>`;
-    this.root.querySelector('.dialogue-line')!.textContent = session.narrative.line;
+  dialogue(session: GameSession, label?: Label): void {
+    const key = label ? label(InputAction.Interact) : 'E';
+    this.root.innerHTML = `<div class="cinematic-bars"></div><section class="dialogue"><p class="eyebrow">${escape(session.narrative.speaker)}</p><p class="dialogue-line"></p><button id="advance" class="text-button">Continuer <kbd>${escape(key)}</kbd> →</button></section>`;
+    const line = this.root.querySelector<HTMLElement>('.dialogue-line')!;
+    this.stopTyping();
+    if (this.reducedMotion) line.textContent = session.narrative.line;
+    else {
+      // Typewriter reveal; the first press completes the line, the next one advances.
+      this.typing = { element: line, text: session.narrative.line, shown: 0 };
+      const step = (): void => {
+        if (!this.typing) return;
+        this.typing.shown = Math.min(this.typing.text.length, this.typing.shown + 2);
+        this.typing.element.textContent = this.typing.text.slice(0, this.typing.shown);
+        if (this.typing.shown >= this.typing.text.length) this.stopTyping();
+        else this.typeTimer = window.setTimeout(step, 28);
+      };
+      step();
+    }
     this.bind('advance', this.actions.advance);
+    this.focus();
+  }
+  /** Completes a line still being revealed. Returns false when nothing was typing. */
+  finishLine(): boolean {
+    if (!this.typing) return false;
+    this.typing.element.textContent = this.typing.text;
+    this.stopTyping();
+    return true;
+  }
+  private stopTyping(): void {
+    window.clearTimeout(this.typeTimer);
+    this.typing = null;
+  }
+  /** The anchor altar: rest, save and trade shards for vitality. */
+  altar(session: GameSession): void {
+    const cost = session.inventory.offeringCost;
+    const made = session.inventory.healthUpgrades;
+    const shards = session.inventory.shards;
+    const total = offeringData.costs.length;
+    const offer =
+      cost === null
+        ? '<p class="altar-note">Toutes les offrandes ont été faites. La céramique ne peut porter davantage.</p>'
+        : `<button id="offer" class="solid-button" ${shards < cost ? 'disabled' : ''}>Offrir ${cost} éclats — +${offeringData.vitality} vitalité</button>${shards < cost ? `<p class="altar-note">Il manque ${cost - shards} éclats. Les Veilleurs vaincus en laissent derrière eux.</p>` : ''}`;
+    this.root.innerHTML = `<div class="modal-scrim"></div><section class="panel compact altar-panel"><p class="eyebrow">AUTEL DE L’ANCRAGE</p><h2>Le repos d’une mémoire.</h2><p>Santé et mémoire restaurées. Votre progression est enregistrée.</p><div class="altar-stats"><span><b>${session.actor.maxHealth}</b><small>VITALITÉ</small></span><span><b>◆ ${shards}</b><small>ÉCLATS</small></span><span><b>${made}/${total}</b><small>OFFRANDES</small></span></div>${offer}<button id="resume" class="text-button">Reprendre le voyage →</button></section>`;
+    this.bind('offer', this.actions.offer);
+    this.bind('resume', this.actions.resume);
     this.focus();
   }
   death(): void {
@@ -238,7 +374,7 @@ export class MenuUI {
     this.focus();
   }
   ending(session: GameSession): void {
-    this.root.innerHTML = `<div class="modal-scrim"></div><section class="panel compact"><p class="eyebrow">FIN DU PRÉLUDE</p><h2>Un ordre peut<br>être oublié.</h2><p>La porte de Nhalis est ouverte.<br>Les Failles de cendre attendent encore.</p><div class="end-stats"><span>${session.narrative.memories.size}/2<br><small>SOUVENIRS</small></span><span>${Math.floor(session.playtime / 60)} min<br><small>DE VOYAGE</small></span></div><p class="muted small">Vous avez atteint la fin de ce prototype jouable. La suite de Nhalis est en développement.</p><button id="explore" class="solid-button">Revenir explorer →</button><button id="menu" class="text-button">Menu principal</button></section>`;
+    this.root.innerHTML = `<div class="modal-scrim"></div><section class="panel compact"><p class="eyebrow">FIN DU PRÉLUDE</p><h2>Un ordre peut<br>être oublié.</h2><p>La porte de Nhalis est ouverte.<br>Les Failles de cendre attendent encore.</p><div class="end-stats"><span>${session.narrative.memories.size}/2<br><small>SOUVENIRS</small></span><span>${Math.floor(session.playtime / 60)} min<br><small>DE VOYAGE</small></span><span>◆ ${session.inventory.shards}<br><small>ÉCLATS</small></span></div><p class="muted small">Vous avez atteint la fin de ce prototype jouable. La suite de Nhalis est en développement.</p><button id="explore" class="solid-button">Revenir explorer →</button><button id="menu" class="text-button">Menu principal</button></section>`;
     this.bind('explore', this.actions.resume);
     this.bind('menu', this.actions.menu);
     this.focus();
@@ -258,9 +394,14 @@ export class MenuUI {
   }
   dispose(): void {
     this.cancelCapture();
+    this.stopTyping();
     window.clearTimeout(this.messageTimer);
     window.clearTimeout(this.captionTimer);
+    window.clearTimeout(this.titleTimer);
+    window.clearTimeout(this.bannerTimer);
     document.getElementById('audio-caption')?.remove();
+    document.getElementById('title-card')?.remove();
+    document.getElementById('ability-banner')?.remove();
     this.root.replaceChildren();
   }
 }

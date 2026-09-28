@@ -16,6 +16,7 @@ export class MovementModel {
   private coyote = 0;
   private buffer = 0;
   private jumps = 0;
+  private lift = 0;
   step(
     dt: number,
     intent: MovementIntent,
@@ -29,6 +30,7 @@ export class MovementModel {
     const wasDashing = this.dashTime > 0;
     this.dashCooldown = Math.max(0, this.dashCooldown - dt);
     this.dashTime = Math.max(0, this.dashTime - dt);
+    this.lift = Math.max(0, this.lift - dt);
     if (Math.abs(intent.axis) > 0.1) this.facing = Math.sign(intent.axis);
     if (this.grounded) {
       this.jumps = 0;
@@ -54,10 +56,25 @@ export class MovementModel {
       this.jumps++;
       this.grounded = false;
     }
-    if (!intent.jumpHeld && this.vy > 5) this.vy = 5;
+    // Releasing jump shortens the arc, except during a pogo bounce which has a fixed height.
+    if (!intent.jumpHeld && this.vy > 5 && this.lift === 0) this.vy = 5;
     this.vy = Math.max(-24, this.vy - 28 * dt);
   }
+  /**
+   * A downward strike that connects launches the character upwards and refreshes
+   * the dash, so enemies and projectiles can be used as stepping stones.
+   */
+  bounce(speed = 10.5): void {
+    this.vy = speed;
+    this.lift = 0.22;
+    this.dashCooldown = 0;
+    this.dashTime = 0;
+    this.grounded = false;
+    this.coyote = 0;
+    this.jumps = Math.min(this.jumps, 1);
+  }
   reset(): void {
+    this.lift = 0;
     this.vx = 0;
     this.vy = 0;
     this.buffer = 0;

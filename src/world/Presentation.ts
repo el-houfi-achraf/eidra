@@ -9,19 +9,30 @@ import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
 import { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
 import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent';
 import { GlowLayer } from '@babylonjs/core/Layers/glowLayer';
+import { ImageProcessingConfiguration } from '@babylonjs/core/Materials/imageProcessingConfiguration';
+import { ImageProcessingPostProcess } from '@babylonjs/core/PostProcesses/imageProcessingPostProcess';
+import { FxaaPostProcess } from '@babylonjs/core/PostProcesses/fxaaPostProcess';
+import type { PostProcess } from '@babylonjs/core/PostProcesses/postProcess';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
 import type { Mesh } from '@babylonjs/core/Meshes/mesh';
 import type { AbstractEngine } from '@babylonjs/core/Engines/abstractEngine';
 import { GPUParticleSystem } from '@babylonjs/core/Particles/gpuParticleSystem';
 import { ParticleSystem } from '@babylonjs/core/Particles/particleSystem';
-import { RawTexture } from '@babylonjs/core/Materials/Textures/rawTexture';
+import type { RawTexture } from '@babylonjs/core/Materials/Textures/rawTexture';
 import { Palette } from './Palette';
+import { Backdrop } from './Backdrop';
 import { CameraRig } from '../camera/CameraRig';
 import { CharacterView } from '../animation/CharacterView';
+import type { CharacterKind } from '../animation/CharacterView';
 import { EffectPool } from '../vfx/EffectPool';
+import { SlashArc } from '../vfx/SlashArc';
+import { Afterimages } from '../vfx/Afterimages';
+import { Motes } from '../vfx/Motes';
+import { proceduralTexture } from '../vfx/textures';
 import type { GameSession } from '../core/GameSession';
 import { presets } from '../config/settings';
 import type { Settings } from '../config/settings';
+const FOG = new Color3(0.025, 0.073, 0.079);
 export class Presentation {
   readonly scene: Scene;
   readonly palette: Palette;
@@ -33,7 +44,11 @@ export class Presentation {
   private enemyViews = new Map<string, { view: CharacterView; ring: Mesh }>();
   private boss: CharacterView;
   private bossCue: Mesh;
-  private slash: Mesh;
+  private rainMarkers: { floor: Mesh; beam: Mesh }[] = [];
+  private slash: SlashArc;
+  private afterimages: Afterimages;
+  private motes: Motes;
+  private backdrop: Backdrop;
   private projectileViews: Mesh[] = [];
   private glow: GlowLayer;
   private sun: DirectionalLight;
@@ -42,17 +57,46 @@ export class Presentation {
   private dustTexture: RawTexture;
   private time = 0;
   private preset = '';
-  private chromatic: ChromaticAberrationPostProcess | null = null;
+  private chain = '';
+  private postProcesses: PostProcess[] = [];
+  // Visual-only bookkeeping derived from the simulation.
+  private flashes = new Map<string, number>();
+  private dying = new Map<string, number>();
+  private lastAttackTime = 0;
+  private wasGrounded = true;
+  private airVy = 0;
+  private land = 0;
+  private heroHit = 0;
+  private hurt = 0;
+  private lastHealth = 0;
+  private gatherClock = 0;
+  private bossState = 'dormant';
+  private bossAlive = false;
+  private bossDissolve = 1;
+  private emitter = new Vector3(10, 4, 2);
   constructor(engine: AbstractEngine) {
     this.scene = new Scene(engine);
     const scene = this.scene;
-    scene.clearColor = new Color4(0.022, 0.057, 0.065, 1);
+    scene.clearColor = new Color4(FOG.r, FOG.g, FOG.b, 1);
     scene.fogMode = Scene.FOGMODE_EXP2;
-    scene.fogColor = new Color3(0.025, 0.073, 0.079);
+    scene.fogColor = FOG;
     scene.fogDensity = 0.016;
+    // Cinematic grade, applied once per pixel by a full-screen pass (see applySettings).
+    const grade = scene.imageProcessingConfiguration;
+    grade.isEnabled = true;
+    grade.toneMappingEnabled = true;
+    grade.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES;
+    grade.exposure = 1.35;
+    grade.contrast = 1.18;
+    grade.vignetteEnabled = true;
+    grade.vignetteBlendMode = ImageProcessingConfiguration.VIGNETTEMODE_MULTIPLY;
+    grade.vignetteWeight = 2.4;
+    grade.vignetteStretch = 0.35;
+    grade.vignetteColor = new Color4(0, 0, 0, 0);
     this.palette = new Palette(scene);
     const p = this.palette;
     this.camera = new CameraRig(scene);
+    this.backdrop = new Backdrop(scene, FOG);
     const sky = new HemisphericLight('cold-sky', new Vector3(-0.2, 1, -0.3), scene);
     sky.intensity = 0.8;
     sky.diffuse = new Color3(0.65, 0.83, 0.79);
@@ -63,22 +107,17 @@ export class Presentation {
     this.sun.diffuse = new Color3(0.79, 0.84, 0.68);
     this.glow = new GlowLayer('lumerite-bloom', scene, {
       mainTextureRatio: 0.4,
-      blurKernelSize: 24,
+      blurKernelSize: 32,
     });
-    this.glow.intensity = 0.5;
+    this.glow.intensity = 0.65;
     this.hero = new CharacterView(scene, p, 'eidra');
     this.echo = new CharacterView(scene, p, 'echo');
     this.mira = new CharacterView(scene, p, 'mira');
     this.boss = new CharacterView(scene, p, 'boss');
     this.effects = new EffectPool(scene, p);
-    this.slash = MeshBuilder.CreateTorus(
-      'blade-arc',
-      { diameter: 2.7, thickness: 0.035, tessellation: 40 },
-      scene,
-    );
-    this.slash.rotation.x = Math.PI / 2;
-    this.slash.material = p.ivory;
-    this.slash.setEnabled(false);
+    this.slash = new SlashArc(scene, p);
+    this.afterimages = new Afterimages(scene, p);
+    this.motes = new Motes(scene, p);
     this.bossCue = MeshBuilder.CreateBox(
       'guardian-telegraph',
       { width: 1, height: 0.035, depth: 4 },
@@ -86,34 +125,48 @@ export class Presentation {
     );
     this.bossCue.material = p.danger;
     this.bossCue.setEnabled(false);
+    for (let i = 0; i < 5; i++) {
+      const floor = MeshBuilder.CreateBox(
+        'rain-marker',
+        { width: 1.3, height: 0.04, depth: 3.4 },
+        scene,
+      );
+      floor.material = p.danger;
+      const beam = MeshBuilder.CreateBox(
+        'rain-beam',
+        { width: 0.07, height: 14, depth: 0.07 },
+        scene,
+      );
+      beam.material = p.danger;
+      for (const mesh of [floor, beam]) {
+        mesh.isPickable = false;
+        mesh.setEnabled(false);
+      }
+      this.rainMarkers.push({ floor, beam });
+    }
     for (let i = 0; i < 20; i++) {
       const m = MeshBuilder.CreatePolyhedron('pooled-projectile', { type: 1, size: 0.18 }, scene);
       m.material = p.danger;
+      m.isPickable = false;
       m.setEnabled(false);
       this.projectileViews.push(m);
     }
-    const pixels = new Uint8Array(16 * 16 * 4);
-    for (let y = 0; y < 16; y++)
-      for (let x = 0; x < 16; x++) {
-        const offset = (y * 16 + x) * 4;
-        pixels[offset] = 200;
-        pixels[offset + 1] = 255;
-        pixels[offset + 2] = 229;
-        pixels[offset + 3] = Math.max(0, 1 - Math.hypot(x - 7.5, y - 7.5) / 7.5) ** 2 * 255;
-      }
-    this.dustTexture = RawTexture.CreateRGBATexture(pixels, 16, 16, scene, false, false);
+    this.dustTexture = proceduralTexture(scene, 16, 16, (u, v) => {
+      const a = Math.max(0, 1 - Math.hypot(u - 0.5, v - 0.5) / 0.5) ** 2;
+      return [0.78, 1, 0.9, a];
+    });
     this.dust = GPUParticleSystem.IsSupported
       ? new GPUParticleSystem('memory-dust', { capacity: 150 }, scene)
       : new ParticleSystem('memory-dust', 150, scene);
     this.dust.particleTexture = this.dustTexture;
-    this.dust.emitter = new Vector3(10, 4, 2);
-    this.dust.minEmitBox = new Vector3(-20, -3, -5);
-    this.dust.maxEmitBox = new Vector3(20, 9, 10);
+    this.dust.emitter = this.emitter;
+    this.dust.minEmitBox = new Vector3(-24, -3, -8);
+    this.dust.maxEmitBox = new Vector3(24, 10, 10);
     this.dust.color1 = new Color4(0.6, 0.85, 0.73, 0.3);
     this.dust.color2 = new Color4(0.8, 0.8, 0.55, 0.3);
     this.dust.colorDead = new Color4(0.2, 0.4, 0.35, 0);
     this.dust.minSize = 0.025;
-    this.dust.maxSize = 0.07;
+    this.dust.maxSize = 0.08;
     this.dust.minLifeTime = 5;
     this.dust.maxLifeTime = 12;
     this.dust.emitRate = 6;
@@ -129,25 +182,45 @@ export class Presentation {
     this.scene.fogDensity = p.fog;
     this.scene.fogMode = settings.preset === 'LOW' ? Scene.FOGMODE_LINEAR : Scene.FOGMODE_EXP2;
     this.scene.fogStart = 25;
-    this.scene.fogEnd = 80;
-    if (settings.chromaticAberration && !settings.reducedMotion && !this.chromatic) {
-      const engine = this.scene.getEngine();
-      this.chromatic = new ChromaticAberrationPostProcess(
-        'subtle-aberration',
-        engine.getRenderWidth(),
-        engine.getRenderHeight(),
-        1,
-        this.camera.camera,
-      );
-      this.chromatic.aberrationAmount = 3;
-      this.chromatic.radialIntensity = 0.2;
+    this.scene.fogEnd = 110;
+    // Post-process chain, rebuilt in a fixed order when it changes: grade → FXAA → aberration.
+    // A single grading pass measured cheaper than per-fragment grading on this overdraw-heavy
+    // scene (PERFORMANCE). LOW keeps the ungraded, MSAA-only path of the original prelude.
+    const graded = settings.preset !== 'LOW';
+    const chromatic = settings.chromaticAberration && !settings.reducedMotion;
+    const chain = `${settings.preset}|${chromatic}`;
+    if (chain !== this.chain) {
+      this.chain = chain;
+      for (const pass of this.postProcesses) pass.dispose(this.camera.camera);
+      this.postProcesses = [];
+      this.scene.imageProcessingConfiguration.isEnabled = graded;
+      const camera = this.camera.camera;
+      if (graded) {
+        const grade = new ImageProcessingPostProcess('cinematic-grade', 1, camera);
+        // MEDIUM trades MSAA for FXAA; HIGH and ULTRA keep multisampled edges.
+        grade.samples = settings.preset === 'MEDIUM' ? 1 : 4;
+        this.postProcesses.push(grade);
+        if (settings.preset === 'MEDIUM')
+          this.postProcesses.push(new FxaaPostProcess('edge-smoothing', 1, camera));
+      }
+      if (chromatic) {
+        const engine = this.scene.getEngine();
+        const aberration = new ChromaticAberrationPostProcess(
+          'subtle-aberration',
+          engine.getRenderWidth(),
+          engine.getRenderHeight(),
+          1,
+          camera,
+        );
+        aberration.aberrationAmount = 3;
+        aberration.radialIntensity = 0.2;
+        this.postProcesses.push(aberration);
+      }
     }
-    if ((!settings.chromaticAberration || settings.reducedMotion) && this.chromatic) {
-      this.chromatic.dispose();
-      this.chromatic = null;
-    }
+    this.backdrop.setEnabled(graded);
     this.glow.isEnabled = p.post;
-    this.glow.intensity = settings.reducedMotion ? 0.3 : 0.5;
+    this.glow.intensity = settings.reducedMotion ? 0.35 : 0.65;
+    this.effects.density = p.effects;
     this.dust.emitRate = settings.reducedMotion ? 0 : p.particles / 6;
     if (this.dust instanceof GPUParticleSystem) this.dust.activeParticleCount = p.particles;
     this.scene.getEngine().resize();
@@ -162,10 +235,32 @@ export class Presentation {
       }
     }
   }
+  /** Called when a blow lands on an enemy: white flash and, for finishers, a zoom punch. */
+  enemyHit(id: string, finisher: boolean, x: number, y: number): void {
+    this.flashes.set(id, 0.09);
+    if (finisher) {
+      this.camera.punch(0.05);
+      this.effects.ring(x, y, 'gold', 2.6, 0.3);
+    }
+  }
+  enemyDefeated(x: number, y: number, shards: number): void {
+    this.motes.spray(x, y, shards * 2, this.palette.gold);
+    this.effects.ring(x, y, 'memory', 3.5, 0.45);
+  }
+  parried(x: number, y: number): void {
+    this.effects.ring(x, y, 'gold', 5, 0.5);
+    this.camera.punch(0.09);
+    this.heroHit = 0.08;
+  }
+  healed(x: number, y: number): void {
+    this.effects.ring(x, y, 'heal', 3, 0.5);
+  }
   render(dt: number, session: GameSession, settings: Settings, menu: boolean): void {
     this.time += dt;
     const p = session.player.position,
       m = session.player.motion;
+    const hx = menu ? 10 : p.x,
+      hy = menu ? 1.1 : p.y;
     this.camera.update(
       dt,
       menu ? 10 : p.x,
@@ -175,17 +270,64 @@ export class Presentation {
       settings,
       menu,
     );
+    for (const [id, t] of this.flashes) this.flashes.set(id, t - dt);
+    // Landing squash and dust, derived from the controller's grounded transitions.
+    if (!m.grounded) this.airVy = Math.min(this.airVy, m.vy);
+    if (m.grounded && !this.wasGrounded && !menu) {
+      if (this.airVy < -9) {
+        this.land = Math.min(1, -this.airVy / 22);
+        this.effects.burst(p.x, p.y - 0.8, 'dust', this.airVy < -18 ? 10 : 6);
+      }
+      this.airVy = 0;
+    }
+    this.wasGrounded = m.grounded;
+    this.land = Math.max(0, this.land - dt * 5);
+    // Player damage feedback: white flash and a red pulse in the vignette.
+    const health = session.actor.health;
+    if (!menu && health < this.lastHealth) {
+      this.heroHit = 0.1;
+      this.hurt = 1;
+    }
+    this.lastHealth = health;
+    this.heroHit = Math.max(0, this.heroHit - dt);
+    this.hurt = Math.max(0, this.hurt - dt * 2.2);
+    const low = menu ? 0 : Math.max(0, 1 - health / (session.actor.maxHealth * 0.3));
+    const pulse = low * (0.55 + 0.45 * Math.sin(this.time * 6));
+    const danger = Math.min(1, Math.max(this.hurt, pulse));
+    const grade = this.scene.imageProcessingConfiguration;
+    grade.vignetteColor.set(0.55 * danger, 0.02 * danger, 0.01 * danger, 0);
+    grade.vignetteWeight = 2.4 + danger * 2.5;
+    // A new swing starts a fresh crescent.
+    if (session.combat.attackTime > this.lastAttackTime + 0.01)
+      this.slash.play(session.combat.attackKind, session.combat.empowered, session.combat.finisher);
+    this.lastAttackTime = session.combat.attackTime;
+    this.slash.update(dt, hx, hy, m.facing);
+    this.afterimages.update(dt, !menu && m.dashTime > 0, hx, hy, m.facing);
+    const channel = menu ? 0 : Math.min(1, session.focus.progress);
+    this.gatherClock -= dt;
+    if (channel > 0 && this.gatherClock <= 0) {
+      this.gatherClock = 0.045;
+      this.motes.gather(hx, hy, this.palette.crystal);
+    }
+    this.motes.update(dt, hx, hy);
     this.hero.update(
-      menu ? 10 : p.x,
-      menu ? 1.1 : p.y,
+      hx,
+      hy,
       m.facing,
       this.time,
       menu ? 0 : m.vx,
       session.combat.attackTime,
-      session.actor.invulnerable > 0 && Math.sin(this.time * 40) > 0,
+      session.actor.invulnerable > 0 && this.heroHit <= 0 && Math.sin(this.time * 40) > 0,
       settings.reducedMotion,
+      {
+        vy: menu ? 0 : m.vy,
+        grounded: menu || m.grounded,
+        land: this.land,
+        hit: this.heroHit,
+        channel,
+        empowered: !menu && (session.combat.parry.riposte > 0 || session.combat.empowered),
+      },
     );
-
     const echo = session.abilities.echo;
     this.echo.root.setEnabled(Boolean(echo) && !menu);
     if (echo)
@@ -211,35 +353,73 @@ export class Presentation {
         false,
         settings.reducedMotion,
       );
+    this.renderEnemies(dt, session, settings);
+    this.renderBoss(dt, session, settings, p.x);
+    this.projectileViews.forEach((mesh, index) => {
+      const shot = session.enemies.projectiles[index];
+      mesh.setEnabled(Boolean(shot));
+      if (shot) {
+        mesh.position.set(shot.x, shot.y, 0);
+        const falling = shot.vx === 0 && shot.vy < 0;
+        mesh.scaling.set(1, falling ? 3 : 1, 1);
+        mesh.rotation.z = falling ? 0 : this.time * 8;
+      }
+    });
+    this.effects.update(dt);
+    this.emitter.set(this.camera.camera.position.x, 4, 2);
+    this.backdrop.update(this.camera.camera.position.x, this.camera.camera.position.y);
+    this.palette.shaft.alpha = settings.reducedMotion
+      ? 0.5
+      : 0.46 + Math.sin(this.time * 0.7) * 0.06 + Math.sin(this.time * 1.9) * 0.03;
+    this.sun.position.x = p.x + 8;
+    session.world.render(this.time, session.inventory.collectibles, session.narrative.flags);
+    this.scene.render();
+  }
+  private renderEnemies(dt: number, session: GameSession, settings: Settings): void {
     for (const [id, entity] of session.enemies.entities) {
       let visual = this.enemyViews.get(id);
       if (!visual) {
-        const kind = entity.kind as 'watcher' | 'wisp' | 'sentinel' | 'keeper';
-        const view = new CharacterView(this.scene, this.palette, kind);
+        const view = new CharacterView(this.scene, this.palette, entity.kind as CharacterKind);
         const ring = MeshBuilder.CreateTorus(
           'enemy-telegraph',
           { diameter: 2, thickness: 0.06, tessellation: 32 },
           this.scene,
         );
         ring.material = this.palette.danger;
+        ring.isPickable = false;
         visual = { view, ring };
         this.enemyViews.set(id, visual);
         for (const mesh of view.meshes) this.shadow?.addShadowCaster(mesh);
       }
       const a = entity.actor,
         warning = entity.fsm.state === 'ALERT';
-      visual.view.update(
-        a.x,
-        a.y + (entity.kind === 'wisp' ? Math.sin(this.time * 2) * 0.2 : 0),
-        entity.facing,
-        this.time,
-        entity.fsm.state === 'CHASE' ? 2 : 0,
-        entity.fsm.state === 'ATTACK' ? 0.1 : 0,
-        a.invulnerable > 0,
-        settings.reducedMotion,
-      );
-      visual.view.root.setEnabled(a.health > 0);
-      visual.view.meshes[1]!.material = warning ? this.palette.danger : this.palette.ivory;
+      // Defeated foes flash white and dissolve instead of vanishing.
+      let dying = this.dying.get(id);
+      if (a.health <= 0 && dying === undefined) dying = 0;
+      if (a.health > 0) dying = undefined;
+      if (dying !== undefined) {
+        dying = Math.min(1, dying + dt / 0.4);
+        this.dying.set(id, dying);
+      } else this.dying.delete(id);
+      const alive = a.health > 0 || (dying !== undefined && dying < 1);
+      visual.view.root.setEnabled(alive);
+      if (alive)
+        visual.view.update(
+          a.x,
+          a.y + (entity.kind === 'wisp' ? Math.sin(this.time * 2) * 0.2 : 0),
+          entity.facing,
+          this.time,
+          entity.fsm.state === 'CHASE' ? entity.data.speed : 0,
+          entity.fsm.state === 'ATTACK' ? 0.1 : 0,
+          false,
+          settings.reducedMotion,
+          {
+            hit: this.flashes.get(id) ?? 0,
+            warning,
+            dying: dying ?? 0,
+            grounded: true,
+          },
+        );
       visual.ring.position.set(a.x, 0.07, 0);
       visual.ring.scaling.setAll(1 + (warning ? entity.fsm.timer / entity.data.windup : 0));
       visual.ring.setEnabled(warning && a.health > 0);
@@ -249,52 +429,72 @@ export class Presentation {
         visual.view.dispose();
         visual.ring.dispose();
         this.enemyViews.delete(id);
+        this.dying.delete(id);
+        this.flashes.delete(id);
       }
+  }
+  private renderBoss(dt: number, session: GameSession, settings: Settings, px: number): void {
     const boss = session.enemies.boss,
       director = session.enemies.director;
-    this.boss.root.setEnabled(p.x > 145 && boss.health > 0);
-    if (p.x > 145 && boss.health > 0) {
+    if (director.state === 'transition' && this.bossState !== 'transition') {
+      this.effects.ring(boss.x, 3, 'damage', 14, 0.9);
+      this.camera.punch(0.1);
+    }
+    this.bossState = director.state;
+    // Only a defeat witnessed this session dissolves; a loaded victory stays hidden.
+    if (boss.health <= 0 && this.bossAlive) this.bossDissolve = 0;
+    this.bossAlive = boss.health > 0;
+    this.bossDissolve = Math.min(1, this.bossDissolve + dt / 1.2);
+    const dying = boss.health > 0 ? 0 : this.bossDissolve;
+    const visible = px > 145 && (boss.health > 0 || dying < 1);
+    this.boss.root.setEnabled(visible);
+    if (visible)
       this.boss.update(
         boss.x,
         boss.y,
         director.direction,
         this.time,
-        director.state === 'approach' ? 2 : 0,
+        director.state === 'approach' ? 2.4 : 0,
         director.state === 'attack' ? 0.15 : 0,
-        boss.invulnerable > 0,
+        false,
         settings.reducedMotion,
+        {
+          warning: director.state === 'windup' || director.state === 'transition',
+          channel: director.state === 'transition' ? 1 : 0,
+          hit: this.flashes.get(boss.id) ?? 0,
+          dying,
+          grounded: true,
+        },
       );
-      this.boss.meshes[1]!.material =
-        director.state === 'windup' ? this.palette.danger : this.palette.ivory;
-    }
     const warning = director.state === 'windup';
-    this.bossCue.setEnabled(warning && session.bossActive);
-    if (warning) {
+    const rain = warning && director.pattern.id === 'rain';
+    this.bossCue.setEnabled(warning && !rain && session.bossActive);
+    if (warning && !rain) {
       this.bossCue.position.set(boss.x + director.direction * 2, 0.055, 0);
       this.bossCue.scaling.x =
         director.pattern.id === 'slam' ? 22 : director.pattern.id === 'charge' ? 14 : 8;
       this.bossCue.visibility = 0.2 + (director.timer / director.pattern.windup) * 0.55;
     }
-    this.slash.setEnabled(session.combat.active);
-    this.slash.position.set(p.x + m.facing * 0.75, p.y, -0.2);
-    this.slash.scaling.y = 0.55;
-    this.slash.rotation.z = session.combat.attackTime * 9 * m.facing;
-    this.projectileViews.forEach((mesh, index) => {
-      const shot = session.enemies.projectiles[index];
-      mesh.setEnabled(Boolean(shot));
-      if (shot) {
-        mesh.position.set(shot.x, shot.y, 0);
-        mesh.rotation.z = this.time * 8;
+    this.rainMarkers.forEach((marker, i) => {
+      const x = director.targets[i];
+      const show = rain && x !== undefined && session.bossActive;
+      marker.floor.setEnabled(show);
+      marker.beam.setEnabled(show);
+      if (show) {
+        const t = director.timer / director.pattern.windup;
+        marker.floor.position.set(x, 0.06, 0);
+        marker.floor.visibility = 0.3 + t * 0.6;
+        marker.beam.position.set(x, 7, 0.4);
+        marker.beam.visibility = 0.12 + t * 0.35 + Math.sin(this.time * 30) * 0.05;
       }
     });
-    this.effects.update(dt);
-    this.dust.emitter = new Vector3(this.camera.camera.position.x, 4, 2);
-    this.sun.position.x = p.x + 8;
-    session.world.render(this.time, session.inventory.collectibles, session.narrative.flags);
-    this.scene.render();
   }
   dispose(): void {
     this.effects.dispose();
+    this.slash.dispose();
+    this.afterimages.dispose();
+    this.motes.dispose();
+    this.backdrop.dispose();
     this.dust.dispose();
     this.dustTexture.dispose();
     this.scene.dispose();

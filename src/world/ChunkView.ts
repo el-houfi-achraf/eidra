@@ -21,6 +21,7 @@ export class ChunkView implements DisposableChunk {
   private crystals: Mesh[] = [];
   private passages: Mesh[] = [];
   private markerMeshes = new Map<string, Mesh[]>();
+  private shaftMeshes: Mesh[] = [];
   constructor(
     readonly data: ChunkData,
     private scene: Scene,
@@ -86,6 +87,42 @@ export class ChunkView implements DisposableChunk {
       }
       const ribbon = this.box('hanging-memorial', x + 0.3, h - 5, 5, 0.36, 3.5, 0.06, p.trim);
       ribbon.rotation.z = 0.08;
+    }
+    // Distant skyline lost in the fog: gives the vault its monumental scale in parallax.
+    for (let i = 0; i < 4; i++) {
+      const x = data.start + i * 10 + 5 + Math.sin(data.seed * 1.7 + i) * 3;
+      const h = 22 + Math.abs(Math.sin(data.seed + i * 5.3)) * 16;
+      this.box('skyline', x, h / 2 - 4, 44, 4 + (i % 2) * 3, h, 4, p.dark);
+      this.box('skyline-spire', x, h - 1, 44, 0.8, 6, 0.8, p.dark);
+    }
+    // Light falling through the broken windows, drawn additively behind the play plane.
+    for (let i = 0; i < 3; i++) {
+      const shaft = MeshBuilder.CreatePlane(
+        `${data.id}-light-shaft`,
+        { width: 3.2 + (i % 2) * 2, height: 24 },
+        scene,
+      );
+      shaft.position.set(data.start + 7 + i * 13 + Math.sin(data.seed + i) * 2, 7, 4.5);
+      shaft.rotation.z = -0.36 - (i % 2) * 0.08;
+      shaft.material = p.shaft;
+      this.add(shaft);
+    }
+    // Foreground silhouettes frame the top and bottom edges without covering the play band.
+    for (let i = 0; i < 3; i++) {
+      const x = data.start + 5 + i * 13 + Math.sin(data.seed * 2.3 + i) * 3;
+      // Broken stone teeth hanging from the vault, pointing down into the top edge.
+      const length = 4.5 + (i % 2) * 2.5;
+      const tooth = MeshBuilder.CreateCylinder(
+        `${data.id}-fg-stalactite`,
+        { height: length, diameterTop: 1.6, diameterBottom: 0.05, tessellation: 4 },
+        scene,
+      );
+      tooth.position.set(x, 8.4 + length / 2, -7);
+      tooth.rotation.z = (i % 2 ? 1 : -1) * 0.12;
+      tooth.material = p.silhouette;
+      this.add(tooth);
+      const mound = this.box('fg-rubble', x + 6, -1.7, -7.5, 5.5, 2.6, 2, p.silhouette);
+      mound.rotation.z = i % 2 ? 0.18 : -0.22;
     }
     for (const c of checkpoints)
       if (c.x >= data.start && c.x < data.end) {
@@ -200,6 +237,8 @@ export class ChunkView implements DisposableChunk {
       }
     for (let i = this.meshes.length - 1; i >= 0; i--)
       if (this.meshes[i]!.isDisposed()) this.meshes.splice(i, 1);
+    this.shaftMeshes = this.meshes.filter((mesh) => mesh.material === p.shaft);
+    for (const mesh of this.shaftMeshes) mesh.receiveShadows = false;
     for (const mesh of this.meshes) {
       mesh.isPickable = false;
       if (!this.crystals.includes(mesh)) mesh.freezeWorldMatrix();
@@ -274,6 +313,7 @@ export class ChunkView implements DisposableChunk {
     }
   }
   setQuality(preset: 'LOW' | 'MEDIUM' | 'HIGH' | 'ULTRA'): void {
+    for (const mesh of this.shaftMeshes) mesh.setEnabled(preset !== 'LOW');
     for (const mesh of this.lodMeshes) {
       mesh.removeLODLevel(null);
       mesh.addLODLevel({ LOW: 50, MEDIUM: 75, HIGH: 100, ULTRA: 150 }[preset], null);

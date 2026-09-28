@@ -14,7 +14,24 @@ Protocole : build de production, Chromium 153.0.8010.0, WebGL2 / SwiftShader log
 | Draw calls                        |                46 |               22 |
 | Triangles soumis, passes incluses |            52 108 |           26 054 |
 
-Le rendu logiciel est le facteur limitant de ce protocole, avec environ 15 / 27 FPS calculés à partir de la frame médiane. Aucune extrapolation à 60 FPS matériel n’est faite. Mesures brutes : [performance.json](evidence/performance.json).
+Le rendu logiciel est le facteur limitant de ce protocole, avec environ 15 / 27 FPS calculés à partir de la frame médiane. Aucune extrapolation à 60 FPS matériel n’est faite.
+
+## Mise à jour « ressenti moderne » : avant / après
+
+Même protocole, même machine pour les deux colonnes : conteneur cloud, Chromium 141.0.7390.37, SwiftShader. Cette machine est environ 2,5 fois plus lente que celle des mesures 0.1.0 ci-dessus ; seules les comparaisons à l’intérieur de ce tableau sont significatives.
+
+| Mesure (médiane / p95)     | MEDIUM avant     | MEDIUM après     | LOW avant      | LOW après      |
+| -------------------------- | ---------------- | ---------------- | -------------- | -------------- |
+| CPU                        | 3,1 / 7,9 ms     | 3,3 / 7,1 ms     | 2,0 / 5,2 ms   | 2,0 / 5,1 ms   |
+| Rendu logiciel             | 151,5 / 206,6 ms | 168,0 / 218,7 ms | 64,1 / 94,6 ms | 62,0 / 84,7 ms |
+| Draw calls                 | 46               | 54               | 22             | 23             |
+| Triangles, passes incluses | 52 108           | 52 484           | 26 054         | 26 234         |
+
+Coût mesuré de chaque ajout en MEDIUM (rendu logiciel médian, désactivation isolée, première itération) : étalonnage appliqué par fragment dans les matériaux ≈ 66 ms, ciel plein écran ≈ 30 ms, rayons de lumière ≈ 12 ms, silhouettes de premier plan ≈ 6 ms ; caméra perspective, rim light fresnel et flou du glow : non mesurables (< 3 ms). L’étalonnage a donc été déplacé dans un seul passage plein écran (`ImageProcessingPostProcess`), avec FXAA en MEDIUM à la place du MSAA et MSAA 4× conservé en HIGH / ULTRA ; LOW garde le chemin non étalonné, sans ciel ni rayons (D014). Résultat : +11 % de rendu logiciel en MEDIUM, aucun écart en LOW, CPU inchangé.
+
+Douze allers-retours x = 123 / 7 : 257 / 242 meshes, 6 / 5 ressources physiques, 2 / 1 chunks, stables à chaque passage. La hausse du nombre de meshes vient des pools VFX préalloués (étincelles, ondes, éclats, traînée, marqueurs de pluie), désactivés hors usage et sans draw call. Le bundle principal passe à 1,82 Mo minifié / 440 ko gzip.
+
+Mesures brutes : [performance.json](evidence/performance.json) (mesures « après »).
 
 ## Optimisation et stabilité
 

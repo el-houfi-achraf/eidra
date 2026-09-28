@@ -17,7 +17,8 @@ async function hold(page: Page, key: string, ms: number): Promise<void> {
   await page.keyboard.up(key);
 }
 async function skipDialogue(page: Page): Promise<void> {
-  for (let i = 0; i < 5; i++) {
+  // Lines are typed out: the first press completes a line, the next one advances.
+  for (let i = 0; i < 12; i++) {
     if ((await snapshot(page)).state !== 'CUTSCENE') break;
     await page.locator('#advance').click();
     await page.waitForTimeout(80);
@@ -30,8 +31,10 @@ test('new game: capsule movement, buffered jump, ability pickup and attack damag
   page.on('pageerror', (e) => errors.push(e.message));
   await start(page);
   const before = (await snapshot(page)).player.x;
-  await hold(page, 'KeyD', 600);
-  expect((await snapshot(page)).player.x).toBeGreaterThan(before + 1);
+  // Hold until the simulation has advanced, independent of the renderer's frame rate.
+  await page.keyboard.down('KeyD');
+  await expect.poll(async () => (await snapshot(page)).player.x).toBeGreaterThan(before + 1);
+  await page.keyboard.up('KeyD');
   await page.keyboard.down('Space');
   await expect.poll(async () => (await snapshot(page)).player.y).toBeGreaterThan(1.5);
   await page.keyboard.up('Space');
@@ -109,8 +112,10 @@ test('memory bridge creates collision and echo holds the counterweight gate', as
   await page.waitForTimeout(5200);
   await page.keyboard.press('KeyR');
   await expect.poll(async () => (await snapshot(page)).echo).not.toBeNull();
-  await hold(page, 'KeyD', 2400);
+  // Walk through the gate while the Echo holds the seal; polling keeps this frame-rate independent.
+  await page.keyboard.down('KeyD');
   await expect.poll(async () => (await snapshot(page)).flags).toContain('echo-gate-open');
+  await page.keyboard.up('KeyD');
   await page.evaluate(() => window.eidra!.teleport(123));
   await page.waitForTimeout(250);
   await page.keyboard.press('KeyE');
@@ -142,6 +147,9 @@ test('boss introduction, phase two, defeat and prelude conclusion', async ({ pag
   await expect.poll(async () => (await snapshot(page)).boss.state).not.toBe('dormant');
   await page.evaluate(() => window.eidra!.setBossHealth(150));
   await expect.poll(async () => (await snapshot(page)).boss.phase).toBe(2);
+  // The phase change is an armored roar before the second rotation begins.
+  await expect.poll(async () => (await snapshot(page)).boss.state).not.toBe('transition');
+  expect((await snapshot(page)).boss.health).toBe(150);
   await page.screenshot({ path: 'test-results/boss.png' });
   await page.evaluate(() => window.eidra!.setBossHealth(0));
   await expect.poll(async () => (await snapshot(page)).flags).toContain('boss-defeated');
@@ -186,7 +194,14 @@ test('crosses the memory bridge using jumps and dash without losing health', asy
     window.eidra!.unlock('remanence');
     window.eidra!.unlock('dash');
   });
-  await expect.poll(async () => (await snapshot(page)).player.grounded).toBe(true);
+  // The grounded flag can still describe the pre-teleport frame; wait until Eidra has
+  // actually settled on the bank, otherwise the buffered jump may expire mid-drop.
+  await expect
+    .poll(async () => {
+      const s = await snapshot(page);
+      return s.player.grounded && s.player.y < 1.05;
+    })
+    .toBe(true);
   await page.keyboard.press('KeyQ');
   for (const target of [91, 98, 105, 110]) {
     const origin = (await snapshot(page)).player.x;
@@ -210,4 +225,80 @@ test('crosses the memory bridge using jumps and dash without losing health', asy
   }
   expect((await snapshot(page)).player.health).toBe(100);
   expect((await snapshot(page)).remanence).toBe(true);
+});
+
+test('Recueillement: resonance earned by real strikes mends Eidra', async ({ page }) => {
+  await start(page);
+  await page.evaluate(() => window.eidra!.teleport(32.3));
+  // Three blows are needed to fell the first Veilleur, each one feeding resonance.
+  await expect
+    .poll(
+      async () => {
+        await page.keyboard.press('KeyJ', { delay: 40 });
+        return (await snapshot(page)).resonance;
+      },
+      { timeout: 30000, intervals: [120] },
+    )
+    .toBeGreaterThanOrEqual(33);
+  await page.evaluate(() => {
+    window.eidra!.teleport(12);
+    window.eidra!.damage(45);
+  });
+  await expect.poll(async () => (await snapshot(page)).player.grounded).toBe(true);
+  const wounded = (await snapshot(page)).player.health;
+  expect(wounded).toBeLessThan(100);
+  await page.keyboard.down('KeyF');
+  await expect
+    .poll(async () => (await snapshot(page)).player.health, { timeout: 20000 })
+    .toBeGreaterThan(wounded);
+  await page.keyboard.up('KeyF');
+  expect((await snapshot(page)).resonance).toBeLessThan(33);
+});
+
+test('anchor altar trades shards for vitality that survives a reload', async ({ page }) => {
+  await start(page);
+  await page.evaluate(() => {
+    window.eidra!.addShards(12);
+    window.eidra!.teleport(7);
+  });
+  await page.waitForTimeout(250);
+  await page.keyboard.press('KeyE');
+  await expect(page.getByText('AUTEL DE L’ANCRAGE')).toBeVisible();
+  await page.getByRole('button', { name: /Offrir 10 éclats/ }).click();
+  await expect.poll(async () => (await snapshot(page)).player.maxHealth).toBe(120);
+  expect((await snapshot(page)).shards).toBe(2);
+  await expect(page.getByRole('button', { name: /Offrir 20 éclats/ })).toBeDisabled();
+  await page.getByRole('button', { name: /Reprendre le voyage/ }).click();
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'PLAYING');
+  await page.evaluate(() => window.eidra!.save());
+  await page.reload();
+  await expect(page.locator('body')).toHaveAttribute('data-ready', 'true');
+  await page.getByRole('button', { name: 'Continuer', exact: true }).click();
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'PLAYING');
+  const s = await snapshot(page);
+  expect(s.healthUpgrades).toBe(1);
+  expect(s.player.maxHealth).toBe(120);
+});
+
+test('a downward strike bounces off a Veilleur', async ({ page }) => {
+  await start(page);
+  // Stay beyond detection range so the Veilleur is idle when Eidra drops onto it.
+  await page.evaluate(() => window.eidra!.teleport(20));
+  await expect
+    .poll(async () => (await snapshot(page)).enemies.find((e) => e.id === 'watcher-1')?.state)
+    .toMatch(/IDLE|PATROL/);
+  const watcher = (await snapshot(page)).enemies.find((e) => e.id === 'watcher-1')!;
+  await page.keyboard.down('KeyS');
+  await page.evaluate((x) => window.eidra!.teleport(x, 3.8), watcher.x);
+  // Strike once the controller reports the fall, as a player would after a jump.
+  await expect
+    .poll(async () => (await snapshot(page)).player.grounded, { intervals: [10] })
+    .toBe(false);
+  await page.keyboard.press('KeyJ');
+  await expect
+    .poll(async () => (await snapshot(page)).player.y, { intervals: [20], timeout: 8000 })
+    .toBeGreaterThan(4.2);
+  await page.keyboard.up('KeyS');
+  const after = (await snapshot(page)).enemies.find((e) => e.id === 'watcher-1')!;
+  expect(after.health).toBeLessThan(watcher.health);
 });

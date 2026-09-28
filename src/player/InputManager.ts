@@ -1,4 +1,4 @@
-import { InputAction, defaultBindings } from './InputAction';
+import { InputAction, defaultBindings, gamepadLabels, keyLabel } from './InputAction';
 export class InputManager {
   private keys = new Set<string>();
   private pendingCodes = new Set<string>();
@@ -8,6 +8,8 @@ export class InputManager {
   private abort = new AbortController();
   bindings = { ...defaultBindings };
   gamepadConnected = false;
+  /** The device that produced the latest input; prompts follow it. */
+  device: 'keyboard' | 'gamepad' = 'keyboard';
   private axis = 0;
   private menuAxis = 0;
   private previousMenuAxis = 0;
@@ -20,6 +22,7 @@ export class InputManager {
           return;
         if (!this.keys.has(event.code)) this.pendingCodes.add(event.code);
         this.keys.add(event.code);
+        this.device = 'keyboard';
         if (document.activeElement === canvas && Object.values(this.bindings).includes(event.code))
           event.preventDefault();
       },
@@ -48,7 +51,7 @@ export class InputManager {
     this.reset();
   }
   label(action: InputAction): string {
-    return this.bindings[action].replace('Key', '').replace('Left', '').replace('Arrow', '');
+    return this.device === 'gamepad' ? gamepadLabels[action] : keyLabel(this.bindings[action]);
   }
   poll(): void {
     this.previous = this.current;
@@ -61,6 +64,7 @@ export class InputManager {
     if (this.keys.has('ArrowLeft')) this.current.add(InputAction.Left);
     if (this.keys.has('ArrowRight')) this.current.add(InputAction.Right);
     if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) this.current.add(InputAction.Jump);
+    if (this.keys.has('ArrowDown')) this.current.add(InputAction.Down);
     const pad = navigator.getGamepads?.().find((candidate) => candidate?.connected);
     this.gamepadConnected = Boolean(pad);
     this.previousMenuAxis = this.menuAxis;
@@ -76,6 +80,7 @@ export class InputManager {
             : 0;
       const raw = pad.axes[0] ?? 0;
       this.axis = Math.abs(raw) > 0.2 ? raw : 0;
+      if (vertical > 0.6) this.current.add(InputAction.Down);
       const map: [number, InputAction][] = [
         [0, InputAction.Jump],
         [1, InputAction.Dash],
@@ -85,12 +90,16 @@ export class InputManager {
         [5, InputAction.Echo],
         [6, InputAction.Charge],
         [7, InputAction.Interact],
+        // Holding the interaction trigger channels Recueillement when nothing is nearby.
+        [7, InputAction.Heal],
         [8, InputAction.Map],
         [9, InputAction.Pause],
+        [13, InputAction.Down],
         [14, InputAction.Left],
         [15, InputAction.Right],
       ];
       for (const [index, action] of map) if (pad.buttons[index]?.pressed) this.current.add(action);
+      if (this.axis !== 0 || pad.buttons.some((button) => button?.pressed)) this.device = 'gamepad';
     }
     for (const action of this.current) if (!this.previous.has(action)) this.edges.add(action);
     for (const action of Object.values(InputAction))
@@ -100,6 +109,7 @@ export class InputManager {
       ['Mouse2', InputAction.Charge],
       ['KeyW', InputAction.Jump],
       ['ArrowUp', InputAction.Jump],
+      ['ArrowDown', InputAction.Down],
     ] as const)
       if (this.pendingCodes.has(code)) this.edges.add(action);
     this.pendingCodes.clear();

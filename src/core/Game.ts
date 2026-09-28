@@ -16,6 +16,7 @@ import type { SaveData } from '../save/SaveManager';
 import { defaultSettings } from '../config/settings';
 import type { Settings } from '../config/settings';
 import { DebugOverlay } from '../debug/DebugOverlay';
+import { abilityData } from '../../game-data/abilities/abilities';
 import type { AbilityId } from '../../game-data/abilities/abilities';
 import type { DebugAPI } from '../debug/types';
 export class Game {
@@ -50,6 +51,7 @@ export class Game {
       save: () => this.saveNow(),
       advance: () => this.advanceDialogue(),
       respawn: () => this.respawn(),
+      offer: () => this.offer(),
     });
   }
   async boot(): Promise<void> {
@@ -75,8 +77,54 @@ export class Game {
       ending: () => {
         this.endingPending = true;
       },
+      title: (kind, title, subtitle) => this.ui.title(kind, title, subtitle),
+      unlock: (id) => {
+        const action = {
+          dash: InputAction.Dash,
+          remanence: InputAction.Remanence,
+          'memory-step': InputAction.Echo,
+        }[id as string];
+        const data = abilityData[id];
+        this.ui.abilityBanner(data.name, data.description, action ? this.input.label(action) : '—');
+      },
+      altar: () => this.openAltar(),
     });
     this.hud = new Hud(this.presentation.scene);
+    const events = this.session.events;
+    events.on('ENEMY_DAMAGED', (e) => {
+      this.hud.number(
+        e.x,
+        e.y,
+        String(Math.round(e.amount)),
+        e.finisher ? '#ffd58e' : '#f1ecdc',
+        e.finisher,
+      );
+      this.hud.enemyDamaged(e.id);
+      this.presentation.enemyHit(e.id, e.finisher, e.x, e.y);
+    });
+    events.on('ENEMY_DEFEATED', (e) => this.presentation.enemyDefeated(e.x, e.y, e.shards));
+    events.on('PLAYER_DAMAGED', (e) =>
+      this.hud.number(
+        this.session.actor.x,
+        this.session.actor.y + 1.1,
+        `-${Math.round(e.amount)}`,
+        '#ff9a7a',
+      ),
+    );
+    events.on('PLAYER_HEALED', (e) => {
+      this.hud.number(
+        this.session.actor.x,
+        this.session.actor.y + 1.1,
+        `+${Math.round(e.amount)}`,
+        '#aef5d8',
+        true,
+      );
+      this.presentation.healed(this.session.actor.x, this.session.actor.y);
+    });
+    events.on('PARRIED', (e) => {
+      this.presentation.parried(e.x, e.y);
+      this.hud.number(e.x, e.y + 1.3, 'PARADE', '#ffd58e', true);
+    });
     try {
       this.settings = await this.save.loadSettings();
       this.saves = await this.save.list();
@@ -141,7 +189,7 @@ export class Game {
             this.session.update(1 / 60, this.input, this.settings);
             this.accumulator -= 1 / 60;
           }
-          this.ui.update(this.session, this.input.bindings);
+          this.ui.update(this.session, (action) => this.input.label(action));
         }
       } else {
         this.accumulator = 0;
@@ -160,7 +208,7 @@ export class Game {
         this.ui.navigate(this.input.menuDirection, this.input.consume(InputAction.Jump));
       const menu = this.state.state === 'MAIN_MENU' || this.state.state === 'BOOT';
       this.presentation.render(dt, this.session, this.settings, menu);
-      this.hud.update(this.session, ['PLAYING', 'PAUSED'].includes(this.state.state));
+      this.hud.update(this.session, ['PLAYING', 'PAUSED'].includes(this.state.state), dt);
       this.audio.listen(this.session.actor.x, this.session.actor.y);
       this.audio.update(dt, this.settings, this.session.bossActive, this.state.state !== 'PLAYING');
       this.debug?.recordCPU(performance.now() - cpuStart);
@@ -195,7 +243,7 @@ export class Game {
       });
       if (!data)
         this.ui.notice(
-          'A / D ou flèches : marcher · Espace : sauter · J ou clic : attaquer · E : interagir',
+          'A / D : marcher · Espace : sauter · J ou clic : attaquer · L : parer · F maintenu : se recueillir · E : interagir',
         );
     } catch (error) {
       this.state.change('MAIN_MENU');
@@ -252,13 +300,26 @@ export class Game {
     if (this.state.state === 'PLAYING') {
       this.state.change('CUTSCENE');
       this.input.reset();
-      this.ui.dialogue(this.session);
+      this.ui.dialogue(this.session, (action) => this.input.label(action));
     }
+  }
+  private openAltar(): void {
+    if (this.state.state !== 'PLAYING') return;
+    this.state.change('PAUSED');
+    this.input.reset();
+    this.ui.altar(this.session);
+  }
+  private offer(): void {
+    if (this.state.state !== 'PAUSED') return;
+    if (this.session.offer())
+      this.ui.notice(`Offrande acceptée. Vitalité portée à ${this.session.actor.maxHealth}.`);
+    this.ui.altar(this.session);
   }
   private advanceDialogue(): void {
     if (this.state.state !== 'CUTSCENE') return;
+    if (this.ui.finishLine()) return;
     if (this.session.narrative.advance()) {
-      this.ui.dialogue(this.session);
+      this.ui.dialogue(this.session, (action) => this.input.label(action));
       this.input.reset();
       return;
     }
@@ -301,6 +362,7 @@ export class Game {
     this.world?.setQuality(value.preset);
     this.canvas.style.filter = `brightness(${value.brightness}) contrast(${value.contrast})`;
     document.body.classList.toggle('reduced-motion', value.reducedMotion);
+    this.ui.setReducedMotion(value.reducedMotion);
     document.body.classList.toggle('chromatic', value.chromaticAberration);
     if (persist) void this.save.saveSettings(value).catch((error) => reportError(error));
   }
@@ -311,10 +373,15 @@ export class Game {
         player: {
           x: this.session.player.position.x,
           y: this.session.player.position.y,
+          vy: this.session.player.motion.vy,
           health: this.session.actor.health,
+          maxHealth: this.session.actor.maxHealth,
           grounded: this.session.player.motion.grounded,
           dashing: this.session.player.motion.dashTime > 0,
         },
+        resonance: this.session.focus.resonance,
+        shards: this.session.inventory.shards,
+        healthUpgrades: this.session.inventory.healthUpgrades,
         abilities: [...this.session.abilities.unlocked],
         energy: this.session.abilities.energy,
         remanence: this.session.abilities.remanence,
@@ -332,6 +399,8 @@ export class Game {
           health: this.session.enemies.boss.health,
           state: this.session.enemies.director.state,
           phase: this.session.enemies.director.phase,
+          pattern: this.session.enemies.director.pattern.id,
+          targets: [...this.session.enemies.director.targets],
         },
         settings: structuredClone(this.settings),
         memories: [...this.session.narrative.memories],
@@ -355,6 +424,10 @@ export class Game {
       damage: (amount: number) => {
         this.session.actor.invulnerable = 0;
         this.session.actor.health = Math.max(0, this.session.actor.health - Math.max(0, amount));
+      },
+      addShards: (amount: number) => {
+        if (!Number.isInteger(amount) || amount < 0) throw new Error('Invalid debug shard amount');
+        this.session.inventory.shards += amount;
       },
       setBossHealth: (value: number) => {
         this.session.enemies.boss.health = Math.max(
