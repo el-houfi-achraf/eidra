@@ -1,5 +1,5 @@
 {
-  "browser": "153.0.8010.0",
+  "browser": "141.0.7390.37",
   "renderer": "SwiftShader / WebGL2 (software)",
   "resolution": "1280 × 720",
   "samples": 120,
@@ -8,120 +8,120 @@
     {
       "preset": "MEDIUM",
       "cpuMs": {
-        "median": 1.8000000000465661,
-        "p95": 2.599999999976717
+        "median": 3.2999999998137355,
+        "p95": 7.100000000093132
       },
       "gpuMs": {
-        "median": 59.371913,
-        "p95": 79.093977
+        "median": 168.033573,
+        "p95": 218.7021
       },
       "frameMs": {
-        "median": 68.30000000004657,
-        "p95": 133.5
+        "median": 188,
+        "p95": 379.39999999990687
       },
       "drawCalls": {
-        "median": 46,
-        "p95": 46
+        "median": 54,
+        "p95": 54
       },
       "triangles": {
-        "median": 52108,
-        "p95": 52108
+        "median": 52484,
+        "p95": 52484
       }
     },
     {
       "preset": "LOW",
       "cpuMs": {
-        "median": 1.1999999999534339,
-        "p95": 1.5
+        "median": 2,
+        "p95": 5.100000000093132
       },
       "gpuMs": {
-        "median": 29.448074,
-        "p95": 37.321003
+        "median": 62.009218,
+        "p95": 84.653314
       },
       "frameMs": {
-        "median": 37.5,
-        "p95": 71.5
+        "median": 83.09999999962747,
+        "p95": 138.5
       },
       "drawCalls": {
-        "median": 22,
-        "p95": 22
+        "median": 23,
+        "p95": 23
       },
       "triangles": {
-        "median": 26054,
-        "p95": 26054
+        "median": 26234,
+        "p95": 26234
       }
     }
   ],
   "streaming": [
     {
       "x": 123,
-      "meshes": 149,
+      "meshes": 257,
       "bodies": 6,
       "chunks": 2
     },
     {
       "x": 7,
-      "meshes": 136,
+      "meshes": 242,
       "bodies": 5,
       "chunks": 1
     },
     {
       "x": 123,
-      "meshes": 149,
+      "meshes": 257,
       "bodies": 6,
       "chunks": 2
     },
     {
       "x": 7,
-      "meshes": 136,
+      "meshes": 242,
       "bodies": 5,
       "chunks": 1
     },
     {
       "x": 123,
-      "meshes": 149,
+      "meshes": 257,
       "bodies": 6,
       "chunks": 2
     },
     {
       "x": 7,
-      "meshes": 136,
+      "meshes": 242,
       "bodies": 5,
       "chunks": 1
     },
     {
       "x": 123,
-      "meshes": 149,
+      "meshes": 257,
       "bodies": 6,
       "chunks": 2
     },
     {
       "x": 7,
-      "meshes": 136,
+      "meshes": 242,
       "bodies": 5,
       "chunks": 1
     },
     {
       "x": 123,
-      "meshes": 149,
+      "meshes": 257,
       "bodies": 6,
       "chunks": 2
     },
     {
       "x": 7,
-      "meshes": 136,
+      "meshes": 242,
       "bodies": 5,
       "chunks": 1
     },
     {
       "x": 123,
-      "meshes": 149,
+      "meshes": 257,
       "bodies": 6,
       "chunks": 2
     },
     {
       "x": 7,
-      "meshes": 136,
+      "meshes": 242,
       "bodies": 5,
       "chunks": 1
     }

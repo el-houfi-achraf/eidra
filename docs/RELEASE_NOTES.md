@@ -1,3 +1,21 @@
+# Mise à jour « ressenti moderne » du prélude
+
+## Livré
+
+- **Combat** : hit-stop, tampon d'attaque, plongée avec rebond (pogo) qui recharge l'esquive, riposte ×2 dans la seconde qui suit une parade, parade sans délai après réussite.
+- **Soin** : Recueillement, alimenté par la résonance des coups portés et des parades, interrompu par les dégâts.
+- **Progression** : autel des ancrages, offrandes d'éclats pour +20 de vitalité (trois paliers), sans changement du format de sauvegarde v2.
+- **Boss** : introduction et transition de phase blindées, carte de titre, pluie d'éclats télégraphiée en phase 2, barre de vie avec « chip », repère de phase et annonce du pattern.
+- **Rendu** : caméra perspective à longue focale (parallaxe), ciel en dégradé, ligne d'horizon, silhouettes de premier plan, rayons de lumière, étalonnage ACES et vignette de danger, rim light des personnages.
+- **Animation / VFX** : squash & stretch, inclinaison en course, flash blanc, dissolution des ennemis, croissant de lame, traînée de dash, poussière d'atterrissage, ondes de choc, éclats attirés vers Eidra, canalisation visible.
+- **Interface** : HUD refondu (vie segmentée avec chip, résonance, éclats), chiffres de dégâts et de soin, barres de vie ennemies, cartes de titre de zones, bannière de pouvoir, dock circulaire avec temps de recharge, invites adaptées au dernier périphérique, dialogues tapés (le premier appui complète la ligne), écran d'autel.
+
+## Limites connues de cette mise à jour
+
+- Les valeurs (résonance, coûts d'offrande, durées de hit-stop, pluie d'éclats) sont des propositions de conception ; aucun playtest humain ne les a encore validées.
+- Pas de nouveaux sons : le soin et les offrandes réutilisent les sons d'ancrage existants.
+- Les mesures de performance restent logicielles (SwiftShader) ; voir PERFORMANCE.
+
 # EIDRA 0.1.0 — Prélude du laboratoire
 
 ## Livré

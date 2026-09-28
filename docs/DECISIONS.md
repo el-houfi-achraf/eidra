@@ -53,3 +53,23 @@ Une boucle de maintenance relie le contrepoids à la chambre d'éveil après ré
 ## D012 — Atterrissage après dash
 
 Le test navigateur de traversée réelle du pont a révélé une dérive de plusieurs mètres après la fin du dash. La vitesse horizontale revient au maximum de course à la sortie du dash, puis le contrôle aérien normal reprend. Un test de mouvement et une traversée clavier avec atterrissages couvrent cette régression. La patrouille du second Veilleur est bornée par les données de sa berge solide.
+
+## D013 — Caméra perspective à longue focale
+
+La caméra orthographique supprimait toute parallaxe : les couches à z = 7, 22 ou 44 défilaient à la vitesse du plan jouable. Une caméra perspective à 32 m, dont le champ vertical est calculé pour conserver la hauteur visible du plan z = 0 (7,2 / 8,7 / 10 m), garde le cadrage et les tailles de gameplay, et fait défiler arrière-plans et silhouettes de premier plan à leur propre vitesse. Le zoom boss est désormais amorti. Les silhouettes de premier plan restent dans les bandes haute et basse de l'écran pour ne pas masquer la zone jouable.
+
+## D014 — Étalonnage en un seul passage plein écran
+
+Tone mapping ACES, exposition, contraste et vignette utilisent `scene.imageProcessingConfiguration`. Appliqué dans les shaders des matériaux, il coûtait environ 66 ms de rendu logiciel en MEDIUM, car chaque fragment recouvert par les nombreux plans de décor payait l'étalonnage. Un `ImageProcessingPostProcess` unique le remplace : MEDIUM y ajoute FXAA à la place du MSAA, HIGH et ULTRA gardent un MSAA 4× sur la cible du passage, LOW reste sans étalonnage (chemin d'origine). La couche GUI est exclue du post-process (`applyPostProcess = false`). La vignette sert aussi de retour de danger en MEDIUM et au-delà (teinte rouge pulsée sous 30 % de vie, flash à l'impact). Le grain de film est écarté tant qu'une mesure GPU réelle ne le justifie pas.
+
+## D015 — Hit-stop dans le pas fixe
+
+Le hit-stop consomme des pas de simulation complets (50 ms coup simple, 85 ms finisher, 120 ms parade, 200 ms plafonné) sans figer le rendu. Les entrées pressées restent dans le tampon d'`InputManager` et un tampon d'attaque de 0,22 s rejoue une pression faite pendant la récupération : aucune entrée n'est perdue. Les résidus flottants sont arrondis pour qu'un arrêt de 50 ms gèle exactement trois pas à 60 Hz.
+
+## D016 — Progression sans nouvelle version de sauvegarde
+
+Les offrandes d'autel utilisent les champs existants `shards` et `healthUpgrades` du schéma v2 ; la résonance du Recueillement est transitoire et remise à zéro au respawn. Aucune migration n'est nécessaire et les sauvegardes 0.1.0 restent chargeables. Les nouvelles actions `down` et `heal` s'ajoutent aux bindings par défaut ; les remappages existants sont conservés par fusion.
+
+## D017 — RT partagé sur manette
+
+La manette standard n'a plus de bouton libre ergonomique. RT reste « interagir » à l'appui et devient « Recueillement » au maintien. Pour éviter un soin involontaire, le maintien est ignoré à la manette quand une interaction est disponible. Au clavier, F reste une touche dédiée. La plongée utilise le stick ou la croix vers le bas.

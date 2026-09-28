@@ -24,26 +24,30 @@ Ouvrir l'adresse indiquée par Vite, généralement http://127.0.0.1:4173. Ne pa
 
 ## Commandes
 
-| Action                         | Clavier / souris                       | Manette standard     |
-| ------------------------------ | -------------------------------------- | -------------------- |
-| Déplacement                    | A / D ou flèches                       | Stick gauche / croix |
-| Marcher                        | Ctrl maintenu                          | Stick partiel        |
-| Saut                           | Espace, W ou flèche haut               | A                    |
-| Attaque légère / aérienne      | J / clic gauche                        | X                    |
-| Charger une attaque            | K / clic droit maintenu, puis relâcher | LT                   |
-| Esquive, après acquisition     | Maj                                    | B                    |
-| Parade                         | L                                      | LB                   |
-| Rémanence, après acquisition   | Q                                      | Y                    |
-| Memory Step, après acquisition | R                                      | RB                   |
-| Dialogue / ancrage / passage   | E                                      | RT                   |
-| Carte et souvenirs             | Tab                                    | View                 |
-| Pause                          | Échap                                  | Start                |
+| Action                            | Clavier / souris                       | Manette standard      |
+| --------------------------------- | -------------------------------------- | --------------------- |
+| Déplacement                       | A / D ou flèches                       | Stick gauche / croix  |
+| Marcher                           | Ctrl maintenu                          | Stick partiel         |
+| Saut                              | Espace, W ou flèche haut               | A                     |
+| Attaque légère / aérienne         | J / clic gauche                        | X                     |
+| Plongée (rebond « pogo »)         | S ou flèche bas + attaque, en l’air    | Stick / croix bas + X |
+| Charger une attaque               | K / clic droit maintenu, puis relâcher | LT                    |
+| Esquive, après acquisition        | Maj                                    | B                     |
+| Parade, puis riposte ×2           | L, puis attaque dans la seconde        | LB, puis X            |
+| Recueillement (soin)              | F maintenu, immobile                   | RT maintenu           |
+| Rémanence, après acquisition      | Q                                      | Y                     |
+| Memory Step, après acquisition    | R                                      | RB                    |
+| Dialogue / ancrage / autel / pass | E                                      | RT                    |
+| Carte et souvenirs                | Tab                                    | View                  |
+| Pause                             | Échap                                  | Start                 |
 
-Touches remappables dans Réglages. Assistance facultative : dégâts reçus réduits. La manette permet également de parcourir les boutons des menus avec le stick vertical / la croix et A. Le réglage des sliders reste accessible au clavier / à la souris.
+Touches remappables dans Réglages. Les invites à l’écran suivent le dernier périphérique utilisé (clavier ou manette). Assistance facultative : dégâts reçus réduits. La manette permet également de parcourir les boutons des menus avec le stick vertical / la croix et A. Le réglage des sliders reste accessible au clavier / à la souris.
 
 ## Contenu jouable
 
-Cinq secteurs du laboratoire ; mouvement avec coyote time et jump buffer ; capsule Havok ; dash ; attaques légère, chargée, aérienne et pendant le dash ; combo ; parade ; trois archétypes ennemis ; mini-boss ; Gardien Sans Visage avec trois patterns et deux phases ; Rémanence ; Écho de cinq secondes ; contrepoids ; raccourci de maintenance ; deux souvenirs ; Mira ; transmission de Sael ; ancrages ; trois sauvegardes ; carte ; mort et respawn ; musique et sons originaux temporaires ; quatre presets.
+Cinq secteurs du laboratoire ; mouvement avec coyote time et jump buffer ; capsule Havok ; dash ; attaques légère, chargée, aérienne, plongeante (pogo) et pendant le dash, avec tampon d’entrée ; combo ; parade et riposte ; hit-stop ; Recueillement (soin alimenté par la résonance des coups portés) ; trois archétypes ennemis ; mini-boss ; Gardien Sans Visage avec quatre patterns, deux phases et une transition ; Rémanence ; Écho de cinq secondes ; contrepoids ; raccourci de maintenance ; deux souvenirs ; Mira ; transmission de Sael ; ancrages et autel d’offrandes (éclats → vitalité) ; trois sauvegardes ; carte ; mort et respawn ; musique et sons originaux temporaires ; quatre presets.
+
+Présentation : caméra perspective à longue focale (parallaxe réelle des décors et silhouettes de premier plan), étalonnage ACES et vignette dans les shaders, rayons de lumière, ciel en dégradé, rim light des personnages, squash & stretch, traînée de dash, poussière d’atterrissage, flash blanc à l’impact, dissolution des ennemis, éclats attirés vers Eidra, chiffres de dégâts, barres de vie ennemies, barres « chip », cartes de titre (zones, boss, victoires), bannière de pouvoir, dialogues tapés, invites adaptées au périphérique.
 
 Les sept fragments et trois fins sont définis et leurs conditions sont testées dans le domaine narratif. Ils **ne constituent pas encore une campagne jouable**. Les autres pouvoirs, régions et boss restent dans la roadmap. La durée de 15–20 minutes est une cible de conception, non une durée certifiée par playtest.
 

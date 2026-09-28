@@ -24,6 +24,20 @@ Node 24. Les E2E démarrent le build de production avec Vite preview ; pas de HM
 
 Les fixtures debug positionnent le joueur au début de certaines épreuves et règlent la vie du boss pour vérifier ses transitions. Elles ne prouvent ni un parcours complet sans debug ni l’équilibrage du boss. Déplacement, attaques, capacités, ancrage et traversée du pont passent par les vraies entrées clavier. La Gamepad API est simulée ; ce n’est pas un test de manette physique.
 
+## Mise à jour « ressenti moderne »
+
+42 tests unitaires / intégration dans 11 fichiers. Ajouts : hit-stop (pas gelés, plafond, résidus flottants), tampon d'attaque, riposte après parade, hitbox de plongée, rebond pogo à hauteur fixe, Recueillement (gain, canalisation, interruptions, pas de soin excédentaire), offrandes d'autel (coûts croissants, plafond), Gardien (blindage d'introduction et de transition, pluie d'éclats réservée à la phase 2, projectiles sur les marques), direction « bas » et invites selon le dernier périphérique.
+
+12 parcours E2E. Ajouts : Recueillement alimenté par de vrais coups clavier puis soin en maintenant F ; autel, offrande d'éclats et vitalité conservée après rechargement ; plongée qui rebondit sur un Veilleur et le blesse. Le parcours du boss vérifie la fin de la transition blindée sans perte de vie du Gardien ; l'aide `skipDialogue` tolère les lignes tapées (un premier appui complète la ligne).
+
+Sur un rendu logiciel lent, le pas de simulation est plafonné à 0,1 s par image : une durée réelle fixe couvre alors moins de temps de jeu. Dans le conteneur de cette mise à jour (environ 4 à 7 FPS), le code 0.1.0 non modifié échouait déjà à deux parcours : la porte du contrepoids (touche maintenue 2,4 s) et la traversée du pont. Le parcours de déplacement initial (touche maintenue 600 ms) échouait aussi une fois avec la mise à jour. Corrections, sans retirer d'assertion et avec les vraies entrées clavier :
+
+- les deux parcours à durée fixe maintiennent la touche jusqu'à la condition attendue ;
+- la traversée du pont attend qu'Eidra soit réellement posée après la téléportation de départ. L'indicateur « au sol » pouvait encore décrire l'image précédant la téléportation : le saut, pressé pendant la chute de 20 cm, expirait parfois dans le tampon et Eidra marchait dans le vide ;
+- la plongée attend que le contrôleur signale la chute avant de frapper, pour la même raison.
+
+Après correction : suite complète réussie, traversée du pont 5 / 5 et plongée 5 / 5 en répétition.
+
 ## Qualité restant à qualifier
 
 WebGPU réel, Firefox / Safari, manettes physiques, accessibilité avec lecteurs d’écran, quotas / stockage privé, CSP sur Cloudflare et campagne complète. Le protocole de performance logiciel est décrit dans PERFORMANCE ; il ne certifie pas 60 FPS. Aucun test défaillant n’est désactivé pour rendre la CI verte.
