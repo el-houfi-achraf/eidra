@@ -25,7 +25,8 @@ export class World {
     ] as const) {
       const mesh = MeshBuilder.CreateBox(
         `${id}-gate`,
-        { width: 0.4, height: 8, depth: 4.5 },
+        // Thin in depth: the perspective camera would otherwise show a glowing slab side.
+        { width: 0.4, height: 8, depth: 1.4 },
         scene,
       );
       mesh.position.set(x, 4, 0);
