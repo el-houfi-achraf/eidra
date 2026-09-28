@@ -6,6 +6,11 @@ export interface GameEvents {
   CHECKPOINT_ACTIVATED: { id: string };
   MEMORY_DISCOVERED: { id: string };
   QUEST_UPDATED: { id: string };
+  ENEMY_DAMAGED: { id: string; amount: number; x: number; y: number; finisher: boolean };
+  ENEMY_DEFEATED: { id: string; x: number; y: number; shards: number };
+  PLAYER_HEALED: { amount: number; health: number };
+  PARRIED: { x: number; y: number };
+  OFFERING_MADE: { upgrades: number; maxHealth: number };
 }
 export class EventBus<Events extends object = GameEvents> {
   private listeners = new Map<keyof Events, Set<(payload: never) => void>>();

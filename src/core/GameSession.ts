@@ -1,8 +1,9 @@
 import type { Scene } from '@babylonjs/core/scene';
 import { PlayerController } from '../physics/PlayerController';
 import { CombatSystem, makeCombatant, HurtboxSystem } from '../combat/CombatSystem';
-import type { Hitbox, Combatant } from '../combat/CombatSystem';
+import type { Hitbox, Combatant, AttackKind } from '../combat/CombatSystem';
 import { AbilitySystem } from '../abilities/AbilitySystem';
+import { FocusSystem } from '../abilities/FocusSystem';
 import { EnemyManager } from '../enemies/EnemyManager';
 import { NarrativeManager } from '../narrative/NarrativeManager';
 import { QuestManager } from '../quests/QuestManager';
@@ -14,24 +15,32 @@ import type { World } from '../world/World';
 import type { Settings } from '../config/settings';
 import type { SaveData } from '../save/SaveManager';
 import { checkpoints, landmarks, chunks, shortcuts } from '../../game-data/zones/laboratory';
-import { abilityData } from '../../game-data/abilities/abilities';
+import { focusData } from '../../game-data/abilities/abilities';
 import type { AbilityId } from '../../game-data/abilities/abilities';
 import type { DialogueId } from '../../game-data/dialogue/story';
+import { guardianData } from '../../game-data/bosses/guardian';
+export type BurstKind = 'gold' | 'damage' | 'memory' | 'dust' | 'heal';
+export type TitleKind = 'area' | 'boss' | 'victory';
 export interface SessionEffects {
   notice: (text: string) => void;
-  burst: (x: number, y: number, kind: 'gold' | 'damage' | 'memory') => void;
+  burst: (x: number, y: number, kind: BurstKind) => void;
   sound: (id: string, x?: number, y?: number) => void;
   shake: (value: number) => void;
   save: () => void;
   dialogue: () => void;
   death: () => void;
   ending: () => void;
+  /** Large cinematic card: a newly entered area, a boss introduction or a victory. */
+  title: (kind: TitleKind, title: string, subtitle: string) => void;
+  unlock: (id: AbilityId) => void;
+  altar: () => void;
 }
 export class GameSession {
   readonly player: PlayerController;
   readonly actor = makeCombatant('eidra', 100, 4, 1, 0.35, 1.7);
   readonly combat = new CombatSystem();
   readonly abilities = new AbilitySystem();
+  readonly focus = new FocusSystem();
   readonly enemies = new EnemyManager();
   readonly narrative = new NarrativeManager();
   readonly quests = new QuestManager();
@@ -50,6 +59,7 @@ export class GameSession {
   private hintTime = 0;
   private footstepTime = 0;
   private keeperDefeated = false;
+  private bossIntroduced = false;
   constructor(
     scene: Scene,
     readonly world: World,
@@ -126,7 +136,9 @@ export class GameSession {
     this.chargeTime = 0;
     this.wasCharging = false;
     this.narrative.active = null;
-    this.actor.maxHealth = 100 + this.inventory.healthUpgrades * 20;
+    this.actor.maxHealth = this.inventory.maxHealth;
+    this.focus.reset();
+    this.bossIntroduced = false;
     this.actor.health = this.actor.maxHealth;
     this.actor.invulnerable = 1;
     this.actor.stagger = 0;
@@ -137,6 +149,9 @@ export class GameSession {
     this.actor.y = 1.2;
   }
   update(dt: number, input: InputManager, settings: Settings): void {
+    // Hit-stop: the world holds its breath for a few frames when a blow lands.
+    // Pressed inputs stay buffered and are consumed on the next live step.
+    if (this.combat.hitStop.freeze(dt)) return;
     this.playtime += dt;
     this.hintTime = Math.max(0, this.hintTime - dt);
     this.echoHitTime = Math.max(0, this.echoHitTime - dt);
@@ -144,10 +159,11 @@ export class GameSession {
     this.combat.update(dt, [this.actor, ...this.enemies.actors]);
     const jump = input.consume(InputAction.Jump),
       dash = input.consume(InputAction.Dash);
+    if (jump || dash) this.focus.interrupt();
     p.update(
       dt,
       {
-        axis: this.actor.stagger > 0 ? 0 : input.movement,
+        axis: this.actor.stagger > 0 || this.focus.channeling ? 0 : input.movement,
         jump,
         jumpHeld: input.held(InputAction.Jump),
         dash: dash && this.actor.stagger <= 0,
@@ -172,8 +188,18 @@ export class GameSession {
     this.combat.dodge.apply(this.actor, p.motion.dashTime > 0.025);
     if (input.consume(InputAction.Parry) && this.actor.stagger <= 0 && this.combat.parry.start())
       this.fx.sound('parry');
-    if (input.consume(InputAction.Attack) && this.actor.stagger <= 0)
-      this.attack(p.motion.dashTime > 0 ? 'dash' : p.motion.grounded ? 'light' : 'aerial');
+    // A press during recovery is remembered briefly, so combos chain without dropped inputs.
+    if (input.consume(InputAction.Attack)) this.combat.attackBuffer.press();
+    if (this.combat.attackBuffer.take(this.actor.stagger <= 0 && this.combat.cooldown === 0))
+      this.attack(
+        p.motion.dashTime > 0
+          ? 'dash'
+          : p.motion.grounded
+            ? 'light'
+            : input.held(InputAction.Down)
+              ? 'down'
+              : 'aerial',
+      );
     const chargePressed = input.consume(InputAction.Charge);
     const charging = input.held(InputAction.Charge) || chargePressed;
     if (charging) this.chargeTime = Math.min(1.2, this.chargeTime + dt);
@@ -208,41 +234,95 @@ export class GameSession {
       this.fx.notice('Le contrepoids se souvient. Le passage reste ouvert.');
       this.fx.save();
     }
+    // Recueillement: grounded, idle and away from a shared-button interaction.
+    const healed = this.focus.update(
+      dt,
+      input.held(InputAction.Heal) && !(input.device === 'gamepad' && this.interaction),
+      p.motion.grounded &&
+        !this.combat.attacking &&
+        p.motion.dashTime === 0 &&
+        this.actor.stagger <= 0 &&
+        this.chargeTime === 0,
+      this.actor,
+    );
+    if (healed > 0) {
+      this.events.emit('PLAYER_HEALED', { amount: healed, health: this.actor.health });
+      this.fx.burst(this.actor.x, this.actor.y, 'heal');
+      this.fx.sound('save');
+    }
     this.world.update(this.actor.x, this.abilities.remanence, this.echoOpen, this.bossActive);
     this.enemies.sync([...this.world.stream.loaded.values()].map((c) => c.data));
     this.enemies.update(dt, this.actor, (hit, source) => this.takeHit(hit, source, settings));
     if (this.combat.active) {
       const hit = this.combat.strike(this.actor, p.motion.facing);
+      let bounced = false;
       for (const enemy of this.enemies.actors) {
-        if (enemy.id === 'faceless-guardian' && !this.bossActive) continue;
-        if (this.combat.hitboxes.test(hit, enemy)) this.hurtEnemy(enemy, hit);
+        if (enemy.health <= 0) continue;
+        const boss = enemy.id === 'faceless-guardian';
+        if (boss && !this.bossActive) continue;
+        if (!this.combat.hitboxes.test(hit, enemy)) continue;
+        if (!boss || !this.enemies.director.armored) this.hurtEnemy(enemy, hit, true);
+        // Pogo: a downward strike that connects springs Eidra back into the air.
+        if (this.combat.attackKind === 'down' && !bounced) {
+          bounced = true;
+          p.motion.bounce();
+          this.fx.sound('jump');
+        }
       }
     }
     if (echo?.attacking && this.echoHitTime === 0) {
       this.echoHitTime = 0.3;
       const hit = { ...this.combat.strike({ ...this.actor, ...echo }, echo.facing), damage: 6 };
       for (const enemy of this.enemies.actors)
-        if (new HurtboxSystem().overlaps(hit, enemy)) this.hurtEnemy(enemy, hit);
+        if (
+          new HurtboxSystem().overlaps(hit, enemy) &&
+          (enemy.id !== 'faceless-guardian' || (this.bossActive && !this.enemies.director.armored))
+        )
+          this.hurtEnemy(enemy, hit, false);
     }
     for (const entity of this.enemies.entities.values())
       if (entity.actor.health <= 0 && !entity.rewarded) {
         entity.rewarded = true;
         this.inventory.shards += entity.data.drops;
+        this.combat.hitStop.trigger(0.09);
         this.fx.burst(entity.actor.x, entity.actor.y, 'gold');
+        this.events.emit('ENEMY_DEFEATED', {
+          id: entity.actor.id,
+          x: entity.actor.x,
+          y: entity.actor.y,
+          shards: entity.data.drops,
+        });
         if (entity.kind === 'keeper') {
           this.keeperDefeated = true;
-          this.fx.notice('Le dernier ordre s’éteint.');
+          this.fx.title('victory', 'LE DERNIER ORDRE S’ÉTEINT', 'Porteur du dernier ordre vaincu');
           this.fx.save();
         }
       }
+    if (this.enemies.director.state === 'intro' && !this.bossIntroduced) {
+      this.bossIntroduced = true;
+      this.fx.title('boss', guardianData.name, guardianData.subtitle);
+      this.fx.shake(0.5);
+    }
+    if (this.enemies.director.state === 'transition' && this.enemies.director.timer === 0) {
+      this.fx.shake(0.9);
+      this.fx.sound('heavy', this.enemies.boss.x, this.enemies.boss.y);
+      this.fx.burst(this.enemies.boss.x, 3, 'damage');
+    }
     if (this.enemies.boss.health <= 0 && !this.enemies.bossRewarded) {
       this.enemies.bossRewarded = true;
       this.enemies.bossDefeated = true;
       this.narrative.flags.add('boss-defeated');
       this.events.emit('BOSS_DEFEATED', { id: 'faceless-guardian' });
+      this.events.emit('ENEMY_DEFEATED', {
+        id: this.enemies.boss.id,
+        x: this.enemies.boss.x,
+        y: 2,
+        shards: 20,
+      });
       this.inventory.shards += 20;
+      this.combat.hitStop.trigger(0.2);
       this.fx.burst(this.enemies.boss.x, 2, 'gold');
-      this.fx.notice('L’ORDRE EST ROMPU');
+      this.fx.title('victory', 'L’ORDRE EST ROMPU', 'Gardien Sans Visage vaincu');
       this.fx.sound('victory');
       this.fx.save();
     }
@@ -276,25 +356,43 @@ export class GameSession {
       this.fx.death();
     }
   }
-  private attack(kind: 'light' | 'charged' | 'aerial' | 'dash'): void {
-    if (this.combat.begin(kind)) this.fx.sound(kind === 'charged' ? 'heavy' : 'attack');
+  private attack(kind: AttackKind): void {
+    this.focus.interrupt();
+    if (this.combat.begin(kind))
+      this.fx.sound(kind === 'charged' || this.combat.empowered ? 'heavy' : 'attack');
   }
-  private hurtEnemy(enemy: Combatant, hit: Hitbox): void {
+  private hurtEnemy(enemy: Combatant, hit: Hitbox, byPlayer: boolean): void {
     const dealt = this.combat.damage.apply(
       enemy,
       enemy.id === 'faceless-guardian' ? { ...hit, stagger: 0 } : hit,
     );
     if (dealt > 0) {
+      const finisher = byPlayer && this.combat.finisher;
+      this.events.emit('ENEMY_DAMAGED', {
+        id: enemy.id,
+        amount: dealt,
+        x: enemy.x,
+        y: enemy.y + enemy.height / 2,
+        finisher,
+      });
+      if (byPlayer) {
+        this.focus.gain(focusData.gainPerHit);
+        this.combat.hitStop.trigger(finisher ? 0.085 : 0.05);
+      }
       this.fx.burst(enemy.x, enemy.y, 'damage');
       this.fx.sound('hit', enemy.x, enemy.y);
-      this.fx.shake(0.22);
+      this.fx.shake(finisher ? 0.4 : 0.22);
     }
   }
   private takeHit(hit: Hitbox, source: Combatant, settings: Settings, fall = false): void {
     if (!fall && !new HurtboxSystem().overlaps(hit, this.actor)) return;
     if (!fall && this.combat.parry.tryParry(source)) {
+      this.focus.gain(focusData.gainOnParry);
+      this.combat.hitStop.trigger(0.12);
+      this.events.emit('PARRIED', { x: this.actor.x, y: this.actor.y });
       this.fx.burst(this.actor.x, this.actor.y, 'gold');
       this.fx.sound('parry');
+      this.fx.shake(0.35);
       return;
     }
     if (fall) this.actor.invulnerable = 0;
@@ -304,6 +402,8 @@ export class GameSession {
       0.8,
     );
     if (dealt > 0) {
+      this.focus.interrupt();
+      this.combat.hitStop.trigger(0.07);
       this.fx.burst(this.actor.x, this.actor.y, 'damage');
       this.fx.shake(0.6);
       this.fx.sound('hurt');
@@ -315,16 +415,24 @@ export class GameSession {
       y = this.actor.y;
     const zone = chunks.find((c) => x >= c.start && x < c.end);
     if (zone) {
+      const first = !this.discovered.has(zone.id);
       this.discovered.add(zone.id);
       if (zone.id !== this.zone) {
         this.zone = zone.id;
-        this.fx.notice(zone.name);
+        this.fx.title(
+          'area',
+          zone.name,
+          first ? 'Nouvelle zone découverte' : 'Laboratoire de l’éveil',
+        );
       }
     }
     this.interaction = '';
     for (const point of checkpoints)
       if (Math.abs(x - point.x) < 2 && y < 2.5) {
-        this.interaction = `${input.label(InputAction.Interact)} · S’ancrer — restaurer et sauvegarder`;
+        const current = point.id === this.checkpoint;
+        this.interaction = current
+          ? `${input.label(InputAction.Interact)} · Autel de l’ancrage — repos et offrandes`
+          : `${input.label(InputAction.Interact)} · S’ancrer — restaurer et sauvegarder`;
         if (input.consume(InputAction.Interact)) {
           this.checkpoint = point.id;
           this.actor.health = this.actor.maxHealth;
@@ -333,6 +441,7 @@ export class GameSession {
           this.fx.burst(x, y, 'memory');
           this.fx.sound('save');
           this.fx.save();
+          if (current) this.fx.altar();
         }
       }
     for (const marker of landmarks) {
@@ -346,7 +455,7 @@ export class GameSession {
         this.abilities.unlock(id);
         this.inventory.collect(marker.id, 0);
         this.events.emit('ABILITY_UNLOCKED', { id });
-        this.fx.notice(`${abilityData[id].name.toUpperCase()} — ${abilityData[id].description}`);
+        this.fx.unlock(id);
         this.fx.burst(x, y, 'memory');
         this.fx.sound('memory');
         this.fx.save();
@@ -397,6 +506,20 @@ export class GameSession {
     }
     for (const id of this.quests.update(this.narrative.flags))
       this.events.emit('QUEST_UPDATED', { id });
+  }
+  /** Anchor offering: spends shards for a permanent vitality upgrade. */
+  offer(): boolean {
+    if (!this.inventory.offer()) return false;
+    this.actor.maxHealth = this.inventory.maxHealth;
+    this.actor.health = this.actor.maxHealth;
+    this.events.emit('OFFERING_MADE', {
+      upgrades: this.inventory.healthUpgrades,
+      maxHealth: this.actor.maxHealth,
+    });
+    this.fx.burst(this.actor.x, this.actor.y, 'heal');
+    this.fx.sound('save');
+    this.fx.save();
+    return true;
   }
   dialogue(id: DialogueId): void {
     this.narrative.start(id);
