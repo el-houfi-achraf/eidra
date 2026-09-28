@@ -1,5 +1,4 @@
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
-import { FresnelParameters } from '@babylonjs/core/Materials/fresnelParameters';
 import { Constants } from '@babylonjs/core/Engines/constants';
 import { Color3 } from '@babylonjs/core/Maths/math.color';
 import type { Scene } from '@babylonjs/core/scene';
@@ -19,11 +18,13 @@ export class Palette {
   readonly silhouette: StandardMaterial;
   /** Additive light shafts falling from the broken windows. */
   readonly shaft: StandardMaterial;
-  /** Character materials with a fresnel rim so silhouettes read against the stone. */
-  readonly heroInk: StandardMaterial;
-  readonly foeDark: StandardMaterial;
   /** Solid white used for hit flashes. */
   readonly flash: StandardMaterial;
+  /** Unlit vertex-coloured materials for the toon-shaded puppets. */
+  readonly puppet: StandardMaterial;
+  readonly puppetDouble: StandardMaterial;
+  readonly ghost: StandardMaterial;
+  readonly ghostDouble: StandardMaterial;
   constructor(scene: Scene) {
     const make = (id: string, color: string, emission = 0, alpha = 1): StandardMaterial => {
       const m = new StandardMaterial(id, scene);
@@ -32,15 +33,6 @@ export class Palette {
       m.specularColor = new Color3(0.08, 0.12, 0.12);
       m.alpha = alpha;
       return m;
-    };
-    const rim = (material: StandardMaterial, color: string, power: number): StandardMaterial => {
-      material.emissiveFresnelParameters = new FresnelParameters({
-        leftColor: Color3.FromHexString(color),
-        rightColor: material.emissiveColor.clone(),
-        power,
-        bias: 0.05,
-      });
-      return material;
     };
     this.stone = make('basalt', '#28403f');
     this.trim = make('aged-bronze', '#8c8164');
@@ -54,10 +46,31 @@ export class Palette {
     this.ink = make('cloak', '#132f34');
     this.silhouette = make('foreground-silhouette', '#040b0c');
     this.silhouette.specularColor = Color3.Black();
-    this.heroInk = rim(make('cloak-rim', '#163a40'), '#7fe8cf', 2.2);
-    this.foeDark = rim(make('foe-rim', '#0f2224'), '#d9824a', 2.6);
     this.flash = make('hit-flash', '#ffffff', 1);
     this.flash.disableLighting = true;
+    // Colours and toon tones are baked into the vertices; lighting would only muddy them.
+    // Unlit standard materials output (emissive + ambient) x vertex colour. A white scene
+    // ambient only reaches materials whose own ambient is white (the puppets): every other
+    // material keeps the default black ambient, and the glow layer, which reads emissive,
+    // does not light the puppets up.
+    scene.ambientColor = Color3.White();
+    const puppet = (id: string, alpha: number, doubleSided: boolean): StandardMaterial => {
+      const m = new StandardMaterial(id, scene);
+      m.diffuseColor = Color3.White();
+      m.ambientColor = Color3.White();
+      m.specularColor = Color3.Black();
+      m.disableLighting = true;
+      m.backFaceCulling = !doubleSided;
+      // Characters stay crisp in front of the atmospheric fog, like inked figures on a painted set.
+      m.fogEnabled = false;
+      m.alpha = alpha;
+      if (alpha < 1) m.emissiveColor = new Color3(0.08, 0.2, 0.17);
+      return m;
+    };
+    this.puppet = puppet('puppet', 1, false);
+    this.puppetDouble = puppet('puppet-ribbon', 1, true);
+    this.ghost = puppet('memory-puppet', 0.5, false);
+    this.ghostDouble = puppet('memory-ribbon', 0.45, true);
     this.shaft = new StandardMaterial('light-shaft', scene);
     // Brightest where the light enters (top, v = 1), fading downwards and at both edges.
     this.shaft.emissiveTexture = proceduralTexture(scene, 32, 64, (u, v) => {

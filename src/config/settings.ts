@@ -13,6 +13,8 @@ export const SettingsSchema = z.object({
   subtitles: z.boolean().default(true),
   memoryToggle: z.boolean().default(true),
   assist: z.boolean().default(false),
+  /** Contextual control prompts (tutorial). */
+  hints: z.boolean().default(true),
   bindings: z.record(z.string(), z.string()).default({}),
 });
 export type Settings = z.infer<typeof SettingsSchema>;

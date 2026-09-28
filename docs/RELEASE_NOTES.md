@@ -10,6 +10,12 @@
 - **Animation / VFX** : squash & stretch, inclinaison en course, flash blanc, dissolution des ennemis, croissant de lame, traînée de dash, poussière d'atterrissage, ondes de choc, éclats attirés vers Eidra, canalisation visible.
 - **Interface** : HUD refondu (vie segmentée avec chip, résonance, éclats), chiffres de dégâts et de soin, barres de vie ennemies, cartes de titre de zones, bannière de pouvoir, dock circulaire avec temps de recharge, invites adaptées au dernier périphérique, dialogues tapés (le premier appui complète la ligne), écran d'autel.
 
+### Deuxième itération : personnages, UI et UX
+
+- **Personnages** redessinés et pilotés par les données : marionnettes toon à contours encrés, capuches, capes plissées, masques expressifs aux yeux lumineux qui clignent, écharpe et voiles animés, jambes animées. Chaque ennemi a une silhouette distincte (hallebarde, urne, bannière, voiles, masque sans visage).
+- **HUD** : emblème-réceptacle en forme de masque qui se remplit de résonance et s'illumine quand un soin est disponible.
+- **UX** : tutoriel contextuel mémorisé dans la sauvegarde, réglages par onglets (valeurs affichées, interrupteurs, réinitialisation, capture de touche guidée), notifications empilées, cartes de sauvegarde détaillées, pause avec objectif et commandes, carte en itinéraire, conseils.
+
 ## Limites connues de cette mise à jour
 
 - Les valeurs (résonance, coûts d'offrande, durées de hit-stop, pluie d'éclats) sont des propositions de conception ; aucun playtest humain ne les a encore validées.

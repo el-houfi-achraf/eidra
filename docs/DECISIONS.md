@@ -73,3 +73,11 @@ Les offrandes d'autel utilisent les champs existants `shards` et `healthUpgrades
 ## D017 — RT partagé sur manette
 
 La manette standard n'a plus de bouton libre ergonomique. RT reste « interagir » à l'appui et devient « Recueillement » au maintien. Pour éviter un soin involontaire, le maintien est ignoré à la manette quand une interaction est disponible. Au clavier, F reste une touche dédiée. La plongée utilise le stick ou la croix vers le bas.
+
+## D018 — Personnages toon procéduraux pilotés par les données
+
+Chaque personnage est décrit dans `game-data/characters/appearance.ts` (cape plissée à pointes, capuche, masque, style des yeux, col, écharpe, clous, jambes, arme, accessoire, couleurs), validé par Zod et assemblé par `CharacterView`. `PuppetGeometry` produit des triangles à couleur plate et y précalcule un ombrage cartoon à trois tons ; les normales sont soudées par position pour que le rendu de contours Babylon (`renderOutline`) trace un trait d'encre continu. Les matériaux « puppet » sont non éclairés : Babylon y sort (émissif + ambiant) × couleur de sommet, donc seuls ces matériaux reçoivent un ambiant blanc (la scène a un ambiant blanc, tous les autres matériaux gardent leur ambiant noir par défaut et le glow, qui lit l'émissif, ne les illumine pas). Les personnages ignorent le brouillard pour rester lisibles devant le décor. L'écharpe et les voiles sont des chaînes de Verlet (`SecondaryChain`) purement visuelles, bornées en vitesse et réinitialisées après une téléportation. Les designs sont originaux : inspirés par le style des action-plateformes à silhouettes encapuchonnées, sans reprise d'un personnage existant.
+
+## D019 — Tutoriel contextuel dans les drapeaux existants
+
+Les invites de `game-data/quests/tutorial.ts` apparaissent dans une bande du laboratoire, après les pouvoirs requis, et se retirent dès que le joueur accomplit l'action n'importe où. L'apprentissage est enregistré comme drapeau `tutorial:<id>` dans les flags déjà sauvegardés : aucune migration. Le réglage « Aides contextuelles » (par défaut activé) masque les invites sans affecter le domaine.

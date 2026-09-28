@@ -31,7 +31,20 @@ Coût mesuré de chaque ajout en MEDIUM (rendu logiciel médian, désactivation 
 
 Douze allers-retours x = 123 / 7 : 257 / 242 meshes, 6 / 5 ressources physiques, 2 / 1 chunks, stables à chaque passage. La hausse du nombre de meshes vient des pools VFX préalloués (étincelles, ondes, éclats, traînée, marqueurs de pluie), désactivés hors usage et sans draw call. Le bundle principal passe à 1,82 Mo minifié / 440 ko gzip.
 
-Mesures brutes : [performance.json](evidence/performance.json) (mesures « après »).
+### Deuxième itération : personnages toon, HUD et interface
+
+Même machine et même protocole, comparés à la colonne « après » ci-dessus.
+
+| Mesure (médiane / p95)     | MEDIUM itération 1 | MEDIUM itération 2 | LOW itération 1 | LOW itération 2 |
+| -------------------------- | ------------------ | ------------------ | --------------- | --------------- |
+| CPU                        | 3,3 / 7,1 ms       | 4,2 / 7,4 ms       | 2,0 / 5,1 ms    | 2,3 / 6,3 ms    |
+| Rendu logiciel             | 168,0 / 218,7 ms   | 171,0 / 212,4 ms   | 62,0 / 84,7 ms  | 58,0 / 81,7 ms  |
+| Draw calls                 | 54                 | 62                 | 23              | 29              |
+| Triangles, passes incluses | 52 484             | 54 608             | 26 234          | 28 440          |
+
+Les nouveaux personnages ajoutent environ 1 ms de CPU (animation des jambes, de la lame et des chaînes d'écharpe, mise à jour des rubans) et quelques draw calls par personnage visible (contour encré du corps et de l'arme, yeux lumineux, jambes, ruban). Le rendu logiciel varie dans le bruit de mesure. Douze allers-retours x = 123 / 7 : 255 / 241 meshes, 6 / 5 ressources physiques, 2 / 1 chunks, stables. Bundle principal : 1,87 Mo minifié / 456 ko gzip.
+
+Mesures brutes : [performance.json](evidence/performance.json) (dernière itération).
 
 ## Optimisation et stabilité
 

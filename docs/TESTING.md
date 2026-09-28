@@ -38,6 +38,12 @@ Sur un rendu logiciel lent, le pas de simulation est plafonné à 0,1 s par imag
 
 Après correction : suite complète réussie, traversée du pont 5 / 5 et plongée 5 / 5 en répétition.
 
+## Deuxième itération : personnages, UI, UX
+
+51 tests unitaires / intégration dans 13 fichiers. Ajouts : validation Zod de toutes les apparences et couverture du roster ennemi, lisibilité des silhouettes (cape qui s'évase, capuche au-dessus du masque), chaîne d'écharpe (pend sous l'ancre, garde ses longueurs, traîne derrière un ancrage mobile, suit le vent, se réinitialise après téléportation, ignore les pas invalides), tutoriel contextuel (bandes et prérequis, retrait après le geste n'importe où, soin seulement blessé, données valides).
+
+13 parcours E2E, tous réussis sur le build final. Ajout : les invites contextuelles enseignent le déplacement puis le saut et se retirent une fois le geste accompli. Le parcours des réglages ouvre désormais les onglets Accessibilité et Commandes avant d'y agir.
+
 ## Qualité restant à qualifier
 
 WebGPU réel, Firefox / Safari, manettes physiques, accessibilité avec lecteurs d’écran, quotas / stockage privé, CSP sur Cloudflare et campagne complète. Le protocole de performance logiciel est décrit dans PERFORMANCE ; il ne certifie pas 60 FPS. Aucun test défaillant n’est désactivé pour rendre la CI verte.

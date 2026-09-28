@@ -80,9 +80,12 @@ test('settings, remapping and keyboard without a gamepad survive reload', async 
   await page.goto('/?debug=1');
   await expect(page.locator('body')).toHaveAttribute('data-ready', 'true');
   await page.getByRole('button', { name: 'Réglages', exact: true }).click();
+  // Settings are grouped in tabs; each control is reached through its tab.
   await page.locator('#reducedMotion').check();
-  await page.locator('#assist').check();
   await page.locator('#preset').selectOption('LOW');
+  await page.getByRole('tab', { name: 'Accessibilité' }).click();
+  await page.locator('#assist').check();
+  await page.getByRole('tab', { name: 'Commandes' }).click();
   await page.locator('[data-action="attack"]').click();
   await page.keyboard.press('KeyF');
   await page.locator('#back').click();
@@ -301,4 +304,22 @@ test('a downward strike bounces off a Veilleur', async ({ page }) => {
   await page.keyboard.up('KeyS');
   const after = (await snapshot(page)).enemies.find((e) => e.id === 'watcher-1')!;
   expect(after.health).toBeLessThan(watcher.health);
+});
+
+test('contextual hints teach a control and retire once it is performed', async ({ page }) => {
+  await start(page);
+  const hint = page.locator('#hint');
+  await expect(hint).toHaveClass(/visible/);
+  await expect(hint).toContainText('Se déplacer');
+  await expect(hint.locator('kbd').first()).toHaveText('A');
+  await page.keyboard.down('KeyD');
+  await expect.poll(async () => (await snapshot(page)).flags).toContain('tutorial:move');
+  await page.keyboard.up('KeyD');
+  // Jumping is taught next; performing it anywhere retires the prompt for good.
+  await page.evaluate(() => window.eidra!.teleport(16));
+  await expect(hint).toContainText('Sauter');
+  await page.keyboard.press('Space');
+  await expect.poll(async () => (await snapshot(page)).flags).toContain('tutorial:jump');
+  // The prompt fades out (its text stays during the fade).
+  await expect(hint).not.toHaveClass(/visible/);
 });

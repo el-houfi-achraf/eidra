@@ -189,7 +189,7 @@ export class Game {
             this.session.update(1 / 60, this.input, this.settings);
             this.accumulator -= 1 / 60;
           }
-          this.ui.update(this.session, (action) => this.input.label(action));
+          this.ui.update(this.session, (action) => this.input.label(action), this.settings.hints);
         }
       } else {
         this.accumulator = 0;
@@ -241,10 +241,6 @@ export class Game {
         console.error('[EIDRA] Audio initialization failed', error);
         this.ui.notice('Le son n’a pas pu être chargé. Le voyage reste accessible.');
       });
-      if (!data)
-        this.ui.notice(
-          'A / D : marcher · Espace : sauter · J ou clic : attaquer · L : parer · F maintenu : se recueillir · E : interagir',
-        );
     } catch (error) {
       this.state.change('MAIN_MENU');
       this.ui.main(this.saves, this.settings);
@@ -254,7 +250,7 @@ export class Game {
   private pause(): void {
     this.state.change('PAUSED');
     this.input.reset();
-    this.ui.pause(this.settings);
+    this.ui.pause(this.settings, this.session, (action) => this.input.label(action));
   }
   private resume(): void {
     if (this.state.state === 'ENDING') {

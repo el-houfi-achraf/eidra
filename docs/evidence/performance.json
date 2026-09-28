@@ -8,120 +8,120 @@
     {
       "preset": "MEDIUM",
       "cpuMs": {
-        "median": 3.2999999998137355,
-        "p95": 7.100000000093132
+        "median": 4.2000000001862645,
+        "p95": 7.400000000372529
       },
       "gpuMs": {
-        "median": 168.033573,
-        "p95": 218.7021
+        "median": 171.004492,
+        "p95": 212.376548
       },
       "frameMs": {
-        "median": 188,
-        "p95": 379.39999999990687
+        "median": 189.70000000018626,
+        "p95": 353.90000000037253
       },
       "drawCalls": {
-        "median": 54,
-        "p95": 54
+        "median": 62,
+        "p95": 62
       },
       "triangles": {
-        "median": 52484,
-        "p95": 52484
+        "median": 54608,
+        "p95": 54608
       }
     },
     {
       "preset": "LOW",
       "cpuMs": {
-        "median": 2,
-        "p95": 5.100000000093132
+        "median": 2.2999999998137355,
+        "p95": 6.300000000745058
       },
       "gpuMs": {
-        "median": 62.009218,
-        "p95": 84.653314
+        "median": 58.046889,
+        "p95": 81.694808
       },
       "frameMs": {
-        "median": 83.09999999962747,
-        "p95": 138.5
+        "median": 80.20000000018626,
+        "p95": 137.09999999962747
       },
       "drawCalls": {
-        "median": 23,
-        "p95": 23
+        "median": 29,
+        "p95": 29
       },
       "triangles": {
-        "median": 26234,
-        "p95": 26234
+        "median": 28440,
+        "p95": 28440
       }
     }
   ],
   "streaming": [
     {
       "x": 123,
-      "meshes": 257,
+      "meshes": 255,
       "bodies": 6,
       "chunks": 2
     },
     {
       "x": 7,
-      "meshes": 242,
+      "meshes": 241,
       "bodies": 5,
       "chunks": 1
     },
     {
       "x": 123,
-      "meshes": 257,
+      "meshes": 255,
       "bodies": 6,
       "chunks": 2
     },
     {
       "x": 7,
-      "meshes": 242,
+      "meshes": 241,
       "bodies": 5,
       "chunks": 1
     },
     {
       "x": 123,
-      "meshes": 257,
+      "meshes": 255,
       "bodies": 6,
       "chunks": 2
     },
     {
       "x": 7,
-      "meshes": 242,
+      "meshes": 241,
       "bodies": 5,
       "chunks": 1
     },
     {
       "x": 123,
-      "meshes": 257,
+      "meshes": 255,
       "bodies": 6,
       "chunks": 2
     },
     {
       "x": 7,
-      "meshes": 242,
+      "meshes": 241,
       "bodies": 5,
       "chunks": 1
     },
     {
       "x": 123,
-      "meshes": 257,
+      "meshes": 255,
       "bodies": 6,
       "chunks": 2
     },
     {
       "x": 7,
-      "meshes": 242,
+      "meshes": 241,
       "bodies": 5,
       "chunks": 1
     },
     {
       "x": 123,
-      "meshes": 257,
+      "meshes": 255,
       "bodies": 6,
       "chunks": 2
     },
     {
       "x": 7,
-      "meshes": 242,
+      "meshes": 241,
       "bodies": 5,
       "chunks": 1
     }

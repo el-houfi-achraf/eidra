@@ -10,6 +10,8 @@ import { QuestManager } from '../quests/QuestManager';
 import { Inventory } from '../inventory/Inventory';
 import { EventBus } from './EventBus';
 import { InputAction } from '../player/InputAction';
+import { TutorialDirector } from '../quests/TutorialDirector';
+import type { HintAction, TutorialHint } from '../../game-data/quests/tutorial';
 import type { InputManager } from '../player/InputManager';
 import type { World } from '../world/World';
 import type { Settings } from '../config/settings';
@@ -41,6 +43,9 @@ export class GameSession {
   readonly combat = new CombatSystem();
   readonly abilities = new AbilitySystem();
   readonly focus = new FocusSystem();
+  readonly tutorial = new TutorialDirector();
+  /** Contextual prompt to display, if any. */
+  hint: TutorialHint | null = null;
   readonly enemies = new EnemyManager();
   readonly narrative = new NarrativeManager();
   readonly quests = new QuestManager();
@@ -56,7 +61,6 @@ export class GameSession {
   private wasCharging = false;
   private echoHitTime = 0;
   private zone = '';
-  private hintTime = 0;
   private footstepTime = 0;
   private keeperDefeated = false;
   private bossIntroduced = false;
@@ -153,7 +157,6 @@ export class GameSession {
     // Pressed inputs stay buffered and are consumed on the next live step.
     if (this.combat.hitStop.freeze(dt)) return;
     this.playtime += dt;
-    this.hintTime = Math.max(0, this.hintTime - dt);
     this.echoHitTime = Math.max(0, this.echoHitTime - dt);
     const p = this.player;
     this.combat.update(dt, [this.actor, ...this.enemies.actors]);
@@ -175,19 +178,26 @@ export class GameSession {
     );
     this.actor.x = p.position.x;
     this.actor.y = p.position.y;
+    if (p.motion.grounded && Math.abs(p.motion.vx) > 2) this.learn('move');
     if (dash && p.motion.dashTime > 0) {
+      this.learn('dash');
       this.fx.sound('dash');
       this.fx.burst(this.actor.x, this.actor.y, 'memory');
     }
-    if (jump && p.motion.vy > 0) this.fx.sound('jump');
+    if (jump && p.motion.vy > 0) {
+      this.learn('jump');
+      this.fx.sound('jump');
+    }
     this.footstepTime -= dt;
     if (p.motion.grounded && Math.abs(p.motion.vx) > 1 && this.footstepTime <= 0) {
       this.fx.sound('footstep');
       this.footstepTime = 0.3;
     }
     this.combat.dodge.apply(this.actor, p.motion.dashTime > 0.025);
-    if (input.consume(InputAction.Parry) && this.actor.stagger <= 0 && this.combat.parry.start())
+    if (input.consume(InputAction.Parry) && this.actor.stagger <= 0 && this.combat.parry.start()) {
+      this.learn('parry');
       this.fx.sound('parry');
+    }
     // A press during recovery is remembered briefly, so combos chain without dropped inputs.
     if (input.consume(InputAction.Attack)) this.combat.attackBuffer.press();
     if (this.combat.attackBuffer.take(this.actor.stagger <= 0 && this.combat.cooldown === 0))
@@ -209,14 +219,18 @@ export class GameSession {
     }
     this.wasCharging = charging;
     if (input.consume(InputAction.Remanence)) {
-      if (this.abilities.toggleRemanence()) this.fx.sound('memory');
-      else this.fx.notice('Cette mémoire attend d’être retrouvée.');
+      if (this.abilities.toggleRemanence()) {
+        if (this.abilities.remanence) this.learn('remanence');
+        this.fx.sound('memory');
+      } else this.fx.notice('Cette mémoire attend d’être retrouvée.');
     }
     if (!settings.memoryToggle && !input.held(InputAction.Remanence))
       this.abilities.remanence = false;
     if (input.consume(InputAction.Echo)) {
-      if (this.abilities.createEcho()) this.fx.sound('memory');
-      else this.fx.notice('Memory Step nécessite une trace, 25 de mémoire et un temps de repos.');
+      if (this.abilities.createEcho()) {
+        this.learn('echo');
+        this.fx.sound('memory');
+      } else this.fx.notice('Memory Step nécessite une trace, 25 de mémoire et un temps de repos.');
     }
     this.abilities.update(dt, {
       x: this.actor.x,
@@ -246,6 +260,7 @@ export class GameSession {
       this.actor,
     );
     if (healed > 0) {
+      this.learn('heal');
       this.events.emit('PLAYER_HEALED', { amount: healed, health: this.actor.health });
       this.fx.burst(this.actor.x, this.actor.y, 'heal');
       this.fx.sound('save');
@@ -266,6 +281,7 @@ export class GameSession {
         if (this.combat.attackKind === 'down' && !bounced) {
           bounced = true;
           p.motion.bounce();
+          this.learn('down');
           this.fx.sound('jump');
         }
       }
@@ -327,6 +343,14 @@ export class GameSession {
       this.fx.save();
     }
     this.updateProgression(input);
+    this.hint = this.tutorial.update({
+      x: this.actor.x,
+      abilities: this.abilities.unlocked,
+      flags: this.narrative.flags,
+      wounded:
+        this.actor.health < this.actor.maxHealth * 0.6 &&
+        this.focus.resonance >= this.focus.data.cost,
+    });
     if (this.actor.y < -5) {
       this.takeHit(
         {
@@ -356,10 +380,14 @@ export class GameSession {
       this.fx.death();
     }
   }
+  private learn(action: HintAction): void {
+    this.tutorial.perform(action, this.narrative.flags);
+  }
   private attack(kind: AttackKind): void {
     this.focus.interrupt();
-    if (this.combat.begin(kind))
-      this.fx.sound(kind === 'charged' || this.combat.empowered ? 'heavy' : 'attack');
+    if (!this.combat.begin(kind)) return;
+    this.learn('attack');
+    this.fx.sound(kind === 'charged' || this.combat.empowered ? 'heavy' : 'attack');
   }
   private hurtEnemy(enemy: Combatant, hit: Hitbox, byPlayer: boolean): void {
     const dealt = this.combat.damage.apply(
@@ -490,14 +518,6 @@ export class GameSession {
         this.fx.notice(passage.label);
         break;
       }
-    }
-    if (x > 125 && x < 140 && this.hintTime === 0 && !this.narrative.flags.has('echo-gate-open')) {
-      this.fx.notice(
-        'Restez quelques secondes sur le sceau, puis créez votre Écho avec ' +
-          input.label(InputAction.Echo) +
-          '.',
-      );
-      this.hintTime = 12;
     }
     if (x > 163 && !this.narrative.flags.has('heard-sael')) this.dialogue('sael');
     if (x > 195 && this.enemies.bossDefeated) {
