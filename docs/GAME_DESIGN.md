@@ -21,6 +21,10 @@ Ressenti des coups (référence : action-plateformes modernes) : hit-stop court 
 - **Recueillement** : chaque coup porté donne 11 de résonance (22 pour une parade), jusqu'à 99, soit trois segments. Maintenir le soin immobile pendant 0,8 s dépense un segment et rend 32 points de vie. Sauter, esquiver, attaquer ou être touché interrompt la canalisation. La résonance est perdue à la mort.
 - **Autel des ancrages** : interagir avec l'ancrage déjà actif ouvre l'autel (repos, sauvegarde) et permet d'offrir des éclats pour +20 de vitalité maximale : 10, 20 puis 35 éclats.
 
+## Apprentissage et interface
+
+Un tutoriel contextuel remplace le long texte de départ : une invite (glyphe de touche ou de bouton + verbe) apparaît dans la zone où le geste devient utile — se déplacer, sauter, frapper, l'élan après son acquisition, parer près du Porteur de cendres, la Rémanence au pont, la plongée près du Veilleur du pont, l'Écho au sceau — et disparaît dès que le joueur l'a accompli, où qu'il soit. Le Recueillement n'est suggéré que blessé et avec un segment disponible. Les menus privilégient l'information utile : dernier ancrage sur l'écran titre, cartes de sauvegarde (lieu, durée, vitalité, éclats, souvenirs, pouvoirs), objectif et rappel des commandes en pause, carte en itinéraire avec marqueurs, conseils à la mort et au chargement.
+
 ## Gardien Sans Visage
 
 Phase 1 : balayage, onde au sol, charge. Sous 50 % de vie, une transition blindée de 1,6 s (rugissement, onde de choc) ouvre la phase 2 : télégraphes raccourcis de 15 % et **pluie d'éclats**, cinq impacts marqués au sol et au plafond autour de la position d'Eidra, espacés de 2,6 m. Le Gardien est également blindé pendant son introduction. Chaque pattern est annoncé dans la barre de vie (« ONDE — SAUTEZ », « PLUIE D'ÉCLATS — QUITTEZ LES MARQUES »).
