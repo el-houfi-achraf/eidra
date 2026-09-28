@@ -97,7 +97,7 @@ export class Hud {
     );
     this.bossLabel.text =
       session.enemies.director.state === 'windup'
-        ? `GARDIEN SANS VISAGE  ·  ${{ sweep: 'BALAYAGE', slam: 'ONDE — SAUTEZ', charge: 'CHARGE' }[session.enemies.director.pattern.id]}`
+        ? `GARDIEN SANS VISAGE  ·  ${{ sweep: 'BALAYAGE', slam: 'ONDE — SAUTEZ', charge: 'CHARGE', rain: 'PLUIE D’ÉCLATS' }[session.enemies.director.pattern.id]}`
         : 'G A R D I E N   S A N S   V I S A G E';
   }
   dispose(): void {

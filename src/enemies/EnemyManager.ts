@@ -110,7 +110,14 @@ export class EnemyManager {
     if (!this.bossDefeated && player.x > 166) this.director.activate();
     const boss = this.boss,
       direction = Math.sign(player.x - boss.x) || -1;
-    this.director.update(dt, boss.health, Math.abs(player.x - boss.x), direction, boss.stagger);
+    this.director.update(
+      dt,
+      boss.health,
+      Math.abs(player.x - boss.x),
+      direction,
+      boss.stagger,
+      player.x,
+    );
     if (this.director.state === 'approach' && boss.stagger <= 0)
       boss.x += direction * (this.director.phase === 2 ? 3.2 : 2.4) * dt;
     if (this.director.state === 'attack' && this.director.pattern.id === 'charge')
@@ -118,7 +125,18 @@ export class EnemyManager {
     boss.x = Math.max(167, Math.min(192, boss.x));
     if (this.director.trigger) {
       const pattern = this.director.pattern;
-      if (pattern.id === 'slam')
+      if (pattern.id === 'rain')
+        for (const x of this.director.targets)
+          this.projectiles.push({
+            sourceId: boss.id,
+            x,
+            y: 11,
+            vx: 0,
+            vy: -15,
+            life: 0.8,
+            damage: pattern.damage,
+          });
+      else if (pattern.id === 'slam')
         for (const sign of [-1, 1])
           this.projectiles.push({
             sourceId: boss.id,
