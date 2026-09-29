@@ -2,7 +2,7 @@ import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import { Constants } from '@babylonjs/core/Engines/constants';
 import { Color3 } from '@babylonjs/core/Maths/math.color';
 import type { Scene } from '@babylonjs/core/scene';
-import { proceduralTexture, smooth } from '../vfx/textures';
+import { proceduralTexture, smooth, tileableNoise } from '../vfx/textures';
 export class Palette {
   readonly stone: StandardMaterial;
   readonly trim: StandardMaterial;
@@ -12,10 +12,7 @@ export class Palette {
   readonly gold: StandardMaterial;
   readonly danger: StandardMaterial;
   readonly memory: StandardMaterial;
-  readonly distant: StandardMaterial;
   readonly ink: StandardMaterial;
-  /** Near-black foreground silhouettes that frame the play plane. */
-  readonly silhouette: StandardMaterial;
   /** Additive light shafts falling from the broken windows. */
   readonly shaft: StandardMaterial;
   /** Solid white used for hit flashes. */
@@ -25,6 +22,14 @@ export class Palette {
   readonly puppetDouble: StandardMaterial;
   readonly ghost: StandardMaterial;
   readonly ghostDouble: StandardMaterial;
+  /** Painted scenery: unlit vertex colours modulated by a tiling brush texture. */
+  readonly painted: StandardMaterial;
+  /** Painted foreground with feathered, out-of-focus edges (vertex alpha). */
+  readonly paintedSoft: StandardMaterial;
+  /** Additive soft light pools around lanterns, crystals and windows. */
+  readonly halo: StandardMaterial;
+  /** Painted remembered slabs; a faint emissive lets the bloom catch them. */
+  readonly paintedMemory: StandardMaterial;
   constructor(scene: Scene) {
     const make = (id: string, color: string, emission = 0, alpha = 1): StandardMaterial => {
       const m = new StandardMaterial(id, scene);
@@ -42,10 +47,7 @@ export class Palette {
     this.gold = make('remembered-gold', '#d7ad69', 0.6);
     this.danger = make('warning-amber', '#ff914d', 1);
     this.memory = make('memory-surface', '#86d6bf', 0.55, 0.38);
-    this.distant = make('distant-ruins', '#243b3a');
     this.ink = make('cloak', '#132f34');
-    this.silhouette = make('foreground-silhouette', '#040b0c');
-    this.silhouette.specularColor = Color3.Black();
     this.flash = make('hit-flash', '#ffffff', 1);
     this.flash.disableLighting = true;
     // Colours and toon tones are baked into the vertices; lighting would only muddy them.
@@ -71,15 +73,62 @@ export class Palette {
     this.puppetDouble = puppet('puppet-ribbon', 1, true);
     this.ghost = puppet('memory-puppet', 0.5, false);
     this.ghostDouble = puppet('memory-ribbon', 0.45, true);
+    // Hand-painted grain: soft blotches and faint horizontal strokes, tiling in world space.
+    const blotch = tileableNoise(7, 4, 4),
+      stroke = tileableNoise(11, 16, 2);
+    const brush = proceduralTexture(
+      scene,
+      128,
+      128,
+      (u, v) => {
+        const k = 0.8 + 0.2 * (0.65 * blotch(u, v) + 0.35 * stroke(u * 0.25, v));
+        return [k, k, k, 1];
+      },
+      true,
+    );
+    const painted = (id: string): StandardMaterial => {
+      const m = new StandardMaterial(id, scene);
+      m.diffuseColor = Color3.White();
+      m.specularColor = Color3.Black();
+      m.diffuseTexture = brush;
+      // Unlit standard materials output (emissive + ambient) x texture x vertex colour.
+      m.ambientColor = Color3.White();
+      m.disableLighting = true;
+      m.backFaceCulling = false;
+      // Depth haze is painted into the vertex colours per layer.
+      m.fogEnabled = false;
+      return m;
+    };
+    this.painted = painted('painted-layer');
+    this.paintedSoft = painted('painted-foreground');
+    this.paintedMemory = painted('painted-memory');
+    this.paintedMemory.emissiveColor = new Color3(0.08, 0.16, 0.14);
+    this.halo = new StandardMaterial('light-pool', scene);
+    this.halo.diffuseTexture = proceduralTexture(scene, 64, 64, (u, v) => {
+      const r = Math.min(1, Math.hypot(u - 0.5, v - 0.5) * 2);
+      const a = (1 - r) ** 2.2;
+      return [a, a, a, 1];
+    });
+    this.halo.diffuseColor = Color3.White();
+    this.halo.ambientColor = Color3.White();
+    this.halo.specularColor = Color3.Black();
+    this.halo.disableLighting = true;
+    this.halo.backFaceCulling = false;
+    this.halo.fogEnabled = false;
+    this.halo.alphaMode = Constants.ALPHA_ADD;
+    this.halo.alpha = 0.99;
+    this.halo.disableDepthWrite = true;
     this.shaft = new StandardMaterial('light-shaft', scene);
     // Brightest where the light enters (top, v = 1), fading downwards and at both edges.
-    this.shaft.emissiveTexture = proceduralTexture(scene, 32, 64, (u, v) => {
+    // Tinted per sector by the vertex colours of each shaft.
+    this.shaft.diffuseTexture = proceduralTexture(scene, 32, 64, (u, v) => {
       const edge = smooth(0, 0.35, u) * smooth(1, 0.65, u);
       const fall = v ** 1.6 * (0.25 + 0.75 * smooth(0, 0.2, v));
       const a = edge * fall;
       return [0.75 * a, 0.95 * a, 0.82 * a, 1];
     });
-    this.shaft.diffuseColor = Color3.Black();
+    this.shaft.diffuseColor = Color3.White();
+    this.shaft.ambientColor = Color3.White();
     this.shaft.specularColor = Color3.Black();
     this.shaft.disableLighting = true;
     this.shaft.backFaceCulling = false;

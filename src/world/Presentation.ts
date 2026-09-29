@@ -21,6 +21,9 @@ import { ParticleSystem } from '@babylonjs/core/Particles/particleSystem';
 import type { RawTexture } from '@babylonjs/core/Materials/Textures/rawTexture';
 import { Palette } from './Palette';
 import { Backdrop } from './Backdrop';
+import { Atmosphere } from './Atmosphere';
+import { mixRgb, tintAt } from './Mood';
+import type { Tint } from './Mood';
 import { CameraRig } from '../camera/CameraRig';
 import { CharacterView } from '../animation/CharacterView';
 import type { CharacterKind } from '../animation/CharacterView';
@@ -36,6 +39,8 @@ import type { GameSession } from '../core/GameSession';
 import { presets } from '../config/settings';
 import type { Settings } from '../config/settings';
 const FOG = new Color3(0.025, 0.073, 0.079);
+/** Clear and fog colours follow the sector mood; these are reused every frame. */
+const clear = new Color4(FOG.r, FOG.g, FOG.b, 1);
 export class Presentation {
   readonly scene: Scene;
   readonly palette: Palette;
@@ -53,6 +58,7 @@ export class Presentation {
   private motes: Motes;
   private rays: LightRays;
   private backdrop: Backdrop;
+  private atmosphere: Atmosphere;
   private projectileViews: Mesh[] = [];
   private glow: GlowLayer;
   private sun: DirectionalLight;
@@ -78,6 +84,7 @@ export class Presentation {
   private bossAlive = false;
   private bossDissolve = 1;
   private emitter = new Vector3(10, 4, 2);
+  private lastTint: Tint | null = null;
   // Hero life cycle: shattering on death, reforming from light at the anchor.
   private shatter = -1;
   private reform = 0;
@@ -90,9 +97,9 @@ export class Presentation {
   constructor(engine: AbstractEngine) {
     this.scene = new Scene(engine);
     const scene = this.scene;
-    scene.clearColor = new Color4(FOG.r, FOG.g, FOG.b, 1);
+    scene.clearColor = clear;
     scene.fogMode = Scene.FOGMODE_EXP2;
-    scene.fogColor = FOG;
+    scene.fogColor = FOG.clone();
     scene.fogDensity = 0.016;
     // Cinematic grade, applied once per pixel by a full-screen pass (see applySettings).
     const grade = scene.imageProcessingConfiguration;
@@ -109,7 +116,8 @@ export class Presentation {
     this.palette = new Palette(scene);
     const p = this.palette;
     this.camera = new CameraRig(scene);
-    this.backdrop = new Backdrop(scene, FOG);
+    this.backdrop = new Backdrop(scene);
+    this.atmosphere = new Atmosphere(scene);
     const sky = new HemisphericLight('cold-sky', new Vector3(-0.2, 1, -0.3), scene);
     sky.intensity = 0.8;
     sky.diffuse = new Color3(0.65, 0.83, 0.79);
@@ -232,6 +240,7 @@ export class Presentation {
       }
     }
     this.backdrop.setEnabled(graded);
+    this.atmosphere.setQuality(settings.preset);
     this.glow.isEnabled = p.post;
     this.glow.intensity = settings.reducedMotion ? 0.35 : 0.65;
     this.effects.density = p.effects;
@@ -441,7 +450,19 @@ export class Presentation {
     });
     this.effects.update(dt);
     this.emitter.set(this.camera.camera.position.x, 4, 2);
-    this.backdrop.update(this.camera.camera.position.x, this.camera.camera.position.y);
+    // Each sector has its own colour identity: fog, sky, mist and dust follow the camera.
+    const cx = this.camera.camera.position.x;
+    const tint = tintAt(cx);
+    this.scene.fogColor.copyFromFloats(...tint.fog);
+    clear.set(tint.fog[0], tint.fog[1], tint.fog[2], 1);
+    this.backdrop.update(cx, this.camera.camera.position.y, tint);
+    this.atmosphere.update(cx, this.time, tint, settings.reducedMotion);
+    if (tint !== this.lastTint) {
+      this.lastTint = tint;
+      this.dust.color1 = new Color4(...tint.light, 0.32);
+      this.dust.color2 = new Color4(...mixRgb(tint.light, tint.mist, 0.5), 0.26);
+      this.dust.colorDead = new Color4(...tint.mist, 0);
+    }
     this.palette.shaft.alpha = settings.reducedMotion
       ? 0.5
       : 0.46 + Math.sin(this.time * 0.7) * 0.06 + Math.sin(this.time * 1.9) * 0.03;
@@ -600,6 +621,7 @@ export class Presentation {
     this.motes.dispose();
     this.rays.dispose();
     this.backdrop.dispose();
+    this.atmosphere.dispose();
     this.dust.dispose();
     this.dustTexture.dispose();
     this.scene.dispose();
