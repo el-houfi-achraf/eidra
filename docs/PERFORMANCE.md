@@ -75,6 +75,10 @@ Le décor peint est **plus rapide** que l'ancien décor en boîtes éclairées :
 
 Protocole standard (`tools/benchmark.mjs`) : MEDIUM CPU 3,8 / 6,5 ms, rendu logiciel 156,7 / 198,0 ms, 64 draw calls, 54 794 triangles ; LOW CPU 2,2 / 3,7 ms, rendu 47,5 / 77,4 ms, 26 draw calls, 27 921 triangles. Douze allers-retours x = 123 / 7 : 262 / 251 meshes, 7 / 5 ressources physiques, 2 / 1 chunks, stables. Bundle principal : 1,89 Mo minifié / 469 ko gzip.
 
+### Cinquième itération : étapes scellées
+
+Trois portes de plus, désactivées une fois ouvertes. Protocole standard : mêmes draw calls et triangles (64 / 54 794 en MEDIUM, 26 / 27 921 en LOW), CPU 4,0 / 2,4 ms et rendu logiciel 154,5 / 46,8 ms, dans le bruit des mesures précédentes. Allers-retours x = 123 / 7 : 265 / 254 meshes, 7 / 6 ressources physiques (la sortie scellée de la chambre d'éveil reçoit son collider à moins de 45 m), 2 / 1 chunks, stables.
+
 Mesures brutes : [performance.json](evidence/performance.json) (dernière itération).
 
 ## Optimisation et stabilité

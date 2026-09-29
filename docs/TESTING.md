@@ -65,6 +65,12 @@ La CI GitHub a échoué sur « a downward strike bounces off a Veilleur » aprè
 
 Correctifs : appui correct dès le premier pas après une téléportation, priorité de la plongée sur le contact du corps frappé (test unitaire), et parcours réécrit sans affaiblir ses assertions. Il attend la fin de l'invulnérabilité (le contact est donc actif), frappe dès la chute comme un joueur, vérifie un vrai rebond (plus d'1 m au-dessus du point bas), les dégâts au Veilleur **et** qu'Eidra n'est pas blessée. Résultat : 8 / 8 en répétition dans les conditions de la CI (contre 0 / 8 avec la frappe immédiate avant le correctif du contrôleur), suite complète réussie.
 
+## Cinquième itération : étapes scellées
+
+91 tests unitaires / intégration dans 17 fichiers. Ajouts (`tests/unit/stages.test.ts`) : étapes ordonnées le long de la route, gardiens de chaque étape présents dans son secteur et de son côté de la sortie, **tous les ennemis hors arène sont gardiens d'une étape**, sorties sur sol plein et hors de la bande d'hystérésis des ancrages ; ouverture seulement quand tous les gardiens sont tombés, mémorisée dans les drapeaux et non refermée par leur retour ; porte qui ne bloque que le côté non franchi ; gardien poursuivant Eidra retenu derrière la sortie.
+
+15 parcours E2E, tous réussis. Ajout : **« a sector exit stays sealed until its guardian falls, then stays open »** — message du nombre de gardiens restants, Eidra poussée contre la sortie de la chambre d'éveil pendant 2,5 s sans la franchir, ouverture et annonce à la chute du Veilleur, passage, puis sortie toujours ouverte après sauvegarde, rechargement et « Continuer », pendant que la sortie de la galerie reste scellée. Répété 3 / 3.
+
 ## Qualité restant à qualifier
 
 WebGPU réel, Firefox / Safari, manettes physiques, accessibilité avec lecteurs d’écran, quotas / stockage privé, CSP sur Cloudflare et campagne complète. Le protocole de performance logiciel est décrit dans PERFORMANCE ; il ne certifie pas 60 FPS. Aucun test défaillant n’est désactivé pour rendre la CI verte.

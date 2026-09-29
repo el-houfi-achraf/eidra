@@ -24,6 +24,11 @@
 - **Animation** : anticipation / frappe / récupération lisibles pour chaque ennemi, silhouettes propres à chaque pattern du Gardien, sursaut à la détection, recul à l'impact ; inclinaison d'Eidra dans les coups et l'esquive, poussière de course et de saut, agenouillement à l'ancrage ; masque qui éclate à la mort puis reconstitution en lumière ; lames de lumière pour les pouvoirs et les gardiens vaincus ; portes qui jaillissent du sol.
 - **UX** : autel sur le côté pour voir le repos, HUD qui tressaute sous les coups et bat à faible vie, caméra qui revient directement à l'ancrage au respawn, musique de combat aussi contre le Porteur.
 
+### Cinquième itération : étapes scellées
+
+- **Progression** : chaque secteur est une étape ; sa sortie reste scellée tant que ses gardiens ne sont pas vaincus (Veilleur de l'éveil ; Souvenir errant et Porteur de cendres ; Veilleur du pont), avant les arènes du Porteur et du Gardien. On ne peut plus passer une étape en marchant.
+- **UX** : nombre de gardiens restants à l'approche d'une sortie scellée, annonce et sauvegarde à l'ouverture, état des sorties sur la carte ; une étape vaincue reste ouverte après une mort ou un rechargement.
+
 ### Quatrième itération : décor peint et ambiances
 
 - **Décor peint** : le laboratoire est redessiné en silhouettes superposées dans une brume colorée — plafond de caverne et dents, lianes et racines, piliers ébréchés, arches, caverne lointaine, tours de la cité oubliée, avant-plan flou.
