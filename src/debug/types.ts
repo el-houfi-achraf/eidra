@@ -11,6 +11,8 @@ export interface DebugSnapshot {
     maxHealth: number;
     grounded: boolean;
     dashing: boolean;
+    /** Seconds of invulnerability left (respawn grace, recent hit, dash). */
+    invulnerable: number;
   };
   resonance: number;
   shards: number;

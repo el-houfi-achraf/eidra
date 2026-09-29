@@ -408,6 +408,7 @@ export class Game {
           maxHealth: this.session.actor.maxHealth,
           grounded: this.session.player.motion.grounded,
           dashing: this.session.player.motion.dashTime > 0,
+          invulnerable: this.session.actor.invulnerable,
         },
         resonance: this.session.focus.resonance,
         shards: this.session.inventory.shards,

@@ -75,6 +75,8 @@ export class EnemyManager {
     player: Combatant,
     onAttack: (hit: Hitbox, source: Combatant) => void,
     gates: readonly number[] = [],
+    /** A downward strike is under way: bodies below Eidra are being struck, not touched. */
+    plunging = false,
   ): void {
     for (const entity of this.entities.values()) {
       const a = entity.actor,
@@ -95,7 +97,7 @@ export class EnemyManager {
         a.x += Math.sign(entity.home - a.x) * entity.data.speed * dt;
       if (entity.fsm.state === 'PATROL') a.x += Math.sin(entity.fsm.timer * 2) * dt * 0.5;
       a.x = clampToGates(a.x + a.knockback * dt, entity.home, a.radius, gates, entity.patrol);
-      if (entity.data.contact > 0 && touching(a, player))
+      if (entity.data.contact > 0 && touching(a, player) && !(plunging && a.y < player.y))
         onAttack(contact(a, player, entity.data.contact), a);
       if (entity.fsm.attackTriggered) {
         if (entity.data.ranged) {
@@ -144,7 +146,8 @@ export class EnemyManager {
     if (
       boss.health > 0 &&
       !['dormant', 'dead'].includes(this.director.state) &&
-      touching(boss, player)
+      touching(boss, player) &&
+      !(plunging && boss.y < player.y)
     )
       onAttack(contact(boss, player, guardianData.contact), boss);
     if (this.director.trigger) {

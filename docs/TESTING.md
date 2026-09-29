@@ -56,6 +56,15 @@ Après correction : suite complète réussie, traversée du pont 5 / 5 et plong�
 
 Les 14 parcours E2E réussissent sans modification sur le build final. Le rendu a été vérifié par captures des six zones en HIGH et LOW.
 
+### Correctif CI : plongée sur un Veilleur
+
+La CI GitHub a échoué sur « a downward strike bounces off a Veilleur » après la fusion de la PR #3 (`Received: 0.9955…`, Eidra restée au sol). Cause, reproduite localement à l'identique (2 échecs sur 5 avec le code de `main`) en laissant simplement expirer l'invulnérabilité de départ :
+
+1. l'indicateur « au sol » est faux au premier pas qui suit une téléportation (contacts Havok de l'ancienne position, D025). Le test devait donc attendre de voir Eidra « en l'air » avant de frapper, ce qui coûte plusieurs images de chute ;
+2. depuis les dégâts de contact de la PR #3, une frappe trop tardive laisse le corps du Veilleur toucher Eidra d'abord (recul et étourdissement), et le rebond n'a pas lieu. En local, l'exécution ralentie (~4 FPS, pas plafonné à 0,1 s) gardait Eidra invulnérable pendant la chute et masquait le problème.
+
+Correctifs : appui correct dès le premier pas après une téléportation, priorité de la plongée sur le contact du corps frappé (test unitaire), et parcours réécrit sans affaiblir ses assertions. Il attend la fin de l'invulnérabilité (le contact est donc actif), frappe dès la chute comme un joueur, vérifie un vrai rebond (plus d'1 m au-dessus du point bas), les dégâts au Veilleur **et** qu'Eidra n'est pas blessée. Résultat : 8 / 8 en répétition dans les conditions de la CI (contre 0 / 8 avec la frappe immédiate avant le correctif du contrôleur), suite complète réussie.
+
 ## Qualité restant à qualifier
 
 WebGPU réel, Firefox / Safari, manettes physiques, accessibilité avec lecteurs d’écran, quotas / stockage privé, CSP sur Cloudflare et campagne complète. Le protocole de performance logiciel est décrit dans PERFORMANCE ; il ne certifie pas 60 FPS. Aucun test défaillant n’est désactivé pour rendre la CI verte.
