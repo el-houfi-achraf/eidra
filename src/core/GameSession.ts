@@ -11,12 +11,14 @@ import { Inventory } from '../inventory/Inventory';
 import { EventBus } from './EventBus';
 import { InputAction } from '../player/InputAction';
 import { TutorialDirector } from '../quests/TutorialDirector';
+import { ArenaDirector } from '../bosses/ArenaDirector';
+import { enemyData } from '../../game-data/enemies/roster';
 import type { HintAction, TutorialHint } from '../../game-data/quests/tutorial';
 import type { InputManager } from '../player/InputManager';
 import type { World } from '../world/World';
 import type { Settings } from '../config/settings';
 import type { SaveData } from '../save/SaveManager';
-import { checkpoints, landmarks, chunks, shortcuts } from '../../game-data/zones/laboratory';
+import { checkpoints, landmarks, chunks, shortcuts, gates } from '../../game-data/zones/laboratory';
 import { focusData } from '../../game-data/abilities/abilities';
 import type { AbilityId } from '../../game-data/abilities/abilities';
 import type { DialogueId } from '../../game-data/dialogue/story';
@@ -44,6 +46,7 @@ export class GameSession {
   readonly abilities = new AbilitySystem();
   readonly focus = new FocusSystem();
   readonly tutorial = new TutorialDirector();
+  readonly arenas = new ArenaDirector();
   /** Contextual prompt to display, if any. */
   hint: TutorialHint | null = null;
   readonly enemies = new EnemyManager();
@@ -103,7 +106,7 @@ export class GameSession {
     this.enemies.bossDefeated = save.bosses.includes('faceless-guardian');
     this.keeperDefeated = save.bosses.includes('keeper');
     this.respawn();
-    this.world.update(save.position.x, false, this.narrative.flags.has('echo-gate-open'), false);
+    this.world.update(save.position.x, false, this.closedGates());
     this.player.teleport(save.position.x, save.position.y);
     this.actor.health = Math.max(1, Math.min(this.actor.maxHealth, save.health));
   }
@@ -135,6 +138,8 @@ export class GameSession {
     const point = checkpoints.find((c) => c.id === this.checkpoint) ?? checkpoints[0]!;
     this.enemies.reset();
     if (this.keeperDefeated) this.enemies.defeated.add('keeper');
+    this.arenas.reset();
+    this.echoOpen = false;
     this.abilities.resetTransient();
     this.combat.reset();
     this.chargeTime = 0;
@@ -147,7 +152,7 @@ export class GameSession {
     this.actor.invulnerable = 1;
     this.actor.stagger = 0;
     this.actor.knockback = 0;
-    this.world.update(point.x, false, this.narrative.flags.has('echo-gate-open'), false);
+    this.world.update(point.x, false, this.closedGates());
     this.player.teleport(point.x, 1.2);
     this.actor.x = point.x;
     this.actor.y = 1.2;
@@ -265,9 +270,15 @@ export class GameSession {
       this.fx.burst(this.actor.x, this.actor.y, 'heal');
       this.fx.sound('save');
     }
-    this.world.update(this.actor.x, this.abilities.remanence, this.echoOpen, this.bossActive);
+    const closed = this.closedGates();
+    this.world.update(this.actor.x, this.abilities.remanence, closed);
     this.enemies.sync([...this.world.stream.loaded.values()].map((c) => c.data));
-    this.enemies.update(dt, this.actor, (hit, source) => this.takeHit(hit, source, settings));
+    this.enemies.update(
+      dt,
+      this.actor,
+      (hit, source) => this.takeHit(hit, source, settings),
+      gates.filter((gate) => closed.has(gate.id)).map((gate) => gate.x),
+    );
     if (this.combat.active) {
       const hit = this.combat.strike(this.actor, p.motion.facing);
       let bounced = false;
@@ -342,6 +353,19 @@ export class GameSession {
       this.fx.sound('victory');
       this.fx.save();
     }
+    // Guarded chambers: sealing and clearing are announced; gates follow `closedGates`.
+    const arena = this.arenas.update(this.actor.x, this.isDefeated);
+    if (arena?.type === 'sealed') {
+      if (arena.arena.guardian !== 'faceless-guardian')
+        this.fx.title('boss', arena.arena.name, arena.arena.subtitle);
+      this.fx.notice('Le seuil se referme derrière vous.');
+      this.fx.shake(0.6);
+      this.fx.sound('heavy');
+    }
+    if (arena?.type === 'cleared') {
+      this.fx.notice('Le passage s’ouvre.');
+      this.fx.sound('save');
+    }
     this.updateProgression(input);
     this.hint = this.tutorial.update({
       x: this.actor.x,
@@ -414,7 +438,7 @@ export class GameSession {
   }
   private takeHit(hit: Hitbox, source: Combatant, settings: Settings, fall = false): void {
     if (!fall && !new HurtboxSystem().overlaps(hit, this.actor)) return;
-    if (!fall && this.combat.parry.tryParry(source)) {
+    if (!fall && !hit.unblockable && this.combat.parry.tryParry(source)) {
       this.focus.gain(focusData.gainOnParry);
       this.combat.hitStop.trigger(0.12);
       this.events.emit('PARRIED', { x: this.actor.x, y: this.actor.y });
@@ -512,7 +536,7 @@ export class GameSession {
         ? `${input.label(InputAction.Interact)} · ${passage.label}`
         : 'Conduit scellé — un contrepoids retient la porte';
       if (unlocked && input.consume(InputAction.Interact)) {
-        this.world.update(passage.toX, this.abilities.remanence, true, false);
+        this.world.update(passage.toX, this.abilities.remanence, this.closedGates());
         this.player.teleport(passage.toX, passage.toY);
         this.fx.sound('memory');
         this.fx.notice(passage.label);
@@ -547,6 +571,40 @@ export class GameSession {
   }
   get zoneName(): string {
     return chunks.find((c) => c.id === this.zone)?.name ?? 'CHAMBRE D’ÉVEIL';
+  }
+  private isDefeated = (guardian: string): boolean =>
+    guardian === 'faceless-guardian'
+      ? this.enemies.bossDefeated
+      : guardian === 'keeper'
+        ? this.keeperDefeated
+        : this.enemies.defeated.has(guardian);
+  /** Gates currently barring the way: arenas of living guardians and the unsolved seal. */
+  closedGates(): Set<string> {
+    const closed = new Set(this.arenas.closedGates(this.isDefeated));
+    if (!this.echoOpen && !this.narrative.flags.has('echo-gate-open')) closed.add('echo');
+    return closed;
+  }
+  /** Health bar of the guardian currently fought, if any. */
+  get bossBar(): { name: string; subtitle: string; health: number; maxHealth: number } | null {
+    const arena = this.arenas.active;
+    if (arena?.guardian === 'keeper') {
+      const keeper = this.enemies.entities.get('keeper')?.actor;
+      if (keeper && keeper.health > 0)
+        return {
+          name: arena.name,
+          subtitle: arena.subtitle,
+          health: keeper.health,
+          maxHealth: enemyData.keeper.health,
+        };
+    }
+    if (!this.bossActive) return null;
+    const boss = this.enemies.boss;
+    return {
+      name: 'GARDIEN SANS VISAGE',
+      subtitle: 'Celui qui n’a jamais désobéi',
+      health: boss.health,
+      maxHealth: boss.maxHealth,
+    };
   }
   get bossActive(): boolean {
     return !this.enemies.bossDefeated && !['dormant', 'dead'].includes(this.enemies.director.state);

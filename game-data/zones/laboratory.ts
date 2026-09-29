@@ -67,7 +67,8 @@ export const chunks = [
       { x: 98, y: 0.6, w: 4, h: 0.5, memory: true },
       { x: 105, y: -0.15, w: 4, h: 0.5, memory: true },
     ],
-    enemies: [{ id: 'watcher-2', kind: 'watcher', x: 113, patrol: [108.5, 119.5] }],
+    // The bank's first metres stay clear: a safe landing after the bridge.
+    enemies: [{ id: 'watcher-2', kind: 'watcher', x: 114, patrol: [112, 119.5] }],
   },
   {
     id: 'counterweight',
@@ -77,9 +78,11 @@ export const chunks = [
     seed: 77,
     platforms: [
       { x: 140, y: -1, w: 40, h: 2 },
-      { x: 149, y: 2, w: 4, h: 0.5 },
+      // Ledge of Seris's fragment, in the antechamber before the Keeper's arena, so the
+      // Keeper (2.97 m tall) never has to walk under a slab lower than its head.
+      { x: 144.5, y: 2, w: 3, h: 0.5 },
     ],
-    enemies: [{ id: 'keeper', kind: 'keeper', x: 154 }],
+    enemies: [{ id: 'keeper', kind: 'keeper', x: 154, patrol: [149, 157.2] }],
   },
   {
     id: 'obedience',
@@ -103,7 +106,7 @@ export const landmarks = [
   { id: 'remanence', x: 80.5, y: 1.4, kind: 'ability', label: 'Rémanence' },
   { id: 'memory-step', x: 119, y: 1.4, kind: 'ability', label: 'Memory Step' },
   { id: 'kael', x: 31, y: 6.2, kind: 'memory', label: 'Fragment de Kael' },
-  { id: 'seris', x: 147, y: 3.2, kind: 'memory', label: 'Fragment de Seris' },
+  { id: 'seris', x: 144.5, y: 3.2, kind: 'memory', label: 'Fragment de Seris' },
 ] as const;
 
 export const shortcuts = [
@@ -126,3 +129,52 @@ export const shortcuts = [
     requires: 'echo-gate-open',
   },
 ] as const;
+
+const ArenaSchema = z.object({
+  id: z.string(),
+  /** Enemy id of the fight's guardian, or `faceless-guardian` for the boss. */
+  guardian: z.string(),
+  name: z.string(),
+  subtitle: z.string(),
+  /** Crossing this abscissa seals the arena behind the player. */
+  trigger: z.number(),
+  /** Gate positions: `left` closes behind the player, `right` bars the way on. */
+  left: z.number(),
+  right: z.number(),
+  /** Horizontal range the guardian's centre may occupy. */
+  roam: z.tuple([z.number(), z.number()]),
+});
+export type Arena = z.infer<typeof ArenaSchema>;
+/**
+ * Guarded chambers. The far gate stays shut until the guardian falls; the near gate
+ * seals behind the player once the fight starts, so a guardian cannot be walked past.
+ */
+export const arenas = [
+  {
+    id: 'last-order',
+    guardian: 'keeper',
+    name: 'LE PORTEUR DU DERNIER ORDRE',
+    subtitle: 'Il garde encore le seuil',
+    trigger: 149.5,
+    left: 147.5,
+    right: 158.6,
+    roam: [149, 157.2],
+  },
+  {
+    id: 'obedience',
+    guardian: 'faceless-guardian',
+    name: 'GARDIEN SANS VISAGE',
+    subtitle: 'Celui qui n’a jamais désobéi',
+    trigger: 166,
+    left: 164,
+    right: 196,
+    roam: [167, 192],
+  },
+].map((arena) => ArenaSchema.parse(arena));
+export const gates = [
+  { id: 'echo', x: 141 },
+  ...arenas.flatMap((arena) => [
+    { id: `${arena.id}-left`, x: arena.left },
+    { id: `${arena.id}-right`, x: arena.right },
+  ]),
+];

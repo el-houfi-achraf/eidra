@@ -13,6 +13,10 @@ export const EnemySchema = z.object({
   drops: z.number().int().nonnegative(),
   ranged: z.boolean(),
   scale: z.number().positive(),
+  /** Damage dealt by touching the body; dashing through it is safe. */
+  contact: z.number().nonnegative(),
+  /** Flies over the floor instead of walking on it. */
+  flying: z.boolean().default(false),
 });
 export const enemyData = {
   keeper: EnemySchema.parse({
@@ -29,6 +33,7 @@ export const enemyData = {
     drops: 8,
     ranged: false,
     scale: 1.65,
+    contact: 16,
   }),
   watcher: EnemySchema.parse({
     id: 'watcher',
@@ -44,6 +49,7 @@ export const enemyData = {
     drops: 2,
     ranged: false,
     scale: 1,
+    contact: 10,
   }),
   wisp: EnemySchema.parse({
     id: 'wisp',
@@ -59,6 +65,8 @@ export const enemyData = {
     drops: 2,
     ranged: true,
     scale: 0.75,
+    contact: 8,
+    flying: true,
   }),
   sentinel: EnemySchema.parse({
     id: 'sentinel',
@@ -74,6 +82,7 @@ export const enemyData = {
     drops: 4,
     ranged: false,
     scale: 1.35,
+    contact: 14,
   }),
 };
 export type EnemyKind = keyof typeof enemyData;

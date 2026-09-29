@@ -133,7 +133,7 @@ export class Game {
       this.ui.notice('Les sauvegardes existantes n’ont pas pu être lues. Elles sont conservées.');
     }
     this.applySettings(this.settings, false);
-    this.world.update(10, false, false, false);
+    this.world.update(10, false, new Set());
     this.session.player.teleport(10, 1.2);
     if (new URLSearchParams(location.search).get('debug') === '1') {
       this.debug = new DebugOverlay(this.presentation.scene);
@@ -267,7 +267,7 @@ export class Game {
     if (this.state.state === 'CUTSCENE') this.state.change('ENDING');
     this.state.change('MAIN_MENU');
     this.input.reset();
-    this.world.update(10, false, true, false);
+    this.world.update(10, false, new Set());
     this.session.player.teleport(10, 1.2);
     try {
       await this.saving;
@@ -398,6 +398,7 @@ export class Game {
           pattern: this.session.enemies.director.pattern.id,
           targets: [...this.session.enemies.director.targets],
         },
+        gates: [...this.session.closedGates()],
         settings: structuredClone(this.settings),
         memories: [...this.session.narrative.memories],
         flags: [...this.session.narrative.flags],
@@ -411,7 +412,7 @@ export class Game {
       teleport: (x, y = 1.2) => {
         if (!Number.isFinite(x) || !Number.isFinite(y))
           throw new Error('Invalid debug coordinates');
-        this.world.update(x, this.session.abilities.remanence, true, false);
+        this.world.update(x, this.session.abilities.remanence, this.session.closedGates());
         this.session.player.teleport(x, y);
       },
       unlock: (id: AbilityId) => {
@@ -430,6 +431,11 @@ export class Game {
           0,
           Math.min(this.session.enemies.boss.maxHealth, value),
         );
+      },
+      setEnemyHealth: (id: string, value: number) => {
+        const enemy = this.session.enemies.entities.get(id)?.actor;
+        if (!enemy || !Number.isFinite(value)) throw new Error(`Invalid debug enemy ${id}`);
+        enemy.health = Math.max(0, Math.min(enemy.maxHealth, value));
       },
       save: () => {
         this.saveNow();

@@ -162,6 +162,48 @@ test('boss introduction, phase two, defeat and prelude conclusion', async ({ pag
   await expect(page.locator('body')).toHaveAttribute('data-state', 'ENDING');
   await expect(page.getByText('FIN DU PRÉLUDE')).toBeVisible();
 });
+/** Holds a key for `ms` and returns the furthest x reached meanwhile. */
+async function furthest(page: Page, key: string, ms: number): Promise<number> {
+  let max = Number.NEGATIVE_INFINITY;
+  await page.keyboard.down(key);
+  const end = Date.now() + ms;
+  while (Date.now() < end) max = Math.max(max, (await snapshot(page)).player.x);
+  await page.keyboard.up(key);
+  return max;
+}
+test('guardians bar the way until they are defeated', async ({ page }) => {
+  await start(page);
+  // The Keeper's chamber: crossing its threshold seals the way back.
+  await page.evaluate(() => window.eidra!.teleport(146));
+  expect((await snapshot(page)).gates).toContain('last-order-right');
+  await page.keyboard.down('KeyD');
+  await expect.poll(async () => (await snapshot(page)).gates).toContain('last-order-left');
+  await page.keyboard.up('KeyD');
+  await expect(page.locator('#title-card')).toContainText('LE PORTEUR DU DERNIER ORDRE');
+  // Walking at the far gate does not get past it while the Keeper stands.
+  await page.evaluate(() => window.eidra!.teleport(157.4));
+  const keeperSide = await furthest(page, 'KeyD', 2500);
+  // Pressed against the gate (capsule radius 0.33), never through it.
+  expect(keeperSide).toBeGreaterThan(157.7);
+  expect(keeperSide).toBeLessThan(158.4);
+  await page.evaluate(() => window.eidra!.setEnemyHealth('keeper', 0));
+  await expect.poll(async () => (await snapshot(page)).gates).not.toContain('last-order-right');
+  expect((await snapshot(page)).gates).not.toContain('last-order-left');
+  await page.keyboard.down('KeyD');
+  await expect.poll(async () => (await snapshot(page)).player.x).toBeGreaterThan(159.5);
+  await page.keyboard.up('KeyD');
+  // The Guardian's arena: the far gate holds until it falls.
+  await page.evaluate(() => window.eidra!.teleport(193.5));
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'CUTSCENE');
+  await skipDialogue(page);
+  await expect.poll(async () => (await snapshot(page)).gates).toContain('obedience-left');
+  const guardianSide = await furthest(page, 'KeyD', 2500);
+  expect(guardianSide).toBeGreaterThan(195);
+  expect(guardianSide).toBeLessThan(195.8);
+  expect((await snapshot(page)).state).toBe('PLAYING');
+  await page.evaluate(() => window.eidra!.setBossHealth(0));
+  await expect.poll(async () => (await snapshot(page)).gates).not.toContain('obedience-right');
+});
 test('standard gamepad API controls the player while keyboard stays available', async ({
   page,
 }) => {

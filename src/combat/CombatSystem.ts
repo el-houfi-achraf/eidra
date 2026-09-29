@@ -16,6 +16,8 @@ export interface Hitbox extends Point {
   stagger: number;
   force: number;
   direction: number;
+  /** Body contact: a parry cannot deflect it. */
+  unblockable?: boolean;
 }
 export const makeCombatant = (
   id: string,

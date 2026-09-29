@@ -7,13 +7,13 @@ describe('enemy traversal and streaming', () => {
   it('keeps the bridge watcher on its solid bank during chase and knockback', () => {
     const manager = new EnemyManager();
     manager.sync([chunks[2]!]);
-    const player = makeCombatant('eidra', 100, 104, 1);
+    const player = makeCombatant('eidra', 100, 106, 1);
     const watcher = manager.entities.get('watcher-2')!;
     for (let i = 0; i < 600; i++) manager.update(1 / 60, player, () => undefined);
-    expect(watcher.actor.x).toBe(108.5);
+    expect(watcher.actor.x).toBe(112);
     watcher.actor.knockback = -40;
     manager.update(1 / 60, player, () => undefined);
-    expect(watcher.actor.x).toBe(108.5);
+    expect(watcher.actor.x).toBe(112);
     manager.sync([chunks[0]!]);
     expect(manager.entities.has('watcher-2')).toBe(false);
   });

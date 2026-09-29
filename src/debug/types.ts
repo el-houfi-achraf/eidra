@@ -23,6 +23,8 @@ export interface DebugSnapshot {
   chunks: string[];
   enemies: { id: string; x: number; y: number; health: number; state: string }[];
   boss: { health: number; state: string; phase: number; pattern: string; targets: number[] };
+  /** Gates currently barring the way (arena gates and the counterweight seal). */
+  gates: string[];
   settings: Settings;
   memories: string[];
   flags: string[];
@@ -46,6 +48,7 @@ export interface DebugAPI {
   damage: (amount: number) => void;
   addShards: (amount: number) => void;
   setBossHealth: (value: number) => void;
+  setEnemyHealth: (id: string, value: number) => void;
   save: () => Promise<void>;
 }
 declare global {

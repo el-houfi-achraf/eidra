@@ -87,6 +87,7 @@ export class Hud {
   private barTimers = new Map<string, number>();
   private chipValue = 1;
   private bossChipValue = 1;
+  private bossMarker: Rectangle;
   private shardCount = -1;
   private shardPop = 0;
   private point = new Vector3();
@@ -282,6 +283,7 @@ export class Hud {
     marker.left = `${guardianData.phaseThreshold * 700 - 1}px`;
     marker.top = '17px';
     this.boss.addControl(marker);
+    this.bossMarker = marker;
     // Pooled world-space widgets: floating numbers and enemy health bars.
     for (let i = 0; i < 24; i++) {
       const block = new TextBlock('damage-number', '');
@@ -374,10 +376,13 @@ export class Hud {
     this.shardPop = Math.max(0, this.shardPop - dt * 4);
     this.shards.scaleX = this.shards.scaleY = 1 + this.shardPop * 0.35;
     this.shards.color = this.shardPop > 0 ? '#fff0c8' : '#e2c48d';
-    const boss = session.enemies.boss,
-      director = session.enemies.director;
-    this.boss.isVisible = session.bossActive;
-    const bossRatio = Math.max(0.001, boss.health / boss.maxHealth);
+    const director = session.enemies.director,
+      bar = session.bossBar,
+      guardian = session.bossActive;
+    this.boss.isVisible = bar !== null;
+    this.bossMarker.isVisible = guardian;
+    if (bar) this.bossLabel.text = bar.name;
+    const bossRatio = bar ? Math.max(0.001, bar.health / bar.maxHealth) : 1;
     this.bossFill.width = bossRatio;
     this.bossChipValue =
       bossRatio >= this.bossChipValue
@@ -390,14 +395,15 @@ export class Hud {
       charge: 'CHARGE — ESQUIVEZ',
       rain: 'PLUIE D’ÉCLATS — QUITTEZ LES MARQUES',
     };
-    this.bossSubtitle.text =
-      director.state === 'windup'
+    this.bossSubtitle.text = !guardian
+      ? (bar?.subtitle ?? '')
+      : director.state === 'windup'
         ? (cue[director.pattern.id] ?? guardianData.subtitle)
         : director.state === 'transition'
           ? 'IL SE SOUVIENT DE SA COLÈRE'
           : guardianData.subtitle;
-    this.bossSubtitle.color = director.state === 'windup' ? '#ffb27a' : '#9fb1a8';
-    this.bossFill.background = director.phase === 2 ? '#e0895a' : '#d5af73';
+    this.bossSubtitle.color = guardian && director.state === 'windup' ? '#ffb27a' : '#9fb1a8';
+    this.bossFill.background = guardian && director.phase === 2 ? '#e0895a' : '#d5af73';
     for (const n of this.numbers) {
       if (n.life <= 0) continue;
       n.life -= dt;
