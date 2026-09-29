@@ -38,6 +38,7 @@ export class Game {
   private running = true;
   private endingPending = false;
   private endShown = false;
+  private deathTimer = 0;
   private saving: Promise<void> = Promise.resolve();
   private lifecycle = new AbortController();
   constructor(private canvas: HTMLCanvasElement) {
@@ -86,6 +87,7 @@ export class Game {
         }[id as string];
         const data = abilityData[id];
         this.ui.abilityBanner(data.name, data.description, action ? this.input.label(action) : '—');
+        this.presentation.radiance(this.session.actor.x, this.session.actor.y, 'memory', 6);
       },
       altar: () => this.openAltar(),
     });
@@ -102,7 +104,15 @@ export class Game {
       this.hud.enemyDamaged(e.id);
       this.presentation.enemyHit(e.id, e.finisher, e.x, e.y);
     });
-    events.on('ENEMY_DEFEATED', (e) => this.presentation.enemyDefeated(e.x, e.y, e.shards));
+    events.on('ENEMY_DEFEATED', (e) => {
+      this.presentation.enemyDefeated(e.x, e.y, e.shards);
+      // Guardians leave a radiant burst where they fell.
+      if (e.id === 'keeper') this.presentation.radiance(e.x, e.y + 0.6, 'gold', 8);
+    });
+    events.on('BOSS_DEFEATED', () => {
+      const boss = this.session.enemies.boss;
+      this.presentation.radiance(boss.x, boss.y + 0.8, 'gold', 11);
+    });
     events.on('PLAYER_DAMAGED', (e) =>
       this.hud.number(
         this.session.actor.x,
@@ -208,9 +218,16 @@ export class Game {
         this.ui.navigate(this.input.menuDirection, this.input.consume(InputAction.Jump));
       const menu = this.state.state === 'MAIN_MENU' || this.state.state === 'BOOT';
       this.presentation.render(dt, this.session, this.settings, menu);
-      this.hud.update(this.session, ['PLAYING', 'PAUSED'].includes(this.state.state), dt);
+      this.hud.update(
+        this.session,
+        ['PLAYING', 'PAUSED'].includes(this.state.state),
+        dt,
+        this.settings.reducedMotion,
+      );
       this.audio.listen(this.session.actor.x, this.session.actor.y);
-      this.audio.update(dt, this.settings, this.session.bossActive, this.state.state !== 'PLAYING');
+      // Guardian fights (the Keeper included) share the combat score.
+      const fight = this.session.bossBar !== null;
+      this.audio.update(dt, this.settings, fight, this.state.state !== 'PLAYING');
       this.debug?.recordCPU(performance.now() - cpuStart);
       this.debug?.update(
         dt,
@@ -231,6 +248,7 @@ export class Game {
     try {
       if (data) this.session.load(data);
       else this.session.newGame(slot);
+      this.presentation.reformHero(this.session.player.position.x, this.session.player.position.y);
       this.state.change('PLAYING');
       this.ui.playing();
       this.input.reset();
@@ -253,6 +271,7 @@ export class Game {
     this.ui.pause(this.settings, this.session, (action) => this.input.label(action));
   }
   private resume(): void {
+    this.presentation.resting = false;
     if (this.state.state === 'ENDING') {
       this.session.player.teleport(190, 1.2);
       this.endShown = true;
@@ -263,6 +282,8 @@ export class Game {
     this.input.focus();
   }
   private async showMenu(): Promise<void> {
+    window.clearTimeout(this.deathTimer);
+    this.presentation.resting = false;
     if (this.state.state === 'PLAYING') this.state.change('PAUSED');
     if (this.state.state === 'CUTSCENE') this.state.change('ENDING');
     this.state.change('MAIN_MENU');
@@ -278,8 +299,10 @@ export class Game {
     this.ui.main(this.saves, this.settings);
   }
   private respawn(): void {
+    window.clearTimeout(this.deathTimer);
     this.state.change('LOADING');
     this.session.respawn();
+    this.presentation.reformHero(this.session.player.position.x, this.session.player.position.y);
     this.state.change('PLAYING');
     this.ui.playing();
     this.input.reset();
@@ -290,7 +313,15 @@ export class Game {
     if (this.state.state !== 'PLAYING') return;
     this.state.change('GAME_OVER');
     this.input.reset();
-    this.ui.death();
+    // The mask shatters first; the death panel follows once the shards have flown.
+    this.presentation.shatterHero(this.session.actor.x, this.session.actor.y);
+    window.clearTimeout(this.deathTimer);
+    this.deathTimer = window.setTimeout(
+      () => {
+        if (this.state.state === 'GAME_OVER') this.ui.death();
+      },
+      this.settings.reducedMotion ? 350 : 1300,
+    );
   }
   private startDialogue(): void {
     if (this.state.state === 'PLAYING') {
@@ -302,6 +333,9 @@ export class Game {
   private openAltar(): void {
     if (this.state.state !== 'PLAYING') return;
     this.state.change('PAUSED');
+    // Eidra kneels before the anchor while the offering is open.
+    this.presentation.resting = true;
+    this.presentation.radiance(this.session.actor.x, this.session.actor.y + 0.4, 'gold', 3.5);
     this.input.reset();
     this.ui.altar(this.session);
   }
@@ -448,6 +482,7 @@ export class Game {
     this.running = false;
     this.engine.stopRenderLoop();
     this.lifecycle.abort();
+    window.clearTimeout(this.deathTimer);
     this.debug?.dispose();
     this.hud.dispose();
     this.session.dispose();

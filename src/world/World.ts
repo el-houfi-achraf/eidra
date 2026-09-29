@@ -21,6 +21,8 @@ export class World {
   readonly stream: SceneManager<ChunkView>;
   private gates = new Map<string, Gate>();
   private lastTime = Number.NaN;
+  /** Gates that started rising or sinking since the presentation last looked. */
+  private changes: { x: number; closed: boolean }[] = [];
   constructor(
     private scene: Scene,
     p: Palette,
@@ -56,6 +58,7 @@ export class World {
       this.gate(gate, closed.has(id) && Math.abs(x - gate.x) < 45);
   }
   private gate(gate: Gate, closed: boolean): void {
+    if (closed !== gate.closed) this.changes.push({ x: gate.x, closed });
     gate.closed = closed;
     if (closed && !gate.body) {
       // The collider always sits at full height, whatever the visual animation shows.
@@ -68,6 +71,11 @@ export class World {
       gate.body.dispose();
       gate.body = null;
     }
+  }
+  takeGateChanges(): { x: number; closed: boolean }[] {
+    const changes = this.changes;
+    this.changes = [];
+    return changes;
   }
   isClosed(id: string): boolean {
     return this.gates.get(id)?.closed ?? false;

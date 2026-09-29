@@ -30,6 +30,11 @@ export class CameraRig {
   shake(amount: number): void {
     this.trauma = Math.min(1, this.trauma + amount);
   }
+  /** Cuts straight to a new framing (respawn), instead of sweeping across the level. */
+  snap(x: number, y: number, facing = 1): void {
+    this.x = Math.max(9, x + facing * 2.3);
+    this.y = Math.max(3.5, y + 1.5);
+  }
   /** Brief zoom towards the action on heavy blows and parries. */
   punch(amount: number): void {
     this.zoom = Math.min(0.12, this.zoom + amount);
@@ -39,14 +44,20 @@ export class CameraRig {
     x: number,
     y: number,
     facing: number,
-    boss: boolean,
+    /** A sealed arena: the camera frames the whole chamber instead of following. */
+    arena: { left: number; right: number } | null,
     settings: Settings,
     menu = false,
   ): void {
     this.clock += dt;
     this.trauma = Math.max(0, this.trauma - dt * 2.5);
     this.zoom = settings.reducedMotion ? 0 : damp(this.zoom, 0, 7, dt);
-    const targetX = menu ? 10 : boss ? 178 : Math.max(9, x + facing * 2.3);
+    const aspect = this.scene.getEngine().getAspectRatio(this.camera) || 16 / 9;
+    const targetX = menu
+      ? 10
+      : arena
+        ? (arena.left + arena.right) / 2
+        : Math.max(9, x + facing * 2.3);
     this.x = damp(this.x, targetX, menu ? 2 : 4.5 * settings.cameraSensitivity, dt);
     this.y = damp(this.y, menu ? 3.8 : Math.max(3.5, y + 1.5), 3.2, dt);
     const shake = settings.reducedMotion ? 0 : this.trauma ** 2 * settings.shake * 0.25;
@@ -57,7 +68,9 @@ export class CameraRig {
     );
     this.target.set(this.x, this.y, 0);
     this.camera.setTarget(this.target);
-    this.halfHeight = damp(this.halfHeight, boss ? 8.7 : menu ? 10 : 7.2, 2.5, dt);
+    // Wide chambers pull the camera back until both gates are in view.
+    const framed = arena ? Math.max(7.2, ((arena.right - arena.left) / 2 + 0.8) / aspect) : 7.2;
+    this.halfHeight = damp(this.halfHeight, menu ? 10 : framed, 2.5, dt);
     const half = this.halfHeight * (1 - this.zoom);
     this.camera.fov = 2 * Math.atan(half / Math.hypot(DISTANCE, 4.8));
   }
