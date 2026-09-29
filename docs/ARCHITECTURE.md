@@ -34,7 +34,9 @@ GameError, ConfigurationError, AssetLoadError et SaveError. Échec critique : é
 
 `TutorialDirector` (quests) choisit l'invite contextuelle à partir des données de `game-data/quests/tutorial.ts` ; `GameSession` lui signale les gestes accomplis et expose `hint`, que `MenuUI` affiche avec les glyphes du dernier périphérique.
 
-`SceneManager` conserve seulement les secteurs proches, puis libère chaque `ChunkView`. `World` possède les colliders simples et portes temporaires. Les corps mémoire sont créés / détruits quand Rémanence change ; aucune physique n’est attachée à un modèle artistique complexe. `AssetLoader` prépare le chargement GLB asynchrone avec annulation et libération ; le blockout du prélude est actuellement procédural.
+`ArenaDirector` (bosses) scelle et libère les arènes décrites dans `game-data/zones/laboratory.ts` ; `GameSession.closedGates()` combine ses portes et le sceau du contrepoids, `World` les applique (colliders statiques créés près du joueur, animation de montée purement visuelle, changements signalés à `Presentation` pour la poussière) et `EnemyManager` en borne les corps avec les intervalles de `Terrain` (D020, D021). `GameSession.bossBar` expose au HUD la vie du gardien combattu. `Poses` traduit l'état des FSM, du directeur de boss et du combat en poses clés visuelles (D022) ; `LightRays` dessine les lames de lumière.
+
+`SceneManager` conserve seulement les secteurs proches, puis libère chaque `ChunkView`. `World` possède les colliders simples et portes d'arène. Les corps mémoire sont créés / détruits quand Rémanence change ; aucune physique n’est attachée à un modèle artistique complexe. `AssetLoader` prépare le chargement GLB asynchrone avec annulation et libération ; le blockout du prélude est actuellement procédural.
 
 Les ressources répétées des impacts et projectiles visuels sont préallouées. Les meshes statiques sont fusionnés par matériau, sauf les éléments interactifs. Les décodeurs WASM et JS sont servis localement. L’audio Babylon V2 utilise des boucles OGG originales, un crossfade et des effets spatiaux, avec secours WAV explicite.
 

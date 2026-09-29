@@ -16,6 +16,14 @@
 - **HUD** : emblème-réceptacle en forme de masque qui se remplit de résonance et s'illumine quand un soin est disponible.
 - **UX** : tutoriel contextuel mémorisé dans la sauvegarde, réglages par onglets (valeurs affichées, interrupteurs, réinitialisation, capture de touche guidée), notifications empilées, cartes de sauvegarde détaillées, pause avec objectif et commandes, carte en itinéraire, conseils.
 
+### Troisième itération : arènes, collisions et animation
+
+- **Correctif** : les gardiens ne se contournent plus. Chaque arène se scelle derrière Eidra et sa porte du fond reste fermée jusqu'à la victoire (Porteur du dernier ordre et Gardien Sans Visage), avec carte de titre, notification, barre de vie et cadrage de toute l'arène.
+- **Correctif** : ennemis et boss ne traversent plus les obstacles. Leurs déplacements sont bornés par la géométrie du niveau et par les portes ; la corniche de Seris a été déplacée hors de l'arène du Porteur.
+- **Combat** : les corps ennemis blessent au contact (non parable, boîte indulgente).
+- **Animation** : anticipation / frappe / récupération lisibles pour chaque ennemi, silhouettes propres à chaque pattern du Gardien, sursaut à la détection, recul à l'impact ; inclinaison d'Eidra dans les coups et l'esquive, poussière de course et de saut, agenouillement à l'ancrage ; masque qui éclate à la mort puis reconstitution en lumière ; lames de lumière pour les pouvoirs et les gardiens vaincus ; portes qui jaillissent du sol.
+- **UX** : autel sur le côté pour voir le repos, HUD qui tressaute sous les coups et bat à faible vie, caméra qui revient directement à l'ancrage au respawn, musique de combat aussi contre le Porteur.
+
 ## Limites connues de cette mise à jour
 
 - Les valeurs (résonance, coûts d'offrande, durées de hit-stop, pluie d'éclats) sont des propositions de conception ; aucun playtest humain ne les a encore validées.

@@ -11,8 +11,11 @@ eidra.unlock('remanence');
 eidra.unlock('memory-step');
 eidra.damage(20);
 eidra.setBossHealth(150);
+eidra.setEnemyHealth('keeper', 0);
 await eidra.save();
 ```
+
+`snapshot().gates` liste les portes qui barrent le chemin (`echo`, `last-order-left` / `-right`, `obedience-left` / `-right`). `setEnemyHealth` vise un ennemi chargé par son identifiant de spawn.
 
 Les commandes modifient la partie actuelle : réserver un emplacement aux tests. Elles ne sont pas requises pour terminer le parcours. L'API n'est pas une interface réseau.
 

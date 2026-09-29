@@ -44,6 +44,12 @@ Après correction : suite complète réussie, traversée du pont 5 / 5 et plong�
 
 13 parcours E2E, tous réussis sur le build final. Ajout : les invites contextuelles enseignent le déplacement puis le saut et se retirent une fois le geste accompli. Le parcours des réglages ouvre désormais les onglets Accessibilité et Commandes avant d'y agir.
 
+## Troisième itération : arènes, collisions et animation
+
+74 tests unitaires / intégration dans 15 fichiers. Ajouts : intervalles de marche (sol sous le centre, dalles contiguës fusionnées, passage sous une dalle haute, volants), vérification que **aucun ennemi du laboratoire ne chevauche une dalle solide sur toute sa patrouille** et garde un sol sous lui, portes fermées qui bornent chaque corps de son côté, cohérence des arènes dans les données (seuil entre les portes, zone du gardien incluse, ancrage du seuil après le Porteur), scellement / libération / respawn des arènes, Porteur retenu derrière sa porte pendant une poursuite, Gardien confiné et réveillé seulement après le seuil, dégâts de contact non parables ; poses clés (anticipation, fente, affaissement, recul, sursaut, lanceurs, silhouettes de chaque pattern du Gardien, introduction, bornes des poses, inclinaison d'Eidra).
+
+14 parcours E2E, tous réussis sur le build final. Ajout : **« guardians bar the way until they are defeated »** — le seuil du Porteur se scelle (carte de titre), Eidra poussée contre la porte du fond pendant 2,5 s reste devant elle, la porte s'ouvre à la mort du Porteur et Eidra passe ; dans l'arène du Gardien, même vérification sur la porte x = 196, qui s'ouvre à sa défaite. Parcours répété 3 / 3. Le parcours du pont reste sans perte de vie grâce à la zone d'atterrissage libérée (D021) ; le Veilleur attendait auparavant exactement sur la zone d'atterrissage. La mort affiche désormais le panneau 1,3 s après l'éclatement ; le parcours de respawn l'attend par l'auto-attente de Playwright, sans délai fixe ajouté.
+
 ## Qualité restant à qualifier
 
 WebGPU réel, Firefox / Safari, manettes physiques, accessibilité avec lecteurs d’écran, quotas / stockage privé, CSP sur Cloudflare et campagne complète. Le protocole de performance logiciel est décrit dans PERFORMANCE ; il ne certifie pas 60 FPS. Aucun test défaillant n’est désactivé pour rendre la CI verte.

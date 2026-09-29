@@ -81,3 +81,15 @@ Chaque personnage est décrit dans `game-data/characters/appearance.ts` (cape pl
 ## D019 — Tutoriel contextuel dans les drapeaux existants
 
 Les invites de `game-data/quests/tutorial.ts` apparaissent dans une bande du laboratoire, après les pouvoirs requis, et se retirent dès que le joueur accomplit l'action n'importe où. L'apprentissage est enregistré comme drapeau `tutorial:<id>` dans les flags déjà sauvegardés : aucune migration. Le réglage « Aides contextuelles » (par défaut activé) masque les invites sans affecter le domaine.
+
+## D020 — Arènes scellées pilotées par les données
+
+Les gardiens se contournaient en marchant. `game-data/zones/laboratory.ts` décrit désormais chaque arène (gardien, bornes gauche / droite, seuil de déclenchement, zone de déplacement du gardien, carte de titre) et en dérive les portes. `ArenaDirector` garde la porte du fond fermée tant que le gardien vit et scelle celle d'entrée dès que le joueur franchit le seuil ; la mort la rouvre (respawn), la victoire ouvre les deux. Les collisions des portes sont des corps statiques Havok créés à pleine hauteur près du joueur seulement ; la montée / descente visible est purement décorative. L'ancrage du seuil (x = 160) est devenu la récompense du Porteur du dernier ordre : son arène [147,5 ; 158,6] se ferme avant lui. Les sauvegardes existantes restent valides (aucun champ nouveau) ; une partie sauvegardée au seuil sans avoir vaincu le Porteur reste jouable, le Porteur restant alors derrière le joueur.
+
+## D021 — Bornes de déplacement déduites de la géométrie et dégâts de contact
+
+Les ennemis se déplacent le long d'un intervalle calculé à partir des dalles du niveau (`src/enemies/Terrain.ts`) : un marcheur reste sur le sol qu'il foule (dalles contiguës fusionnées, hauteur du corps posée sur la dalle sous son centre) et s'arrête avant toute dalle qui traverse son corps ; un volant ignore les sols mais respecte les dalles de sa bande. Les portes fermées bornent aussi chaque corps de son côté. Toucher un corps ennemi blesse (valeur `contact` des données, non parable) avec une boîte réduite à 75 % pour rester juste sur les frôlements. La sortie du pont garde une zone d'atterrissage libre.
+
+## D022 — Poses clés dérivées de l'état, animation hors domaine
+
+Les anticipations, frappes, récupérations et reculs sont calculés par des fonctions pures (`src/animation/Poses.ts`) à partir de l'état des FSM, du directeur de boss et du combat, puis appliqués par `CharacterView` comme décalages (inclinaison, avance, élévation, écrasement, arme levée, tremblement, agenouillement). Aucun temps d'animation n'influence le gameplay : les fenêtres de dégâts restent celles des données. La mort retarde seulement l'affichage du panneau (1,3 s, 0,35 s en mouvements réduits) ; la simulation s'arrête immédiatement. Le réglage « mouvements réduits » annule décalages et tremblements.
