@@ -239,8 +239,8 @@ test('crosses the memory bridge using jumps and dash without losing health', asy
     window.eidra!.unlock('remanence');
     window.eidra!.unlock('dash');
   });
-  // The grounded flag can still describe the pre-teleport frame; wait until Eidra has
-  // actually settled on the bank, otherwise the buffered jump may expire mid-drop.
+  // The fixture drops Eidra slightly above the bank: wait until she has actually settled,
+  // otherwise the buffered jump may expire mid-drop.
   await expect
     .poll(async () => {
       const s = await snapshot(page);
@@ -332,22 +332,32 @@ test('a downward strike bounces off a Veilleur', async ({ page }) => {
   await expect
     .poll(async () => (await snapshot(page)).enemies.find((e) => e.id === 'watcher-1')?.state)
     .toMatch(/IDLE|PATROL/);
+  // Let the respawn grace run out, so the Veilleur's body could hurt Eidra.
+  await expect.poll(async () => (await snapshot(page)).player.invulnerable).toBe(0);
   const watcher = (await snapshot(page)).enemies.find((e) => e.id === 'watcher-1')!;
   await page.keyboard.down('KeyS');
   await page.evaluate((x) => window.eidra!.teleport(x, 3.8), watcher.x);
-  // Strike once the controller reports the fall, as a player would after a jump.
-  await expect
-    .poll(async () => (await snapshot(page)).player.grounded, { intervals: [10] })
-    .toBe(false);
+  // Down + attack straight away, as a player above an enemy would: waiting for a state
+  // round trip first costs frames of fall, and the drop to the Veilleur's head lasts ~0.3 s.
   await page.keyboard.press('KeyJ');
+  // The strike springs Eidra back up: she climbs well above the lowest point of her drop.
+  let lowest = Number.POSITIVE_INFINITY;
   await expect
-    .poll(async () => (await snapshot(page)).player.y, { intervals: [20], timeout: 8000 })
-    .toBeGreaterThan(4.2);
+    .poll(
+      async () => {
+        const y = (await snapshot(page)).player.y;
+        lowest = Math.min(lowest, y);
+        return y - lowest;
+      },
+      { intervals: [20], timeout: 8000 },
+    )
+    .toBeGreaterThan(1);
   await page.keyboard.up('KeyS');
-  const after = (await snapshot(page)).enemies.find((e) => e.id === 'watcher-1')!;
-  expect(after.health).toBeLessThan(watcher.health);
+  const after = await snapshot(page);
+  expect(after.enemies.find((e) => e.id === 'watcher-1')!.health).toBeLessThan(watcher.health);
+  // The plunge had priority over the body it landed on.
+  expect(after.player.health).toBe(100);
 });
-
 test('contextual hints teach a control and retire once it is performed', async ({ page }) => {
   await start(page);
   const hint = page.locator('#hint');

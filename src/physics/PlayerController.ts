@@ -11,6 +11,12 @@ export class PlayerController {
   readonly character: PhysicsCharacterController;
   private gravity = new Vector3(0, -28, 0);
   private velocity = Vector3.Zero();
+  /**
+   * Havok keeps the contact manifold of the previous position after `setPosition`, so the
+   * first support query after a teleport describes the old ground. That step is treated as
+   * airborne; its integration refreshes the contacts at the new position.
+   */
+  private teleported = false;
   constructor(scene: Scene) {
     this.character = new PhysicsCharacterController(
       new Vector3(4, 1.2, 0),
@@ -31,6 +37,10 @@ export class PlayerController {
     knockback = 0,
   ): void {
     const support = this.character.checkSupport(dt, Vector3.Down());
+    if (this.teleported) {
+      support.supportedState = CharacterSupportedState.UNSUPPORTED;
+      this.teleported = false;
+    }
     this.motion.step(
       dt,
       intent,
@@ -48,6 +58,7 @@ export class PlayerController {
     this.character.setPosition(new Vector3(x, y, 0));
     this.character.setVelocity(Vector3.Zero());
     this.motion.reset();
+    this.teleported = true;
   }
   dispose(): void {
     this.character.dispose();

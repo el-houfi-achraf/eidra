@@ -9,9 +9,13 @@ import type { ChunkData } from '../../game-data/zones/laboratory';
 import { checkpoints, landmarks, shortcuts } from '../../game-data/zones/laboratory';
 import type { Palette } from './Palette';
 import type { DisposableChunk } from './SceneManager';
+import { paintScenery } from './Scenery';
+import type { PaintedGeometry } from './PaintedGeometry';
 // TODO_ART: original procedural blockout. Replace through the validated Blender → GLB pipeline.
 export class ChunkView implements DisposableChunk {
-  private lodMeshes: Mesh[] = [];
+  private farLayers: Mesh | null = null;
+  private memoryView: Mesh | null = null;
+  private glowLayer: Mesh | null = null;
   readonly root: TransformNode;
   readonly meshes: Mesh[] = [];
   private bodies: PhysicsAggregate[] = [];
@@ -40,89 +44,16 @@ export class ChunkView implements DisposableChunk {
         platform.memory ? p.memory : p.stone,
       );
       if (platform.memory) {
+        // Colliders only: the scenery paints the remembered slabs.
         this.memoryMeshes.push(mesh);
-        mesh.visibility = 0.12;
-      } else
+        mesh.isVisible = false;
+      } else {
+        // Solid slabs are painted by the scenery; the box only carries the collider.
+        mesh.isVisible = false;
         this.bodies.push(
           new PhysicsAggregate(mesh, PhysicsShapeType.BOX, { mass: 0, friction: 0 }, scene),
         );
-      if (!platform.memory) {
-        this.box(
-          'floor-trim',
-          platform.x,
-          platform.y + platform.h / 2 - 0.12,
-          -2.48,
-          platform.w,
-          0.13,
-          0.12,
-          p.trim,
-        );
-        for (let x = platform.x - platform.w / 2 + 1; x < platform.x + platform.w / 2; x += 2)
-          this.box('seam', x, platform.y + platform.h / 2 + 0.005, 0, 0.025, 0.015, 4.9, p.dark);
       }
-    }
-    // Background parallax layers: monumental ribs, broken windows and receding arcades.
-    for (let i = 0; i < 5; i++) {
-      const x = data.start + i * 8 + 2;
-      const h = 11 + Math.sin(data.seed + i * 3) * 3;
-      this.box('rear-column', x, h / 2 - 2, 7, 1.5, h, 2.6, p.distant);
-      this.box('capital', x, h - 2, 7, 2.2, 0.45, 3, p.trim);
-      this.box('plinth', x, 0.4, 6.5, 2.5, 0.8, 3, p.dark);
-      this.arch(x + 4, h - 2, 7, 3.4, p.distant);
-      this.box('window-core', x + 4, 5.5, 11, 0.12, 8, 0.15, p.crystal);
-      this.box('far-tower', x + 1, 8, 22, 5, 23, 3, p.dark);
-      this.arch(x + 4, 15, 22, 5, p.distant);
-      for (let r = 0; r < 3; r++) {
-        const rock = this.box(
-          'rubble',
-          x + r * 1.2 - 2,
-          -0.1,
-          3.2,
-          0.6 + r * 0.3,
-          0.7,
-          1.2,
-          p.dark,
-        );
-        rock.rotation.z = (i + r) * 0.3;
-      }
-      const ribbon = this.box('hanging-memorial', x + 0.3, h - 5, 5, 0.36, 3.5, 0.06, p.trim);
-      ribbon.rotation.z = 0.08;
-    }
-    // Distant skyline lost in the fog: gives the vault its monumental scale in parallax.
-    for (let i = 0; i < 4; i++) {
-      const x = data.start + i * 10 + 5 + Math.sin(data.seed * 1.7 + i) * 3;
-      const h = 22 + Math.abs(Math.sin(data.seed + i * 5.3)) * 16;
-      this.box('skyline', x, h / 2 - 4, 44, 4 + (i % 2) * 3, h, 4, p.dark);
-      this.box('skyline-spire', x, h - 1, 44, 0.8, 6, 0.8, p.dark);
-    }
-    // Light falling through the broken windows, drawn additively behind the play plane.
-    for (let i = 0; i < 3; i++) {
-      const shaft = MeshBuilder.CreatePlane(
-        `${data.id}-light-shaft`,
-        { width: 3.2 + (i % 2) * 2, height: 24 },
-        scene,
-      );
-      shaft.position.set(data.start + 7 + i * 13 + Math.sin(data.seed + i) * 2, 7, 4.5);
-      shaft.rotation.z = -0.36 - (i % 2) * 0.08;
-      shaft.material = p.shaft;
-      this.add(shaft);
-    }
-    // Foreground silhouettes frame the top and bottom edges without covering the play band.
-    for (let i = 0; i < 3; i++) {
-      const x = data.start + 5 + i * 13 + Math.sin(data.seed * 2.3 + i) * 3;
-      // Broken stone teeth hanging from the vault, pointing down into the top edge.
-      const length = 4.5 + (i % 2) * 2.5;
-      const tooth = MeshBuilder.CreateCylinder(
-        `${data.id}-fg-stalactite`,
-        { height: length, diameterTop: 1.6, diameterBottom: 0.05, tessellation: 4 },
-        scene,
-      );
-      tooth.position.set(x, 8.4 + length / 2, -7);
-      tooth.rotation.z = (i % 2 ? 1 : -1) * 0.12;
-      tooth.material = p.silhouette;
-      this.add(tooth);
-      const mound = this.box('fg-rubble', x + 6, -1.7, -7.5, 5.5, 2.6, 2, p.silhouette);
-      mound.rotation.z = i % 2 ? 0.18 : -0.22;
     }
     for (const c of checkpoints)
       if (c.x >= data.start && c.x < data.end) {
@@ -200,11 +131,6 @@ export class ChunkView implements DisposableChunk {
       this.box('seal-line', 135, 0.01, -1.8, 10, 0.05, 0.07, p.trim);
     }
     if (data.id === 'obedience') {
-      for (let i = 0; i < 7; i++) {
-        const x = 167 + i * 4;
-        this.box('king-vessel', x, 7, 9, 0.6, 14, 1, p.trim);
-      }
-      this.arch(182, 7, 5, 6.7, p.trim);
       this.box('exit', 199, 3, 0, 1, 7, 5, p.dark);
       this.bodies.push(
         new PhysicsAggregate(this.meshes.at(-1)!, PhysicsShapeType.BOX, { mass: 0 }, scene),
@@ -232,13 +158,34 @@ export class ChunkView implements DisposableChunk {
           merged.parent = this.root;
           merged.receiveShadows = true;
           this.meshes.push(merged);
-          if (merged.material === p.distant) this.lodMeshes.push(merged);
         }
       }
     for (let i = this.meshes.length - 1; i >= 0; i--)
       if (this.meshes[i]!.isDisposed()) this.meshes.splice(i, 1);
-    this.shaftMeshes = this.meshes.filter((mesh) => mesh.material === p.shaft);
-    for (const mesh of this.shaftMeshes) mesh.receiveShadows = false;
+    // Painted layers, one draw call each, built after the merge so quality can toggle them.
+    const scenery = paintScenery(data);
+    const paint = (
+      geometry: PaintedGeometry,
+      name: string,
+      material: StandardMaterial,
+    ): Mesh | null => {
+      const mesh = geometry.build(scene, `${data.id}-${name}`);
+      if (!mesh) return null;
+      mesh.material = material;
+      return this.add(mesh);
+    };
+    paint(scenery.near, 'painted-near', p.painted);
+    this.farLayers = paint(scenery.far, 'painted-far', p.painted);
+    const front = paint(scenery.front, 'painted-front', p.paintedSoft);
+    if (front) front.hasVertexAlpha = true;
+    this.glowLayer = paint(scenery.glow, 'light-pools', p.halo);
+    const shafts = paint(scenery.shafts, 'light-shafts', p.shaft);
+    this.memoryView = paint(scenery.memory, 'painted-memory', p.paintedMemory);
+    if (this.memoryView) {
+      this.memoryView.hasVertexAlpha = true;
+      this.memoryView.visibility = 0.14;
+    }
+    this.shaftMeshes = shafts ? [shafts] : [];
     for (const mesh of this.meshes) {
       mesh.isPickable = false;
       if (!this.crystals.includes(mesh)) mesh.freezeWorldMatrix();
@@ -269,22 +216,6 @@ export class ChunkView implements DisposableChunk {
     m.receiveShadows = true;
     return this.add(m);
   }
-  private arch(x: number, y: number, z: number, r: number, material: StandardMaterial): void {
-    for (let i = 0; i < 11; i++) {
-      const angle = (i / 10) * Math.PI;
-      const m = this.box(
-        'arch',
-        x + Math.cos(angle) * r,
-        y + Math.sin(angle) * r,
-        z,
-        0.65,
-        r * 0.32,
-        1.1,
-        material,
-      );
-      m.rotation.z = angle - Math.PI / 2;
-    }
-  }
   private crystal(x: number, y: number, z: number, size: number, material: StandardMaterial): Mesh {
     const m = MeshBuilder.CreatePolyhedron('memory-shard', { type: 1, size }, this.scene);
     m.position.set(x, y, z);
@@ -304,8 +235,8 @@ export class ChunkView implements DisposableChunk {
     this.activeMemory = active;
     for (const body of this.memoryBodies) body.dispose();
     this.memoryBodies = [];
+    if (this.memoryView) this.memoryView.visibility = active ? 1 : 0.14;
     for (const mesh of this.memoryMeshes) {
-      mesh.visibility = active ? 1 : 0.12;
       if (active)
         this.memoryBodies.push(
           new PhysicsAggregate(mesh, PhysicsShapeType.BOX, { mass: 0, friction: 0 }, this.scene),
@@ -313,11 +244,10 @@ export class ChunkView implements DisposableChunk {
     }
   }
   setQuality(preset: 'LOW' | 'MEDIUM' | 'HIGH' | 'ULTRA'): void {
+    // LOW keeps the near layers only: the fog colour stands in for the far ones.
     for (const mesh of this.shaftMeshes) mesh.setEnabled(preset !== 'LOW');
-    for (const mesh of this.lodMeshes) {
-      mesh.removeLODLevel(null);
-      mesh.addLODLevel({ LOW: 50, MEDIUM: 75, HIGH: 100, ULTRA: 150 }[preset], null);
-    }
+    this.farLayers?.setEnabled(preset !== 'LOW');
+    this.glowLayer?.setEnabled(preset !== 'LOW');
   }
   get bodyCount(): number {
     return this.bodies.length + this.memoryBodies.length;

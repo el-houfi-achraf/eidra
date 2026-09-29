@@ -278,6 +278,8 @@ export class GameSession {
       this.actor,
       (hit, source) => this.takeHit(hit, source, settings),
       gates.filter((gate) => closed.has(gate.id)).map((gate) => gate.x),
+      // From the press, a plunge takes priority over the body it lands on (pogo).
+      this.combat.attacking && this.combat.attackKind === 'down',
     );
     if (this.combat.active) {
       const hit = this.combat.strike(this.actor, p.motion.facing);

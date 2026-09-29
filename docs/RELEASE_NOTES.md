@@ -24,6 +24,14 @@
 - **Animation** : anticipation / frappe / récupération lisibles pour chaque ennemi, silhouettes propres à chaque pattern du Gardien, sursaut à la détection, recul à l'impact ; inclinaison d'Eidra dans les coups et l'esquive, poussière de course et de saut, agenouillement à l'ancrage ; masque qui éclate à la mort puis reconstitution en lumière ; lames de lumière pour les pouvoirs et les gardiens vaincus ; portes qui jaillissent du sol.
 - **UX** : autel sur le côté pour voir le repos, HUD qui tressaute sous les coups et bat à faible vie, caméra qui revient directement à l'ancrage au respawn, musique de combat aussi contre le Porteur.
 
+### Quatrième itération : décor peint et ambiances
+
+- **Décor peint** : le laboratoire est redessiné en silhouettes superposées dans une brume colorée — plafond de caverne et dents, lianes et racines, piliers ébréchés, arches, caverne lointaine, tours de la cité oubliée, avant-plan flou.
+- **Ambiances** : chaque secteur a sa couleur et son motif (voûte turquoise, galerie bleue aux vitraux ambrés, abîme de jade, machinerie de bronze, salle du trône indigo et or), fondus entre eux.
+- **Sols** : lisière pâle et irrégulière sous les pieds, touffes, pierres et racines, masse de terre sombre ; plateformes de mémoire en dalles fantômes lumineuses.
+- **Lumière et atmosphère** : lanternes, amas de Lumérite, vitraux et ancrages entourés de halos, rayons teintés, nappes de brume qui dérivent, poussière aux couleurs du secteur.
+- **Performance** : plus rapide qu'avant en rendu logiciel (jusqu'à −18 % en HIGH, −25 % en LOW).
+
 ## Limites connues de cette mise à jour
 
 - Les valeurs (résonance, coûts d'offrande, durées de hit-stop, pluie d'éclats) sont des propositions de conception ; aucun playtest humain ne les a encore validées.

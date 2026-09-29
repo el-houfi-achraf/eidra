@@ -10,6 +10,8 @@
 
 Favoriser des boucles courtes, des vues sur les passages inaccessibles et un retour après acquisition. Chaque secteur possède ses ressources et ses proxies de collision. Ne jamais charger les neuf régions ensemble.
 
+Chaque secteur a une ambiance et un motif de décor décrits dans `game-data/zones/moods.ts` (voir ART_DIRECTION) ; le décor en est généré à partir de la graine du secteur, sans placement manuel. Un nouveau secteur doit y recevoir une entrée (test unitaire).
+
 ## Monde complet (planifié)
 
 Laboratory of Awakening ↔ Ash Rifts ↔ Glass Gardens ↔ Still Sea ↔ Drowned Archives ↔ Cathedral of Voices ↔ Broken Observatory ↔ Inverted Palace ↔ Heart of Remembrance. Des boucles transversales et raccourcis doivent remplacer une simple chaîne avant production. Fast travel tardif.

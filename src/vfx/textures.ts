@@ -11,6 +11,7 @@ export function proceduralTexture(
   width: number,
   height: number,
   shade: (u: number, v: number) => readonly [number, number, number, number],
+  wrap = false,
 ): RawTexture {
   const pixels = new Uint8Array(width * height * 4);
   for (let y = 0; y < height; y++)
@@ -31,9 +32,52 @@ export function proceduralTexture(
     false,
     Texture.BILINEAR_SAMPLINGMODE,
   );
-  texture.wrapU = Texture.CLAMP_ADDRESSMODE;
-  texture.wrapV = Texture.CLAMP_ADDRESSMODE;
+  texture.wrapU = wrap ? Texture.WRAP_ADDRESSMODE : Texture.CLAMP_ADDRESSMODE;
+  texture.wrapV = wrap ? Texture.WRAP_ADDRESSMODE : Texture.CLAMP_ADDRESSMODE;
   return texture;
+}
+/**
+ * Tileable fractal value noise in 0..1: `period` cells per side at the first
+ * octave, each octave doubling the frequency, so the texture wraps seamlessly.
+ */
+export function tileableNoise(
+  seed: number,
+  period: number,
+  octaves: number,
+): (u: number, v: number) => number {
+  const lattice = (ix: number, iy: number, p: number): number => {
+    const x = ((ix % p) + p) % p,
+      y = ((iy % p) + p) % p;
+    let h = (x * 374761393 + y * 668265263 + seed * 2246822519) >>> 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+    return (h ^ (h >>> 16)) / 4294967296;
+  };
+  const value = (u: number, v: number, p: number): number => {
+    const x = u * p,
+      y = v * p;
+    const ix = Math.floor(x),
+      iy = Math.floor(y);
+    const fx = x - ix,
+      fy = y - iy;
+    const sx = fx * fx * (3 - 2 * fx),
+      sy = fy * fy * (3 - 2 * fy);
+    const a = lattice(ix, iy, p),
+      b = lattice(ix + 1, iy, p),
+      c = lattice(ix, iy + 1, p),
+      d = lattice(ix + 1, iy + 1, p);
+    return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+  };
+  return (u, v) => {
+    let sum = 0,
+      weight = 0,
+      amplitude = 1;
+    for (let o = 0; o < octaves; o++) {
+      sum += value(u, v, period << o) * amplitude;
+      weight += amplitude;
+      amplitude *= 0.5;
+    }
+    return sum / weight;
+  };
 }
 /** Mixes two colours given as [r, g, b] triples. */
 export const mix = (

@@ -167,4 +167,21 @@ describe('guardians inside their arenas', () => {
     expect(touch?.damage).toBe(enemyData.watcher.contact);
     expect(touch?.direction).toBe(-1);
   });
+  it('lets a plunge strike the body below instead of being hurt by it', () => {
+    const manager = new EnemyManager();
+    manager.sync([chunks[0]!]);
+    const watcher = manager.entities.get('watcher-1')!;
+    // Eidra drops onto the Veilleur's head: bodies overlap.
+    const player = makeCombatant('eidra', 100, watcher.actor.x, watcher.actor.y + 1.2);
+    const contact = (plunging: boolean): Hitbox[] => {
+      const hits: Hitbox[] = [];
+      manager.update(1 / 60, player, (hit) => hits.push(hit), [], plunging);
+      return hits.filter((h) => h.unblockable);
+    };
+    expect(contact(false)).toHaveLength(1);
+    expect(contact(true)).toHaveLength(0);
+    // A plunge gives no protection against a body above Eidra.
+    player.y = watcher.actor.y - 1.2;
+    expect(contact(true)).toHaveLength(1);
+  });
 });
