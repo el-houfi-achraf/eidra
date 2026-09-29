@@ -25,6 +25,14 @@ Ressenti des coups (référence : action-plateformes modernes) : hit-stop court 
 
 Un tutoriel contextuel remplace le long texte de départ : une invite (glyphe de touche ou de bouton + verbe) apparaît dans la zone où le geste devient utile — se déplacer, sauter, frapper, l'élan après son acquisition, parer près du Porteur de cendres, la Rémanence au pont, la plongée près du Veilleur du pont, l'Écho au sceau — et disparaît dès que le joueur l'a accompli, où qu'il soit. Le Recueillement n'est suggéré que blessé et avec un segment disponible. Les menus privilégient l'information utile : dernier ancrage sur l'écran titre, cartes de sauvegarde (lieu, durée, vitalité, éclats, souvenirs, pouvoirs), objectif et rappel des commandes en pause, carte en itinéraire avec marqueurs, conseils à la mort et au chargement.
 
+## Arènes et contact
+
+Un gardien ne se contourne pas : franchir le seuil de son arène fait surgir une porte derrière Eidra, et celle du fond reste close tant qu'il vit (carte de titre, notification, caméra qui cadre toute l'arène, barre de vie en bas de l'écran — y compris pour le Porteur du dernier ordre). La victoire rabat les deux portes. Mourir rouvre l'entrée ; le gardien attend. Les corps ennemis blessent au contact, ce qui empêche de les traverser sans l'esquive ; l'esquive reste le moyen de passer à travers une attaque.
+
+## Animation et lisibilité
+
+Chaque coup ennemi suit anticipation → frappe → récupération : recul et arme levée (contour ambre, frisson dans les derniers instants), fente vers l'avant, puis affaissement qui ouvre une fenêtre de riposte. Un ennemi qui repère Eidra sursaute ; un ennemi touché recule. Le Gardien donne à chaque pattern une silhouette propre : recul pour le balayage, cabrage puis impact poussiéreux pour l'onde, accroupissement pour la charge, lévitation pour la pluie. Eidra s'incline dans ses coups et ses esquives, soulève de la poussière en courant et en sautant, s'agenouille à l'ancrage ; à la mort son masque se brise en éclats avant l'écran de défaite, et elle se reforme de lumière à l'ancrage. Les pouvoirs retrouvés et les gardiens vaincus irradient des lames de lumière. Le HUD tressaute sous les coups et bat comme un cœur quand la vie est basse.
+
 ## Gardien Sans Visage
 
 Phase 1 : balayage, onde au sol, charge. Sous 50 % de vie, une transition blindée de 1,6 s (rugissement, onde de choc) ouvre la phase 2 : télégraphes raccourcis de 15 % et **pluie d'éclats**, cinq impacts marqués au sol et au plafond autour de la position d'Eidra, espacés de 2,6 m. Le Gardien est également blindé pendant son introduction. Chaque pattern est annoncé dans la barre de vie (« ONDE — SAUTEZ », « PLUIE D'ÉCLATS — QUITTEZ LES MARQUES »).

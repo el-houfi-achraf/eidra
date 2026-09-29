@@ -14,6 +14,8 @@ const BossSchema = z.object({
   subtitle: z.string(),
   health: z.number().positive(),
   phaseThreshold: z.number().min(0).max(1),
+  /** Damage dealt by touching the guardian's body. */
+  contact: z.number().nonnegative(),
   /** Invulnerable roar between phases, in seconds. */
   transition: z.number().nonnegative(),
   patterns: z.array(PatternSchema).min(2),
@@ -24,6 +26,7 @@ export const guardianData = BossSchema.parse({
   subtitle: 'Celui qui n’a jamais désobéi',
   health: 320,
   phaseThreshold: 0.5,
+  contact: 18,
   transition: 1.6,
   patterns: [
     { id: 'sweep', windup: 1.1, recover: 1.2, damage: 22, range: 4.5 },

@@ -28,6 +28,9 @@ import { EffectPool } from '../vfx/EffectPool';
 import { SlashArc } from '../vfx/SlashArc';
 import { Afterimages } from '../vfx/Afterimages';
 import { Motes } from '../vfx/Motes';
+import { LightRays } from '../vfx/LightRays';
+import { bossPose, enemyPose, heroPose } from '../animation/Poses';
+import { damp } from '../core/math';
 import { proceduralTexture } from '../vfx/textures';
 import type { GameSession } from '../core/GameSession';
 import { presets } from '../config/settings';
@@ -48,6 +51,7 @@ export class Presentation {
   private slash: SlashArc;
   private afterimages: Afterimages;
   private motes: Motes;
+  private rays: LightRays;
   private backdrop: Backdrop;
   private projectileViews: Mesh[] = [];
   private glow: GlowLayer;
@@ -74,6 +78,15 @@ export class Presentation {
   private bossAlive = false;
   private bossDissolve = 1;
   private emitter = new Vector3(10, 4, 2);
+  // Hero life cycle: shattering on death, reforming from light at the anchor.
+  private shatter = -1;
+  private reform = 0;
+  private kneel = 0;
+  /** Set while Eidra rests at an anchor (altar open): she kneels. */
+  resting = false;
+  private stepDistance = 0;
+  private lastHeroX = Number.NaN;
+  private wasDashing = false;
   constructor(engine: AbstractEngine) {
     this.scene = new Scene(engine);
     const scene = this.scene;
@@ -118,6 +131,7 @@ export class Presentation {
     this.slash = new SlashArc(scene, p);
     this.afterimages = new Afterimages(scene, p);
     this.motes = new Motes(scene, p);
+    this.rays = new LightRays(scene);
     this.bossCue = MeshBuilder.CreateBox(
       'guardian-telegraph',
       { width: 1, height: 0.035, depth: 4 },
@@ -255,6 +269,30 @@ export class Presentation {
   healed(x: number, y: number): void {
     this.effects.ring(x, y, 'heal', 3, 0.5);
   }
+  /** Radiant blades for a recovered power, a fallen guardian or a lit anchor. */
+  radiance(x: number, y: number, kind: 'gold' | 'memory', size = 6): void {
+    this.rays.play(x, y, kind === 'gold' ? this.palette.gold : this.palette.crystal, size);
+    this.effects.ring(x, y, kind, size * 0.8, 0.7);
+    this.camera.punch(0.06);
+  }
+  /** Death: the ceramic mask cracks and Eidra scatters into shards and light. */
+  shatterHero(x: number, y: number): void {
+    this.shatter = 0;
+    this.reform = 0;
+    this.effects.burst(x, y + 0.3, 'heal', 18);
+    this.effects.burst(x, y, 'memory', 12);
+    this.effects.ring(x, y, 'heal', 5, 0.6);
+    this.camera.punch(0.12);
+    this.camera.shake(0.5);
+  }
+  /** Respawn: Eidra gathers back out of light at the anchor. */
+  reformHero(x: number, y: number): void {
+    this.shatter = -1;
+    this.reform = 1;
+    this.camera.snap(x, y);
+    this.effects.ring(x, y, 'memory', 4, 0.8);
+    for (let i = 0; i < 6; i++) this.motes.gather(x, y, this.palette.crystal);
+  }
   render(dt: number, session: GameSession, settings: Settings, menu: boolean): void {
     this.time += dt;
     const p = session.player.position,
@@ -266,10 +304,11 @@ export class Presentation {
       menu ? 10 : p.x,
       menu ? 1 : p.y,
       m.facing,
-      session.bossActive,
+      menu ? null : session.arenas.active,
       settings,
       menu,
     );
+    if (menu) this.shatter = -1;
     for (const [id, t] of this.flashes) this.flashes.set(id, t - dt);
     // Landing squash and dust, derived from the controller's grounded transitions.
     if (!m.grounded) this.airVy = Math.min(this.airVy, m.vy);
@@ -280,8 +319,31 @@ export class Presentation {
       }
       this.airVy = 0;
     }
+    // Jump puffs, running dust and dash bursts, all read from the controller.
+    if (!menu && !m.grounded && this.wasGrounded && m.vy > 3)
+      this.effects.burst(p.x, p.y - 0.8, 'dust', 5);
+    const moved = Number.isFinite(this.lastHeroX) ? Math.abs(p.x - this.lastHeroX) : 0;
+    this.lastHeroX = p.x;
+    if (!menu && m.grounded && Math.abs(m.vx) > 3 && moved < 1) {
+      this.stepDistance += moved;
+      if (this.stepDistance > 1.7) {
+        this.stepDistance = 0;
+        this.effects.burst(p.x - m.facing * 0.25, p.y - 0.8, 'dust', 2);
+      }
+    }
+    const dashing = !menu && m.dashTime > 0;
+    if (dashing && !this.wasDashing) {
+      this.effects.ring(p.x, p.y, 'memory', 2.2, 0.25);
+      if (m.grounded) this.effects.burst(p.x - m.facing * 0.4, p.y - 0.8, 'dust', 4);
+    }
+    this.wasDashing = dashing;
     this.wasGrounded = m.grounded;
     this.land = Math.max(0, this.land - dt * 5);
+    if (this.shatter >= 0) this.shatter += dt;
+    this.reform = Math.max(0, this.reform - dt / 0.8);
+    this.kneel = damp(this.kneel, this.resting && !menu ? 1 : 0, 8, dt);
+    // Damping never reaches zero: snap, so the walk cycle takes the legs back.
+    if (this.kneel < 0.01) this.kneel = 0;
     // Player damage feedback: white flash and a red pulse in the vignette.
     const health = session.actor.health;
     if (!menu && health < this.lastHealth) {
@@ -326,8 +388,20 @@ export class Presentation {
         hit: this.heroHit,
         channel,
         empowered: !menu && (session.combat.parry.riposte > 0 || session.combat.empowered),
+        ...(menu
+          ? {}
+          : heroPose({
+              attackTime: session.combat.attackTime,
+              attackKind: session.combat.attackKind,
+              dashing,
+            })),
+        kneel: this.kneel,
+        dying: this.shatter >= 0 ? Math.min(1, this.shatter / 0.45) : this.reform,
       },
     );
+    this.hero.root.setEnabled(this.shatter < 0.45);
+    this.rays.follow(hx, hy);
+    this.rays.update(dt, settings.reducedMotion);
     const echo = session.abilities.echo;
     this.echo.root.setEnabled(Boolean(echo) && !menu);
     if (echo)
@@ -372,6 +446,12 @@ export class Presentation {
       ? 0.5
       : 0.46 + Math.sin(this.time * 0.7) * 0.06 + Math.sin(this.time * 1.9) * 0.03;
     this.sun.position.x = p.x + 8;
+    // Gates burst out of the floor in a spray of dust, and sink in a glimmer.
+    for (const gate of session.world.takeGateChanges())
+      if (Math.abs(gate.x - this.camera.camera.position.x) < this.camera.halfWidth + 2) {
+        this.effects.burst(gate.x, 0.2, gate.closed ? 'dust' : 'gold', gate.closed ? 10 : 6);
+        if (gate.closed) this.effects.burst(gate.x, 1.5, 'damage', 4);
+      }
     session.world.render(this.time, session.inventory.collectibles, session.narrative.flags);
     this.scene.render();
   }
@@ -403,6 +483,15 @@ export class Presentation {
       } else this.dying.delete(id);
       const alive = a.health > 0 || (dying !== undefined && dying < 1);
       visual.view.root.setEnabled(alive);
+      const flash = this.flashes.get(id) ?? 0;
+      const { pose, attack } = enemyPose({
+        state: entity.fsm.state,
+        timer: entity.fsm.timer,
+        windup: entity.data.windup,
+        recover: entity.data.recover,
+        ranged: entity.data.ranged,
+        flash,
+      });
       if (alive)
         visual.view.update(
           a.x,
@@ -410,15 +499,10 @@ export class Presentation {
           entity.facing,
           this.time,
           entity.fsm.state === 'CHASE' ? entity.data.speed : 0,
-          entity.fsm.state === 'ATTACK' ? 0.1 : 0,
+          attack,
           false,
           settings.reducedMotion,
-          {
-            hit: this.flashes.get(id) ?? 0,
-            warning,
-            dying: dying ?? 0,
-            grounded: true,
-          },
+          { ...pose, hit: flash, warning, dying: dying ?? 0, grounded: true },
         );
       visual.ring.position.set(a.x, 0.07, 0);
       visual.ring.scaling.setAll(1 + (warning ? entity.fsm.timer / entity.data.windup : 0));
@@ -440,6 +524,15 @@ export class Presentation {
       this.effects.ring(boss.x, 3, 'damage', 14, 0.9);
       this.camera.punch(0.1);
     }
+    // Impact of a slam: dust rolls away from the Guardian's feet.
+    if (
+      director.state === 'attack' &&
+      this.bossState !== 'attack' &&
+      director.pattern.id === 'slam'
+    ) {
+      this.effects.burst(boss.x, 0.3, 'dust', 14);
+      this.effects.ring(boss.x, 0.6, 'damage', 6, 0.4);
+    }
     this.bossState = director.state;
     // Only a defeat witnessed this session dissolves; a loaded victory stays hidden.
     if (boss.health <= 0 && this.bossAlive) this.bossDissolve = 0;
@@ -448,6 +541,13 @@ export class Presentation {
     const dying = boss.health > 0 ? 0 : this.bossDissolve;
     const visible = px > 145 && (boss.health > 0 || dying < 1);
     this.boss.root.setEnabled(visible);
+    const { pose, attack } = bossPose({
+      state: director.state,
+      timer: director.timer,
+      pattern: director.pattern.id,
+      windup: director.pattern.windup * (director.phase === 2 ? 0.85 : 1),
+      recover: director.pattern.recover,
+    });
     if (visible)
       this.boss.update(
         boss.x,
@@ -455,11 +555,15 @@ export class Presentation {
         director.direction,
         this.time,
         director.state === 'approach' ? 2.4 : 0,
-        director.state === 'attack' ? 0.15 : 0,
+        attack,
         false,
         settings.reducedMotion,
         {
-          warning: director.state === 'windup' || director.state === 'transition',
+          ...pose,
+          warning:
+            director.state === 'windup' ||
+            director.state === 'transition' ||
+            (director.state === 'intro' && director.timer > 1.4),
           channel: director.state === 'transition' ? 1 : 0,
           hit: this.flashes.get(boss.id) ?? 0,
           dying,
@@ -494,6 +598,7 @@ export class Presentation {
     this.slash.dispose();
     this.afterimages.dispose();
     this.motes.dispose();
+    this.rays.dispose();
     this.backdrop.dispose();
     this.dust.dispose();
     this.dustTexture.dispose();

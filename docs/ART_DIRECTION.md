@@ -14,6 +14,10 @@ Cinq plans lisibles : ciel en dégradé qui se fond dans la brume, ligne d'horiz
 
 Personnages : marionnettes stylisées à contours encrés et ombrage cartoon à trois tons, hors brouillard pour rester lisibles. Eidra : capuche pointue rejetée en arrière, masque de céramique fêlé cerclé d'or, yeux de Lumérite, col doré, rangée de clous, cape plissée à pointes, écharpe claire qui flotte derrière elle, jambes fines. Veilleur : très haute capuche, œil unique ambré, hallebarde. Porteur de cendres : trapu, trois yeux, urne sur le dos. Porteur du dernier ordre : bannière, col et clous dorés. Souvenir errant : masque flottant aux voiles translucides. Mira : robe et capuche de mémoire translucides, yeux clos, auréole brisée. Gardien Sans Visage : masque vierge traversé d'une faille lumineuse, auréoles brisées, épaulières. Les yeux s'élargissent et le contour vire à l'ambre pendant un télégraphe. Les coups se lisent par un croissant de lame (ivoire, cristal pour la charge, or pour la riposte), un flash blanc, un hit-stop et des éclats. Les ennemis vaincus se dissolvent en blanc au lieu de disparaître.
 
+## Animation
+
+Poses exagérées et lisibles, dans l'esprit des action-plateformes dessinés à la main, sans reprendre de personnage existant : anticipation marquée (recul, accroupissement, arme au-dessus de la tête, frisson final), fente, affaissement. Les portes d'arène jaillissent du sol dans un nuage de poussière et s'y enfoncent dans un scintillement doré. La mort brise le masque en éclats ivoire et cristal ; la reconstitution se fait par une lueur blanche qui se résorbe. Les lames de lumière (pouvoir retrouvé, gardien vaincu, ancrage) sont un seul maillage étoilé, doré ou cristal, qui tourne et s'efface en un peu plus d'une seconde.
+
 ## Production
 
 Les modèles procéduraux initiaux portent le statut TODO_ART. Aucun asset généré ne prétend être un modèle final Blender. Pas de textures externes pour le prototype ; textures de production KTX2 / Basis, plafonds de 512 à 2048 px.

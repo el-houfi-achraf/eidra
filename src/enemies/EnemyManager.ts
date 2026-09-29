@@ -5,12 +5,19 @@ import { EnemyFSM } from '../ai/EnemyFSM';
 import { BossDirector } from '../bosses/BossDirector';
 import { makeCombatant } from '../combat/CombatSystem';
 import type { Combatant, Hitbox } from '../combat/CombatSystem';
+import { arenas, chunks } from '../../game-data/zones/laboratory';
 import type { ChunkData } from '../../game-data/zones/laboratory';
+import { walkableSpan, clampToGates } from './Terrain';
+import type { Solid } from './Terrain';
+/** Solid (non-memory) slabs of the whole laboratory, used to bound enemy movement. */
+const solids: Solid[] = chunks.flatMap((chunk) => chunk.platforms.filter((p) => !p.memory));
+const guardianArena = arenas.find((arena) => arena.guardian === 'faceless-guardian')!;
 export interface EnemyEntity {
   actor: Combatant;
   fsm: EnemyFSM;
   data: EnemyData;
   home: number;
+  /** Patrol range intersected with the floor and the slabs around the spawn. */
   patrol: readonly [number, number];
   kind: string;
   facing: number;
@@ -40,26 +47,35 @@ export class EnemyManager {
       for (const spawn of chunk.enemies) {
         if (this.entities.has(spawn.id) || this.defeated.has(spawn.id)) continue;
         const base = enemyData[spawn.kind];
+        const radius = base.scale * 0.45,
+          height = base.scale * 1.8;
+        const [low, high] = spawn.patrol ?? [spawn.x - 9, spawn.x + 9];
+        const [floorMin, floorMax] = walkableSpan(
+          solids,
+          spawn.x,
+          spawn.y,
+          radius,
+          height,
+          base.flying,
+        );
         this.entities.set(spawn.id, {
-          actor: makeCombatant(
-            spawn.id,
-            base.health,
-            spawn.x,
-            spawn.y,
-            base.scale * 0.45,
-            base.scale * 1.8,
-          ),
+          actor: makeCombatant(spawn.id, base.health, spawn.x, spawn.y, radius, height),
           fsm: new EnemyFSM(base),
           data: base,
           home: spawn.x,
-          patrol: spawn.patrol ?? [spawn.x - 9, spawn.x + 9],
+          patrol: [Math.max(low, floorMin), Math.min(high, floorMax)],
           kind: spawn.kind,
           facing: -1,
           rewarded: false,
         });
       }
   }
-  update(dt: number, player: Combatant, onAttack: (hit: Hitbox, source: Combatant) => void): void {
+  update(
+    dt: number,
+    player: Combatant,
+    onAttack: (hit: Hitbox, source: Combatant) => void,
+    gates: readonly number[] = [],
+  ): void {
     for (const entity of this.entities.values()) {
       const a = entity.actor,
         delta = player.x - a.x;
@@ -78,7 +94,9 @@ export class EnemyManager {
       if (entity.fsm.state === 'RETURN')
         a.x += Math.sign(entity.home - a.x) * entity.data.speed * dt;
       if (entity.fsm.state === 'PATROL') a.x += Math.sin(entity.fsm.timer * 2) * dt * 0.5;
-      a.x = Math.max(entity.patrol[0], Math.min(entity.patrol[1], a.x + a.knockback * dt));
+      a.x = clampToGates(a.x + a.knockback * dt, entity.home, a.radius, gates, entity.patrol);
+      if (entity.data.contact > 0 && touching(a, player))
+        onAttack(contact(a, player, entity.data.contact), a);
       if (entity.fsm.attackTriggered) {
         if (entity.data.ranged) {
           const len = Math.max(0.1, Math.hypot(delta, player.y - a.y));
@@ -107,7 +125,7 @@ export class EnemyManager {
           );
       }
     }
-    if (!this.bossDefeated && player.x > 166) this.director.activate();
+    if (!this.bossDefeated && player.x > guardianArena.trigger) this.director.activate();
     const boss = this.boss,
       direction = Math.sign(player.x - boss.x) || -1;
     this.director.update(
@@ -122,7 +140,13 @@ export class EnemyManager {
       boss.x += direction * (this.director.phase === 2 ? 3.2 : 2.4) * dt;
     if (this.director.state === 'attack' && this.director.pattern.id === 'charge')
       boss.x += this.director.direction * 13 * dt;
-    boss.x = Math.max(167, Math.min(192, boss.x));
+    boss.x = Math.max(guardianArena.roam[0], Math.min(guardianArena.roam[1], boss.x));
+    if (
+      boss.health > 0 &&
+      !['dormant', 'dead'].includes(this.director.state) &&
+      touching(boss, player)
+    )
+      onAttack(contact(boss, player, guardianData.contact), boss);
     if (this.director.trigger) {
       const pattern = this.director.pattern;
       if (pattern.id === 'rain')
@@ -213,4 +237,28 @@ export class EnemyManager {
     this.boss.stagger = 0;
     this.bossRewarded = this.bossDefeated;
   }
+}
+
+/** Contact boxes are smaller than the bodies so grazes and near jumps stay fair. */
+const CONTACT_SCALE = 0.75;
+/** Bodies overlap: shrunken hurtbox of one against the other's. */
+function touching(a: Combatant, b: Combatant): boolean {
+  return (
+    Math.abs(a.x - b.x) < (a.radius + b.radius) * CONTACT_SCALE &&
+    Math.abs(a.y - b.y) < ((a.height + b.height) / 2) * CONTACT_SCALE
+  );
+}
+/** Contact damage pushes the player away from the body and cannot be parried. */
+function contact(source: Combatant, player: Combatant, damage: number): Hitbox {
+  return {
+    x: player.x,
+    y: player.y,
+    width: 0.2,
+    height: 0.2,
+    damage,
+    stagger: 0.12,
+    force: 7,
+    direction: Math.sign(player.x - source.x) || 1,
+    unblockable: true,
+  };
 }

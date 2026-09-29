@@ -649,11 +649,12 @@ kbd {
   font-size: 13px;
 }
 .title-card.boss {
-  top: auto;
-  bottom: 22%;
+  /* Above the fighters and clear of the boss bar at the bottom of the screen. */
+  top: 13%;
 }
 .title-card.boss h2 {
-  font-size: clamp(34px, 5vw, 70px);
+  font-size: clamp(30px, 4.2vw, 60px);
+  letter-spacing: 0.14em;
   color: #f1e3c4;
 }
 .title-card.boss.show,
@@ -717,6 +718,30 @@ kbd {
   background: #dcc494;
   color: #10201f;
   border: 0;
+}
+/* Resting at an anchor: the kneeling Eidra stays visible beside the altar panel. */
+.rest-scrim {
+  background: radial-gradient(ellipse at 42% 62%, transparent 0 16%, #061417a8 42%, #061417e8 100%);
+  backdrop-filter: none;
+}
+.altar-panel {
+  left: auto;
+  right: max(4vw, 24px);
+  transform: translateY(-50%);
+  animation: rest-in 0.45s ease both;
+}
+@keyframes rest-in {
+  from {
+    opacity: 0;
+    translate: 24px 0;
+  }
+}
+@media (max-width: 760px) {
+  .altar-panel {
+    right: auto;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
 }
 .altar-stats {
   display: flex;

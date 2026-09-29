@@ -87,9 +87,15 @@ export class Hud {
   private barTimers = new Map<string, number>();
   private chipValue = 1;
   private bossChipValue = 1;
+  private bossMarker: Rectangle;
   private shardCount = -1;
   private shardPop = 0;
   private point = new Vector3();
+  private status: Rectangle;
+  private lastHealth = Number.NaN;
+  /** 0..1 jolt of the vitals after a blow, and the clock of the low-health heartbeat. */
+  private jolt = 0;
+  private clock = 0;
   constructor(private scene: Scene) {
     this.texture = AdvancedDynamicTexture.CreateFullscreenUI('eidra-hud', true, scene);
     this.texture.idealWidth = 1440;
@@ -103,6 +109,7 @@ export class Hud {
     container.top = '26px';
     container.thickness = 0;
     this.texture.addControl(container);
+    this.status = container;
     // Mask vessel: the resonance gauge rises like light inside Eidra's mask.
     this.vessel = new Ellipse('resonance-vessel');
     this.vessel.width = '78px';
@@ -282,6 +289,7 @@ export class Hud {
     marker.left = `${guardianData.phaseThreshold * 700 - 1}px`;
     marker.top = '17px';
     this.boss.addControl(marker);
+    this.bossMarker = marker;
     // Pooled world-space widgets: floating numbers and enemy health bars.
     for (let i = 0; i < 24; i++) {
       const block = new TextBlock('damage-number', '');
@@ -331,11 +339,29 @@ export class Hud {
   enemyDamaged(id: string): void {
     this.barTimers.set(id, 3);
   }
-  update(session: GameSession, visible: boolean, dt = 1 / 60): void {
+  update(session: GameSession, visible: boolean, dt = 1 / 60, reducedMotion = false): void {
     this.texture.rootContainer.isVisible = visible;
     if (!visible) return;
     const actor = session.actor;
     const ratio = Math.max(0.001, actor.health / actor.maxHealth);
+    // A blow jolts the vitals; a low reserve beats like a heart (lub-dub, then rest).
+    if (actor.health < this.lastHealth) this.jolt = 1;
+    this.lastHealth = actor.health;
+    this.jolt = Math.max(0, this.jolt - dt * 3.5);
+    this.clock += dt;
+    const motion = reducedMotion ? 0 : 1;
+    const shake = this.jolt ** 2 * 7 * motion;
+    const dx = Math.sin(this.clock * 83) * shake,
+      dy = Math.cos(this.clock * 61) * shake * 0.6;
+    this.status.left = `${124 + dx}px`;
+    this.status.top = `${26 + dy}px`;
+    this.vessel.left = `${34 + dx}px`;
+    this.vessel.top = `${18 + dy}px`;
+    const beat = this.clock % 1.1;
+    const heart =
+      ratio < 0.3
+        ? Math.max(0, 1 - Math.abs(beat - 0.08) * 12, 0.7 - Math.abs(beat - 0.3) * 10)
+        : 0;
     this.health.width = ratio;
     this.chipValue = ratio >= this.chipValue ? ratio : Math.max(ratio, this.chipValue - dt * 0.45);
     this.chip.width = Math.max(0.001, this.chipValue);
@@ -356,8 +382,9 @@ export class Hud {
     this.vessel.shadowColor = ready ? '#8effdb' : 'transparent';
     this.vessel.shadowBlur = ready ? 10 + Math.sin(this.vesselPulse) * 4 : 0;
     const scale = session.focus.channeling ? 1.06 + Math.sin(this.vesselPulse) * 0.03 : 1;
-    this.vessel.scaleX = this.vessel.scaleY = scale;
-    this.vesselMask.alpha = session.actor.health / session.actor.maxHealth < 0.3 ? 0.65 : 1;
+    this.vessel.scaleX = this.vessel.scaleY = scale + heart * 0.08 * motion;
+    this.vesselMask.alpha = ratio < 0.3 ? 0.65 + heart * 0.35 : 1;
+    if (ratio < 0.3) this.health.background = heart > 0.5 ? '#ffd2bd' : '#f0b39a';
     this.resonance.forEach(({ frame, fill }, i) => {
       const amount = Math.max(0, Math.min(1, (resonance - i * focusData.cost) / focusData.cost));
       fill.alpha = amount >= 1 ? 1 : amount * 0.45;
@@ -374,10 +401,13 @@ export class Hud {
     this.shardPop = Math.max(0, this.shardPop - dt * 4);
     this.shards.scaleX = this.shards.scaleY = 1 + this.shardPop * 0.35;
     this.shards.color = this.shardPop > 0 ? '#fff0c8' : '#e2c48d';
-    const boss = session.enemies.boss,
-      director = session.enemies.director;
-    this.boss.isVisible = session.bossActive;
-    const bossRatio = Math.max(0.001, boss.health / boss.maxHealth);
+    const director = session.enemies.director,
+      bar = session.bossBar,
+      guardian = session.bossActive;
+    this.boss.isVisible = bar !== null;
+    this.bossMarker.isVisible = guardian;
+    if (bar) this.bossLabel.text = bar.name;
+    const bossRatio = bar ? Math.max(0.001, bar.health / bar.maxHealth) : 1;
     this.bossFill.width = bossRatio;
     this.bossChipValue =
       bossRatio >= this.bossChipValue
@@ -390,14 +420,15 @@ export class Hud {
       charge: 'CHARGE — ESQUIVEZ',
       rain: 'PLUIE D’ÉCLATS — QUITTEZ LES MARQUES',
     };
-    this.bossSubtitle.text =
-      director.state === 'windup'
+    this.bossSubtitle.text = !guardian
+      ? (bar?.subtitle ?? '')
+      : director.state === 'windup'
         ? (cue[director.pattern.id] ?? guardianData.subtitle)
         : director.state === 'transition'
           ? 'IL SE SOUVIENT DE SA COLÈRE'
           : guardianData.subtitle;
-    this.bossSubtitle.color = director.state === 'windup' ? '#ffb27a' : '#9fb1a8';
-    this.bossFill.background = director.phase === 2 ? '#e0895a' : '#d5af73';
+    this.bossSubtitle.color = guardian && director.state === 'windup' ? '#ffb27a' : '#9fb1a8';
+    this.bossFill.background = guardian && director.phase === 2 ? '#e0895a' : '#d5af73';
     for (const n of this.numbers) {
       if (n.life <= 0) continue;
       n.life -= dt;

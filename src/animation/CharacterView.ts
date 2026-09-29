@@ -31,6 +31,20 @@ export interface Pose {
   dying?: number;
   /** Golden blade of an empowered riposte. */
   empowered?: boolean;
+  /** Body lean in radians, positive towards the facing side (lunges), negative away (anticipation). */
+  lean?: number;
+  /** Visual forward shift in metres along the facing side (lunges, recoils). */
+  offset?: number;
+  /** Visual lift in metres (levitation, rearing up). */
+  lift?: number;
+  /** Extra squash: positive crouches, negative stretches tall. */
+  squash?: number;
+  /** 0..1 weapon raised overhead, held before a blow lands. */
+  raise?: number;
+  /** Jitter amplitude in metres (strain, stagger, fury). */
+  tremble?: number;
+  /** 0..1 kneeling rest at an anchor. */
+  kneel?: number;
 }
 interface Ribbon {
   chain: SecondaryChain;
@@ -590,16 +604,23 @@ export class CharacterView {
     // Squash and stretch: stretched by vertical speed, squashed by landings.
     const stretch = pose.grounded === false ? Math.min(0.16, Math.abs(pose.vy ?? 0) / 90) : 0;
     const land = (pose.land ?? 0) * motion;
-    const crouch = (pose.channel ?? 0) * 0.12;
+    const kneel = pose.kneel ?? 0;
+    const crouch = (pose.channel ?? 0) * 0.12 + kneel * 0.3 + (pose.squash ?? 0) * motion;
     const dying = pose.dying ?? 0;
     const sy = (1 + stretch * motion - land * 0.24 - crouch) * (1 - dying * 0.85);
-    const sx = (1 - stretch * 0.45 * motion + land * 0.2) * (1 + dying * 0.4);
+    const sx = (1 - stretch * 0.45 * motion + land * 0.2 + crouch * 0.45) * (1 + dying * 0.4);
     const s = this.look.scale;
+    // Anticipation, lunges and levitation are offsets of the whole puppet.
+    const tremble = (pose.tremble ?? 0) * motion;
+    const jitter = tremble ? Math.sin(time * 71 + this.seed) * tremble : 0;
+    const forward = (pose.offset ?? 0) * motion * side + jitter;
+    const lift = (pose.lift ?? 0) * motion + (tremble ? Math.cos(time * 53) * tremble * 0.4 : 0);
     // Mirroring on x turns the authored right-facing puppet towards the left.
     this.root.scaling.set(side * s * sx, s * sy, s * sx);
-    this.root.position.set(x, y - 0.8 * s * (1 - sy), 0);
+    this.root.position.set(x + forward, y - 0.8 * s * (1 - sy) + lift, 0);
     this.root.rotation.y = -0.3 * side;
-    this.root.rotation.z = -side * Math.min(1, Math.abs(speed) / 7) * 0.09 * motion;
+    const lean = ((pose.lean ?? 0) + kneel * 0.35) * motion;
+    this.root.rotation.z = -side * (Math.min(1, Math.abs(speed) / 7) * 0.09 * motion + lean);
     // Walk cycle driven by the distance actually travelled.
     const moved = Number.isFinite(this.lastX) ? Math.abs(x - this.lastX) : 0;
     this.lastX = x;
@@ -610,14 +631,20 @@ export class CharacterView {
       leg.rotation.z =
         pose.grounded === false
           ? (sign > 0 ? 0.55 : -0.3) * motion
-          : Math.sin(this.stride + (i === 0 ? 0 : Math.PI)) * 0.65 * walk;
+          : kneel > 0
+            ? (sign > 0 ? 1.3 : -0.2) * kneel
+            : Math.sin(this.stride + (i === 0 ? 0 : Math.PI)) * 0.65 * walk;
     });
     const swing = Math.sin(this.stride) * walk;
     this.body.rotation.z = swing * 0.035 + Math.sin(time * 1.7 + this.seed) * 0.01 * motion;
     this.body.position.y = Math.abs(Math.cos(this.stride)) * 0.03 * walk;
     // Blade: resting low, raised then swept forward over the attack.
     const raised = Math.max(0, Math.min(1, (attack - 0.05) / 0.27));
-    this.hand.rotation.z = attack > 0 ? 0.45 + 2.9 * raised : 0.3 + swing * 0.12;
+    const held = (pose.raise ?? 0) * motion;
+    this.hand.rotation.z =
+      attack > 0
+        ? 0.45 + 2.9 * raised
+        : 0.3 + swing * 0.12 + held * 2.6 - kneel * 0.9 + (held ? jitter * 0.6 : 0);
     this.hand.position.y = -0.04 + this.body.position.y;
     if (this.core) {
       const glow = 1 + (pose.channel ?? 0) * 1.6;

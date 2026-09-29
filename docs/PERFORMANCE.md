@@ -44,6 +44,21 @@ Même machine et même protocole, comparés à la colonne « après » ci-dessus
 
 Les nouveaux personnages ajoutent environ 1 ms de CPU (animation des jambes, de la lame et des chaînes d'écharpe, mise à jour des rubans) et quelques draw calls par personnage visible (contour encré du corps et de l'arme, yeux lumineux, jambes, ruban). Le rendu logiciel varie dans le bruit de mesure. Douze allers-retours x = 123 / 7 : 255 / 241 meshes, 6 / 5 ressources physiques, 2 / 1 chunks, stables. Bundle principal : 1,87 Mo minifié / 456 ko gzip.
 
+### Troisième itération : arènes, collisions et animation
+
+Comparaison A / B dans la même session (build `main` précédent contre ce build, servis côte à côte, deux passages alternés, médiane de 40 images par scène puis moyenne des passages), MEDIUM, 1280 × 720, SwiftShader :
+
+| Scène (x)                  | Frame avant | Frame après | CPU avant | CPU après | Draw calls avant / après |
+| -------------------------- | ----------- | ----------- | --------- | --------- | ------------------------ |
+| Chambre d'éveil (10)       | 169,3 ms    | 170,4 ms    | 3,4 ms    | 4,2 ms    | 64 / 64                  |
+| Galerie des veilleurs (30) | 173,1 ms    | 176,6 ms    | 5,0 ms    | 5,6 ms    | 97 / 97                  |
+| Arène du Porteur (150,5)   | 171,4 ms    | 172,3 ms    | 4,8 ms    | 4,5 ms    | 86 / 90                  |
+| Arène du Gardien (170)     | 166,3 ms    | 172,0 ms    | 3,2 ms    | 4,1 ms    | 70 / 72                  |
+
+Écart de +0,5 à +3,4 % sur la frame, dans l'ordre du bruit de ce renderer logiciel. Les draw calls supplémentaires sont les portes d'arène visibles (une par porte). Le CPU gagne jusqu'à environ 0,9 ms : calcul des poses, bornes de déplacement, dégâts de contact, secousse du HUD. Aucune optimisation n'a été jugée nécessaire.
+
+Protocole standard (`tools/benchmark.mjs`, chambre d'éveil immobile, 120 images) : MEDIUM CPU 3,5 / 6,9 ms, rendu logiciel 150,7 / 209,1 ms, 62 draw calls, 54 608 triangles ; LOW CPU 2,2 / 6,0 ms, rendu 52,4 / 76,4 ms, 29 draw calls, 28 440 triangles. Ces valeurs absolues varient d'une exécution à l'autre sur cette machine ; seule la comparaison A / B ci-dessus isole l'effet des changements. Douze allers-retours x = 123 / 7 : 259 / 245 meshes (quatre portes d'arène et le maillage des lames de lumière, désactivés hors usage), 7 / 5 ressources physiques (à x = 123, la porte du fond de l'arène du Porteur est à moins de 45 m et reçoit son collider statique), 2 / 1 chunks, stables. Bundle principal : 1,88 Mo minifié / 463 ko gzip.
+
 Mesures brutes : [performance.json](evidence/performance.json) (dernière itération).
 
 ## Optimisation et stabilité
