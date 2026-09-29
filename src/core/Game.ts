@@ -447,7 +447,7 @@ export class Game {
       teleport: (x, y = 1.2) => {
         if (!Number.isFinite(x) || !Number.isFinite(y))
           throw new Error('Invalid debug coordinates');
-        this.world.update(x, this.session.abilities.remanence, this.session.closedGates());
+        this.world.update(x, this.session.abilities.remanence, this.session.relocate(x));
         this.session.player.teleport(x, y);
       },
       unlock: (id: AbilityId) => {

@@ -171,10 +171,39 @@ export const arenas = [
     roam: [167, 192],
   },
 ].map((arena) => ArenaSchema.parse(arena));
+const StageSchema = z.object({
+  /** Sector whose exit is sealed. */
+  id: z.string(),
+  /** Enemies to defeat before the way on opens. */
+  guardians: z.array(z.string()).min(1),
+  /** Abscissa of the sealed exit. */
+  gate: z.number(),
+  /** Shown when the passage opens. */
+  name: z.string(),
+});
+export type Stage = z.infer<typeof StageSchema>;
+/**
+ * Stages of the laboratory. Each sector's exit stays sealed until its guardians have
+ * fallen; the Keeper and the Faceless Guardian seal their own arenas above.
+ */
+export const stages = [
+  { id: 'awakening', guardians: ['watcher-1'], gate: 39, name: 'Chambre d’éveil' },
+  // Before Mira's anchor: the anchor is the reward for clearing the gallery.
+  { id: 'watchers', guardians: ['wisp-1', 'sentinel-1'], gate: 70, name: 'Galerie des veilleurs' },
+  // Inside the sector, within reach of Memory Step's reliquary (x = 119).
+  { id: 'palimpsest', guardians: ['watcher-2'], gate: 119.8, name: 'Pont du souvenir' },
+].map((stage) => StageSchema.parse(stage));
+export const stageGate = (id: string): string => `stage-${id}`;
 export const gates = [
   { id: 'echo', x: 141 },
+  ...stages.map((stage) => ({ id: stageGate(stage.id), x: stage.gate })),
   ...arenas.flatMap((arena) => [
     { id: `${arena.id}-left`, x: arena.left },
     { id: `${arena.id}-right`, x: arena.right },
   ]),
 ];
+/** Gates that bar progress: they only close in front of a player who has not crossed them. */
+export const progressGates: ReadonlySet<string> = new Set([
+  ...stages.map((stage) => stageGate(stage.id)),
+  ...arenas.map((arena) => `${arena.id}-right`),
+]);

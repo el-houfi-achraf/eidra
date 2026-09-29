@@ -2,7 +2,8 @@ import type { Settings } from '../config/settings';
 import { InputAction, actionLabels, defaultBindings, keyLabel } from '../player/InputAction';
 import type { SaveData } from '../save/SaveManager';
 import type { GameSession, TitleKind } from '../core/GameSession';
-import { chunks, checkpoints, landmarks } from '../../game-data/zones/laboratory';
+import { chunks, checkpoints, landmarks, stages } from '../../game-data/zones/laboratory';
+import { stageFlag } from '../quests/StageProgress';
 import { defaultSettings } from '../config/settings';
 import { offeringData } from '../../game-data/items/offerings';
 import { focusData } from '../../game-data/abilities/abilities';
@@ -499,7 +500,7 @@ export class MenuUI {
   map(session: GameSession): void {
     const flags = session.narrative.flags;
     const width = chunks.at(-1)!.end;
-    const markers = (start: number, end: number): string => {
+    const markers = (start: number, end: number, sector: string): string => {
       const inside = (x: number) => x >= start && x < end;
       const icons: string[] = [];
       for (const c of checkpoints)
@@ -512,22 +513,34 @@ export class MenuUI {
           icons.push(
             `<i class="${session.inventory.collectibles.has(m.id) ? 'found' : ''}" title="${escape(m.label)}">${m.kind === 'memory' ? '❖' : '✦'}</i>`,
           );
+      // Guardians and the sealed exit of each stage.
+      if (inside(154))
+        icons.push(
+          `<i class="${session.defeated('keeper') ? 'found' : 'danger'}" title="Porteur du dernier ordre">☗</i>`,
+        );
       if (inside(183))
         icons.push(
           `<i class="${session.enemies.bossDefeated ? 'found' : 'danger'}" title="Gardien Sans Visage">☗</i>`,
         );
+      for (const stage of stages)
+        if (stage.id === sector) {
+          const open = flags.has(stageFlag(stage.id));
+          icons.push(
+            `<i class="${open ? 'found' : 'danger'}" title="${open ? 'Passage ouvert' : 'Passage scellé : vaincre les gardiens du secteur'}">${open ? '⊙' : '⊘'}</i>`,
+          );
+        }
       return icons.join('');
     };
     const nodes = chunks
       .map((c) => {
         const known = session.discovered.has(c.id);
         const here = session.actor.x >= c.start && session.actor.x < c.end;
-        return `<li class="route-node ${known ? 'discovered' : ''} ${here ? 'current' : ''}"><span class="node-dot"></span><strong>${known ? escape(c.name) : 'INCONNU'}</strong><span class="node-icons">${known ? markers(c.start, c.end) : ''}</span></li>`;
+        return `<li class="route-node ${known ? 'discovered' : ''} ${here ? 'current' : ''}"><span class="node-dot"></span><strong>${known ? escape(c.name) : 'INCONNU'}</strong><span class="node-icons">${known ? markers(c.start, c.end, c.id) : ''}</span></li>`;
       })
       .join('');
     const position = Math.max(0, Math.min(100, (session.actor.x / width) * 100));
     const shortcut = flags.has('echo-gate-open');
-    this.root.innerHTML = `<div class="modal-scrim"></div><section class="panel map-panel"><p class="eyebrow">CARTOGRAPHIE DE LA RÉMANENCE</p><h2>Le laboratoire de l’éveil</h2><div class="route"><div class="route-shortcut ${shortcut ? 'open' : ''}" title="Conduit de maintenance"><span>${shortcut ? 'Conduit de maintenance' : 'Passage scellé'}</span></div><div class="route-line"></div><div class="route-you" style="left:${position.toFixed(1)}%"><span>Eidra</span></div><ol class="route-nodes">${nodes}</ol></div><div class="map-key"><span>◇ Ancrage</span><span>✦ Pouvoir</span><span>❖ Fragment</span><span class="danger">☗ Gardien</span><span class="mint">● Votre position</span></div><h3>Fragments retrouvés</h3><div class="memory-list">${['kael', 'seris', 'ilyan', 'vaela', 'deren', 'noa', 'aren'].map((id, i) => `<span class="${session.narrative.memories.has(id) ? 'found' : ''}"><b>0${i + 1}</b> ${session.narrative.memories.has(id) ? id.toUpperCase() : 'INCONNU'}</span>`).join('')}</div><p class="muted">◇ ${escape(session.quests.objective(flags))} · ◆ ${session.inventory.shards} éclats</p><button id="back" class="text-button">Reprendre le voyage →</button></section>`;
+    this.root.innerHTML = `<div class="modal-scrim"></div><section class="panel map-panel"><p class="eyebrow">CARTOGRAPHIE DE LA RÉMANENCE</p><h2>Le laboratoire de l’éveil</h2><div class="route"><div class="route-shortcut ${shortcut ? 'open' : ''}" title="Conduit de maintenance"><span>${shortcut ? 'Conduit de maintenance' : 'Passage scellé'}</span></div><div class="route-line"></div><div class="route-you" style="left:${position.toFixed(1)}%"><span>Eidra</span></div><ol class="route-nodes">${nodes}</ol></div><div class="map-key"><span>◇ Ancrage</span><span>✦ Pouvoir</span><span>❖ Fragment</span><span class="danger">☗ Gardien</span><span>⊘ Passage scellé</span><span class="mint">● Votre position</span></div><h3>Fragments retrouvés</h3><div class="memory-list">${['kael', 'seris', 'ilyan', 'vaela', 'deren', 'noa', 'aren'].map((id, i) => `<span class="${session.narrative.memories.has(id) ? 'found' : ''}"><b>0${i + 1}</b> ${session.narrative.memories.has(id) ? id.toUpperCase() : 'INCONNU'}</span>`).join('')}</div><p class="muted">◇ ${escape(session.quests.objective(flags))} · ◆ ${session.inventory.shards} éclats</p><button id="back" class="text-button">Reprendre le voyage →</button></section>`;
     this.bind('back', this.actions.resume);
     this.focus();
   }
