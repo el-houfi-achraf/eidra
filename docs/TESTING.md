@@ -50,6 +50,12 @@ Après correction : suite complète réussie, traversée du pont 5 / 5 et plong�
 
 14 parcours E2E, tous réussis sur le build final. Ajout : **« guardians bar the way until they are defeated »** — le seuil du Porteur se scelle (carte de titre), Eidra poussée contre la porte du fond pendant 2,5 s reste devant elle, la porte s'ouvre à la mort du Porteur et Eidra passe ; dans l'arène du Gardien, même vérification sur la porte x = 196, qui s'ouvre à sa défaite. Parcours répété 3 / 3. Le parcours du pont reste sans perte de vie grâce à la zone d'atterrissage libérée (D021) ; le Veilleur attendait auparavant exactement sur la zone d'atterrissage. La mort affiche désormais le panneau 1,3 s après l'éclatement ; le parcours de respawn l'attend par l'auto-attente de Playwright, sans délai fixe ajouté.
 
+## Quatrième itération : décor peint et ambiances
+
+84 tests unitaires / intégration dans 16 fichiers. Ajouts (`tests/unit/scenery.test.ts`) : une ambiance valide par secteur, secteurs purs en leur milieu et fondu sans saut visible sur tout le laboratoire (pas de 5 cm), poids égal des voisins à la frontière ; rubans, bords adoucis transparents, bandes qui ne s'inversent jamais ; générateur aléatoire déterministe ; bruits de texture qui se raccordent aux bords ; décor déterministe par secteur, budget de 500 à 12 000 triangles par secteur ; **aucun élément peint devant les personnages**, hors habillage des dalles qui reste sous les genoux ; avant-plan limité aux bords haut et bas ; dalles fantômes seulement là où existent des plateformes de mémoire.
+
+Les 14 parcours E2E réussissent sans modification sur le build final. Le rendu a été vérifié par captures des six zones en HIGH et LOW.
+
 ## Qualité restant à qualifier
 
 WebGPU réel, Firefox / Safari, manettes physiques, accessibilité avec lecteurs d’écran, quotas / stockage privé, CSP sur Cloudflare et campagne complète. Le protocole de performance logiciel est décrit dans PERFORMANCE ; il ne certifie pas 60 FPS. Aucun test défaillant n’est désactivé pour rendre la CI verte.

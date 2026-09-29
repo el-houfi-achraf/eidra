@@ -59,6 +59,22 @@ Comparaison A / B dans la même session (build `main` précédent contre ce buil
 
 Protocole standard (`tools/benchmark.mjs`, chambre d'éveil immobile, 120 images) : MEDIUM CPU 3,5 / 6,9 ms, rendu logiciel 150,7 / 209,1 ms, 62 draw calls, 54 608 triangles ; LOW CPU 2,2 / 6,0 ms, rendu 52,4 / 76,4 ms, 29 draw calls, 28 440 triangles. Ces valeurs absolues varient d'une exécution à l'autre sur cette machine ; seule la comparaison A / B ci-dessus isole l'effet des changements. Douze allers-retours x = 123 / 7 : 259 / 245 meshes (quatre portes d'arène et le maillage des lames de lumière, désactivés hors usage), 7 / 5 ressources physiques (à x = 123, la porte du fond de l'arène du Porteur est à moins de 45 m et reçoit son collider statique), 2 / 1 chunks, stables. Bundle principal : 1,88 Mo minifié / 463 ko gzip.
 
+### Quatrième itération : décor peint et ambiances
+
+Comparaison A / B dans la même session (build `main` précédent contre ce build, servis côte à côte, médiane de 40 images par scène, moyenne de deux passages en MEDIUM, un passage en HIGH et LOW), 1280 × 720, SwiftShader. Frame médiane en ms, avant → après :
+
+| Scène (x)                  | MEDIUM        | HIGH          | LOW         |
+| -------------------------- | ------------- | ------------- | ----------- |
+| Chambre d'éveil (10)       | 189,3 → 181,4 | 275,1 → 256,1 | 89,9 → 72,9 |
+| Galerie des veilleurs (57) | 189,0 → 193,8 | 268,7 → 248,7 | 70,3 → 55,3 |
+| Pont du souvenir (96)      | 176,9 → 168,6 | 250,3 → 217,6 | 59,8 → 45,1 |
+| Arène du Porteur (146)     | 187,9 → 176,6 | 261,0 → 216,5 | 64,5 → 52,8 |
+| Arène du Gardien (170)     | 176,8 → 166,3 | 250,5 → 205,7 | 65,4 → 49,7 |
+
+Le décor peint est **plus rapide** que l'ancien décor en boîtes éclairées : de −4 à −6 % en MEDIUM (sauf la galerie, +2,5 %, dans le bruit), de −7 à −18 % en HIGH, de −18 à −25 % en LOW (mesure LOW prise avant l'ajout des dalles fantômes, qui ajoutent un maillage par secteur à mémoire). Les matériaux non éclairés évitent l'éclairage par fragment et les faces latérales des boîtes ; les draw calls restent comparables (±6), car chaque secteur ne compte plus que six maillages peints. CPU inchangé à ±0,6 ms : la génération du décor se fait une fois au chargement du secteur.
+
+Protocole standard (`tools/benchmark.mjs`) : MEDIUM CPU 3,8 / 6,5 ms, rendu logiciel 156,7 / 198,0 ms, 64 draw calls, 54 794 triangles ; LOW CPU 2,2 / 3,7 ms, rendu 47,5 / 77,4 ms, 26 draw calls, 27 921 triangles. Douze allers-retours x = 123 / 7 : 262 / 251 meshes, 7 / 5 ressources physiques, 2 / 1 chunks, stables. Bundle principal : 1,89 Mo minifié / 469 ko gzip.
+
 Mesures brutes : [performance.json](evidence/performance.json) (dernière itération).
 
 ## Optimisation et stabilité
