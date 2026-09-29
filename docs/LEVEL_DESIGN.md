@@ -26,7 +26,15 @@ La galerie de maintenance (x=123) rejoint la plateforme de la chambre d'éveil (
 
 Le pont du souvenir comporte trois plateformes disparues séparées par de petits écarts : activer Rémanence puis sauter. Le sceau x=130 exige la présence du joueur ou de son Écho ; la porte x=141 se verrouille en position ouverte une fois franchie. Le boss ferme le seuil derrière le joueur pendant le combat.
 
-## Arènes scellées
+## Étapes et arènes scellées
+
+| Étape                 | Gardiens                            | Sortie (x) |
+| --------------------- | ----------------------------------- | ---------- |
+| Chambre d'éveil       | Veilleur                            | 39         |
+| Galerie des veilleurs | Souvenir errant, Porteur de cendres | 70         |
+| Pont du souvenir      | Veilleur du pont                    | 119,8      |
+
+Chaque sortie est dans son propre secteur, sur sol plein, à plus de 2 m d'un ancrage ; l'ancrage de Mira (x = 73) récompense la galerie, la relique de Memory Step (x = 119) reste à portée devant la sortie du pont. Un secteur qui reçoit des ennemis hors arène doit déclarer une étape (test unitaire).
 
 | Arène            | Gardien                  | Portes (x)    | Seuil | Zone du gardien |
 | ---------------- | ------------------------ | ------------- | ----- | --------------- |

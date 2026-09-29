@@ -204,6 +204,35 @@ test('guardians bar the way until they are defeated', async ({ page }) => {
   await page.evaluate(() => window.eidra!.setBossHealth(0));
   await expect.poll(async () => (await snapshot(page)).gates).not.toContain('obedience-right');
 });
+test('a sector exit stays sealed until its guardian falls, then stays open', async ({ page }) => {
+  await start(page);
+  // Between the Veilleur of the awakening chamber and the chamber's exit.
+  await page.evaluate(() => window.eidra!.teleport(37.5));
+  expect((await snapshot(page)).gates).toContain('stage-awakening');
+  await expect(page.getByText(/Passage scellé : 1 gardien du secteur/)).toBeVisible();
+  // Walking into the exit does not get past it (gate at x = 39, capsule radius 0.33).
+  const reached = await furthest(page, 'KeyD', 2500);
+  expect(reached).toBeGreaterThan(38.2);
+  expect(reached).toBeLessThan(38.8);
+  await page.evaluate(() => window.eidra!.setEnemyHealth('watcher-1', 0));
+  await expect.poll(async () => (await snapshot(page)).gates).not.toContain('stage-awakening');
+  expect((await snapshot(page)).flags).toContain('stage:awakening');
+  await expect(page.getByText('Chambre d’éveil : le passage s’ouvre.')).toBeVisible();
+  await page.keyboard.down('KeyD');
+  await expect.poll(async () => (await snapshot(page)).player.x).toBeGreaterThan(40.5);
+  await page.keyboard.up('KeyD');
+  // The cleared stage is saved: after a reload the way stays open.
+  await page.evaluate(() => window.eidra!.save());
+  await page.reload();
+  await expect(page.locator('body')).toHaveAttribute('data-ready', 'true');
+  await page.getByRole('button', { name: 'Continuer', exact: true }).click();
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'PLAYING');
+  const after = await snapshot(page);
+  expect(after.flags).toContain('stage:awakening');
+  expect(after.gates).not.toContain('stage-awakening');
+  // The next sector's exit is still sealed by its own guardians.
+  expect(after.gates).toContain('stage-watchers');
+});
 test('standard gamepad API controls the player while keyboard stays available', async ({
   page,
 }) => {

@@ -12,13 +12,22 @@ import { EventBus } from './EventBus';
 import { InputAction } from '../player/InputAction';
 import { TutorialDirector } from '../quests/TutorialDirector';
 import { ArenaDirector } from '../bosses/ArenaDirector';
+import { StageProgress } from '../quests/StageProgress';
 import { enemyData } from '../../game-data/enemies/roster';
 import type { HintAction, TutorialHint } from '../../game-data/quests/tutorial';
 import type { InputManager } from '../player/InputManager';
 import type { World } from '../world/World';
 import type { Settings } from '../config/settings';
 import type { SaveData } from '../save/SaveManager';
-import { checkpoints, landmarks, chunks, shortcuts, gates } from '../../game-data/zones/laboratory';
+import {
+  checkpoints,
+  landmarks,
+  chunks,
+  shortcuts,
+  gates,
+  progressGates,
+  stageGate,
+} from '../../game-data/zones/laboratory';
 import { focusData } from '../../game-data/abilities/abilities';
 import type { AbilityId } from '../../game-data/abilities/abilities';
 import type { DialogueId } from '../../game-data/dialogue/story';
@@ -47,6 +56,9 @@ export class GameSession {
   readonly focus = new FocusSystem();
   readonly tutorial = new TutorialDirector();
   readonly arenas = new ArenaDirector();
+  readonly stages = new StageProgress();
+  /** Sealed exits already announced; forgotten once Eidra walks away. */
+  private warned = new Set<string>();
   /** Contextual prompt to display, if any. */
   hint: TutorialHint | null = null;
   readonly enemies = new EnemyManager();
@@ -106,7 +118,7 @@ export class GameSession {
     this.enemies.bossDefeated = save.bosses.includes('faceless-guardian');
     this.keeperDefeated = save.bosses.includes('keeper');
     this.respawn();
-    this.world.update(save.position.x, false, this.closedGates());
+    this.world.update(save.position.x, false, this.relocate(save.position.x));
     this.player.teleport(save.position.x, save.position.y);
     this.actor.health = Math.max(1, Math.min(this.actor.maxHealth, save.health));
   }
@@ -139,6 +151,7 @@ export class GameSession {
     this.enemies.reset();
     if (this.keeperDefeated) this.enemies.defeated.add('keeper');
     this.arenas.reset();
+    this.warned.clear();
     this.echoOpen = false;
     this.abilities.resetTransient();
     this.combat.reset();
@@ -152,7 +165,7 @@ export class GameSession {
     this.actor.invulnerable = 1;
     this.actor.stagger = 0;
     this.actor.knockback = 0;
-    this.world.update(point.x, false, this.closedGates());
+    this.world.update(point.x, false, this.relocate(point.x));
     this.player.teleport(point.x, 1.2);
     this.actor.x = point.x;
     this.actor.y = 1.2;
@@ -368,6 +381,25 @@ export class GameSession {
       this.fx.notice('Le passage s’ouvre.');
       this.fx.sound('save');
     }
+    // Stages: a sector's exit opens once its guardians have fallen, and stays open (saved).
+    const down = (id: string): boolean => this.enemies.defeated.has(id);
+    for (const stage of this.stages.clear(this.narrative.flags, down)) {
+      this.fx.notice(`${stage.name} : le passage s’ouvre.`);
+      this.fx.sound('save');
+      this.fx.save();
+    }
+    for (const stage of this.stages.sealed(this.narrative.flags)) {
+      const id = stageGate(stage.id);
+      const ahead = stage.gate - this.actor.x;
+      if (!this.stages.beyond(id) && ahead > 0 && ahead < 3.5 && !this.warned.has(id)) {
+        this.warned.add(id);
+        const left = this.stages.remaining(stage, down);
+        this.fx.notice(
+          `Passage scellé : ${left} gardien${left > 1 ? 's' : ''} du secteur à vaincre.`,
+        );
+      }
+      if (ahead > 6 || ahead < -1) this.warned.delete(id);
+    }
     this.updateProgression(input);
     this.hint = this.tutorial.update({
       x: this.actor.x,
@@ -538,7 +570,7 @@ export class GameSession {
         ? `${input.label(InputAction.Interact)} · ${passage.label}`
         : 'Conduit scellé — un contrepoids retient la porte';
       if (unlocked && input.consume(InputAction.Interact)) {
-        this.world.update(passage.toX, this.abilities.remanence, this.closedGates());
+        this.world.update(passage.toX, this.abilities.remanence, this.relocate(passage.toX));
         this.player.teleport(passage.toX, passage.toY);
         this.fx.sound('memory');
         this.fx.notice(passage.label);
@@ -574,17 +606,32 @@ export class GameSession {
   get zoneName(): string {
     return chunks.find((c) => c.id === this.zone)?.name ?? 'CHAMBRE D’ÉVEIL';
   }
+  /** A guardian or enemy is down: bosses persist in the save, others until the next death. */
+  defeated(guardian: string): boolean {
+    return this.isDefeated(guardian);
+  }
   private isDefeated = (guardian: string): boolean =>
     guardian === 'faceless-guardian'
       ? this.enemies.bossDefeated
       : guardian === 'keeper'
         ? this.keeperDefeated
         : this.enemies.defeated.has(guardian);
-  /** Gates currently barring the way: arenas of living guardians and the unsolved seal. */
-  closedGates(): Set<string> {
+  /**
+   * Gates currently barring the way: arenas of living guardians, exits of uncleared
+   * stages and the unsolved seal. Progress gates only bar the way forward (D026).
+   */
+  closedGates(x = this.actor.x): Set<string> {
     const closed = new Set(this.arenas.closedGates(this.isDefeated));
+    for (const stage of this.stages.sealed(this.narrative.flags)) closed.add(stageGate(stage.id));
     if (!this.echoOpen && !this.narrative.flags.has('echo-gate-open')) closed.add('echo');
+    this.stages.locate(x, gates);
+    for (const id of closed) if (progressGates.has(id) && this.stages.beyond(id)) closed.delete(id);
     return closed;
+  }
+  /** Gates after a teleport, a respawn or a load: sides are measured afresh at `x`. */
+  relocate(x: number): Set<string> {
+    this.stages.reset();
+    return this.closedGates(x);
   }
   /** Health bar of the guardian currently fought, if any. */
   get bossBar(): { name: string; subtitle: string; health: number; maxHealth: number } | null {

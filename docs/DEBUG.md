@@ -15,7 +15,7 @@ eidra.setEnemyHealth('keeper', 0);
 await eidra.save();
 ```
 
-`snapshot().player.invulnerable` donne les secondes d'invulnérabilité restantes. `snapshot().gates` liste les portes qui barrent le chemin (`echo`, `last-order-left` / `-right`, `obedience-left` / `-right`). `setEnemyHealth` vise un ennemi chargé par son identifiant de spawn.
+`snapshot().player.invulnerable` donne les secondes d'invulnérabilité restantes. `snapshot().gates` liste les portes qui barrent le chemin (`echo`, `stage-awakening` / `-watchers` / `-palimpsest`, `last-order-left` / `-right`, `obedience-left` / `-right`). `setEnemyHealth` vise un ennemi chargé par son identifiant de spawn.
 
 Les commandes modifient la partie actuelle : réserver un emplacement aux tests. Elles ne sont pas requises pour terminer le parcours. L'API n'est pas une interface réseau.
 

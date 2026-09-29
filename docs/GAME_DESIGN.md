@@ -27,7 +27,9 @@ Un tutoriel contextuel remplace le long texte de départ : une invite (glyphe de
 
 ## Arènes et contact
 
-Un gardien ne se contourne pas : franchir le seuil de son arène fait surgir une porte derrière Eidra, et celle du fond reste close tant qu'il vit (carte de titre, notification, caméra qui cadre toute l'arène, barre de vie en bas de l'écran — y compris pour le Porteur du dernier ordre). La victoire rabat les deux portes. Mourir rouvre l'entrée ; le gardien attend. Les corps ennemis blessent au contact, ce qui empêche de les traverser sans l'esquive ; l'esquive reste le moyen de passer à travers une attaque.
+Aucune étape ne se contourne : la sortie de chaque secteur reste scellée tant que ses gardiens vivent — le Veilleur de la chambre d'éveil, le Souvenir errant et le Porteur de cendres de la galerie, le Veilleur du pont — puis le Porteur du dernier ordre et le Gardien Sans Visage gardent leurs arènes. Approcher d'une sortie scellée affiche le nombre de gardiens restants ; la vaincre ouvre la porte, l'annonce et sauvegarde. Une étape vaincue le reste, même si ses ennemis reviennent après une mort. La carte indique l'état de chaque sortie (⊘ scellée, ⊙ ouverte).
+
+Un gardien d'arène ne se contourne pas non plus : franchir le seuil de son arène fait surgir une porte derrière Eidra, et celle du fond reste close tant qu'il vit (carte de titre, notification, caméra qui cadre toute l'arène, barre de vie en bas de l'écran — y compris pour le Porteur du dernier ordre). La victoire rabat les deux portes. Mourir rouvre l'entrée ; le gardien attend. Les corps ennemis blessent au contact, ce qui empêche de les traverser sans l'esquive ; l'esquive reste le moyen de passer à travers une attaque.
 
 ## Animation et lisibilité
 
