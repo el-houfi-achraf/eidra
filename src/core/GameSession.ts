@@ -283,10 +283,10 @@ export class GameSession {
       this.fx.notice('Le contrepoids se souvient. Le passage reste ouvert.');
       this.fx.save();
     }
-    // Recueillement: grounded, idle and away from a shared-button interaction.
+    // Recueillement: grounded and idle.
     const healed = this.focus.update(
       dt,
-      input.held(InputAction.Heal) && !(input.device === 'gamepad' && this.interaction),
+      input.held(InputAction.Heal),
       p.motion.grounded &&
         !this.combat.attacking &&
         p.motion.dashTime === 0 &&

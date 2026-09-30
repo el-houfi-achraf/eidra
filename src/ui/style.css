@@ -1574,3 +1574,55 @@ body.reduced-motion *:before {
     font-size: 7px;
   }
 }
+/* Controller play: the focus is always visible, whatever the browser's heuristics. */
+body[data-device='gamepad'] #interface button:focus,
+body[data-device='gamepad'] #interface input:focus,
+body[data-device='gamepad'] #interface select:focus {
+  outline: 1px solid var(--gold);
+  outline-offset: 5px;
+}
+body[data-device='gamepad'] .menu-link:focus b {
+  opacity: 1;
+}
+body[data-device='gamepad'] .menu-link:focus:not(:disabled) {
+  color: #d2dfc9;
+  transform: translateX(5px);
+}
+body[data-device='gamepad'] .slot:focus {
+  border-color: #c6aa7b88;
+  background: linear-gradient(90deg, #163236ee, #0e2427cc);
+  transform: translateX(4px);
+}
+body[data-device='gamepad'] .binding:focus {
+  color: #fff;
+}
+/* Controller glyphs read as round buttons. */
+body[data-device='gamepad'] kbd {
+  border-radius: 999px;
+  font-family: 'Segoe UI Symbol', 'Noto Sans Symbols 2', Arial, sans-serif;
+}
+.binding.capturing kbd {
+  border-color: var(--gold);
+  color: var(--gold);
+  animation: breathe 1.2s infinite;
+}
+.pad-status {
+  margin: 4px 0 14px;
+  padding: 9px 12px;
+  border: 1px dashed #8baa9244;
+  font-size: 11px;
+  color: var(--muted);
+}
+.pad-status.connected {
+  border-style: solid;
+  border-color: #8effdb55;
+  color: #9cead3;
+}
+.setting-with-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.setting-with-action > .setting {
+  flex: 1;
+}

@@ -78,3 +78,14 @@ Lire README, ROADMAP et AGENT_RULES, lancer `npm ci`, puis `npm run check` et le
 - **Décor** : cinq nouvelles ambiances et deux motifs (cheminées et braseros, jardin d'arbres morts).
 - **UX** : quêtes de l'Acte II, carte et en-tête du HUD par acte, invite du double saut.
 - Sauvegarde v2 inchangée ; une partie qui avait atteint l'ancienne fin reprend sur la route de l'Acte II.
+
+### Septième itération : jouer avec n'importe quelle manette
+
+- **Toutes les manettes** (D030) : Xbox, PlayStation, Nintendo, clones XInput et manettes génériques, y compris celles que le navigateur ne sait pas associer (croix en axe unique, gâchettes en axes). Plusieurs manettes branchées : celle sur laquelle on appuie joue.
+- **Disposition à la Hollow Knight** : saut en bas, frappe à gauche, recueillement à droite, esquive sur la gâchette droite, parler et se reposer en poussant vers le haut.
+- **Symboles** de la manette en main dans toutes les invites (A, ✕, B…), ou style imposé.
+- **Menus entièrement à la manette** : navigation spatiale, curseurs et listes, onglets aux gâchettes hautes, retour sur B / ○, focus toujours visible.
+- **Onglet Manette** : réassignation de chaque action en appuyant sur le bouton voulu (échange en cas de conflit), zone morte, vibrations et test, symboles, réinitialisation.
+- **Vibrations** sur les coups, parades, blessures, chocs, victoires et à la mort.
+- **Branchement annoncé ; débranchement en jeu = pause.**
+- Sauvegardes et réglages existants compatibles (nouveaux réglages avec valeurs par défaut). Les manettes physiques restent à qualifier : les tests utilisent des manettes scriptées.

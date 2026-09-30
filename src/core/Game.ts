@@ -20,6 +20,8 @@ import { abilityData } from '../../game-data/abilities/abilities';
 import type { AbilityId } from '../../game-data/abilities/abilities';
 import type { DebugAPI } from '../debug/types';
 import { arenas, route } from '../../game-data/zones/laboratory';
+import { familyNames } from '../../game-data/input/controllers';
+import { rumbleCues } from '../../game-data/input/rumble';
 export class Game {
   private engine!: AbstractEngine;
   private presentation!: Presentation;
@@ -39,6 +41,8 @@ export class Game {
   private running = true;
   private endingPending = false;
   private endShown = false;
+  /** The map is the page shown while paused. */
+  private mapOpen = false;
   private deathTimer = 0;
   private saving: Promise<void> = Promise.resolve();
   private lifecycle = new AbortController();
@@ -54,6 +58,21 @@ export class Game {
       advance: () => this.advanceDialogue(),
       respawn: () => this.respawn(),
       offer: () => this.offer(),
+      capturePad: (done) => this.input.capture(done),
+      cancelPadCapture: () => this.input.cancelCapture(),
+      pad: () => ({ info: this.input.pad, glyph: (token) => this.input.padLabel(token) }),
+      rumbleTest: () => this.input.rumble(rumbleCues.heavy!),
+    });
+    this.input.onConnection((info, connected) => {
+      this.ui.notice(
+        connected
+          ? `Manette connectée : ${info.name} (${familyNames[info.family]}).`
+          : `Manette déconnectée : ${info.name}.`,
+      );
+      // Losing the controller mid-fight pauses the journey, as on a console.
+      if (!connected && this.state.state === 'PLAYING' && this.input.device === 'gamepad')
+        this.pause();
+      this.ui.refreshPad();
     });
   }
   async boot(): Promise<void> {
@@ -67,6 +86,8 @@ export class Game {
       burst: (x, y, kind) => this.presentation.effects.burst(x, y, kind),
       sound: (id, x, y) => {
         this.audio.play(id, x ?? this.session.actor.x, y ?? this.session.actor.y);
+        const rumble = rumbleCues[id];
+        if (rumble) this.input.rumble(rumble);
         if (this.settings.subtitles && ['memory', 'save', 'parry'].includes(id))
           this.ui.caption(
             id === 'parry' ? '[ La céramique résonne. ]' : '[ La Lumérite chante doucement. ]',
@@ -194,6 +215,7 @@ export class Game {
         else if (this.input.consume(InputAction.Map)) {
           this.state.change('PAUSED');
           this.ui.map(this.session);
+          this.mapOpen = true;
           this.input.reset();
         } else {
           this.accumulator += dt;
@@ -208,17 +230,24 @@ export class Game {
         this.accumulator = 0;
         if (
           this.state.state === 'CUTSCENE' &&
-          (this.input.consume(InputAction.Interact) || this.input.consume(InputAction.Jump))
+          (this.input.consume(InputAction.Interact) ||
+            this.input.consume(InputAction.Jump) ||
+            this.input.menu.confirm)
         )
           this.advanceDialogue();
         else if (this.state.state === 'PAUSED' && this.input.consume(InputAction.Pause))
           this.resume();
+        // The map button closes the map it opened.
+        else if (
+          this.state.state === 'PAUSED' &&
+          this.mapOpen &&
+          this.input.consume(InputAction.Map)
+        )
+          this.resume();
       }
-      if (
-        this.input.gamepadConnected &&
-        ['MAIN_MENU', 'PAUSED', 'GAME_OVER', 'ENDING'].includes(this.state.state)
-      )
-        this.ui.navigate(this.input.menuDirection, this.input.consume(InputAction.Jump));
+      if (['MAIN_MENU', 'PAUSED', 'GAME_OVER', 'ENDING'].includes(this.state.state))
+        this.ui.navigate(this.input.menu);
+      this.ui.setDevice(this.input.device, this.input.family);
       const menu = this.state.state === 'MAIN_MENU' || this.state.state === 'BOOT';
       this.presentation.render(dt, this.session, this.settings, menu);
       this.hud.update(
@@ -269,11 +298,13 @@ export class Game {
     }
   }
   private pause(): void {
+    this.mapOpen = false;
     this.state.change('PAUSED');
     this.input.reset();
     this.ui.pause(this.settings, this.session, (action) => this.input.label(action));
   }
   private resume(): void {
+    this.mapOpen = false;
     this.presentation.resting = false;
     if (this.state.state === 'ENDING') {
       this.world.update(
@@ -319,6 +350,7 @@ export class Game {
   }
   private die(): void {
     if (this.state.state !== 'PLAYING') return;
+    this.input.rumble(rumbleCues.death!);
     this.state.change('GAME_OVER');
     this.input.reset();
     // The mask shatters first; the death panel follows once the shards have flown.
@@ -395,6 +427,12 @@ export class Game {
   private applySettings(value: Settings, persist = true): void {
     this.settings = value;
     this.input.setBindings(value.bindings);
+    this.input.setPad({
+      bindings: value.padBindings,
+      deadzone: value.deadzone,
+      vibration: value.vibration,
+      glyphs: value.glyphs,
+    });
     this.presentation?.applySettings(value);
     if (!value.subtitles) this.ui.caption('');
     this.world?.setQuality(value.preset);
@@ -453,6 +491,14 @@ export class Game {
         memories: [...this.session.narrative.memories],
         flags: [...this.session.narrative.flags],
         gamepad: this.input.gamepadConnected,
+        device: this.input.device,
+        pad: this.input.pad
+          ? {
+              name: this.input.pad.name,
+              family: this.input.pad.family,
+              profile: this.input.pad.profile?.id ?? 'standard',
+            }
+          : null,
         meshes: this.presentation.scene.meshes.length,
         bodies: this.world.bodyCount,
         renderer: this.engine.isWebGPU ? 'WebGPU' : 'WebGL2',

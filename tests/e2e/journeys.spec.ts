@@ -480,3 +480,203 @@ test('contextual hints teach a control and retire once it is performed', async (
   // The prompt fades out (its text stays during the fade).
   await expect(hint).not.toHaveClass(/visible/);
 });
+interface FakePad {
+  id: string;
+  index: number;
+  mapping: string;
+  connected: boolean;
+  timestamp: number;
+  axes: number[];
+  buttons: { pressed: boolean; touched: boolean; value: number }[];
+  vibrationActuator: { effects: string[]; playEffect: (type: string) => Promise<string> };
+}
+type PadWindow = Window & { pad?: FakePad };
+/** Plugs in a scripted controller; its buttons and axes are then set by the test. */
+async function plugPad(page: Page, id: string, mapping: string, axes: number[]): Promise<void> {
+  await page.evaluate(
+    ([id, mapping, axes]) => {
+      const pad: FakePad = {
+        id,
+        index: 0,
+        mapping,
+        connected: true,
+        timestamp: 1,
+        axes,
+        buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })),
+        vibrationActuator: {
+          effects: [],
+          playEffect(type: string) {
+            this.effects.push(type);
+            return Promise.resolve('complete');
+          },
+        },
+      };
+      (window as PadWindow).pad = pad;
+      Object.defineProperty(navigator, 'getGamepads', { configurable: true, value: () => [pad] });
+      window.dispatchEvent(Object.assign(new Event('gamepadconnected'), { gamepad: pad }));
+    },
+    [id, mapping, axes] as const,
+  );
+}
+/** Waits for two rendered frames, so the game has polled the pad at least once. */
+const frames = (page: Page): Promise<void> =>
+  page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+async function padButton(page: Page, index: number, pressed: boolean): Promise<void> {
+  await page.evaluate(
+    ([index, pressed]) => {
+      const pad = (window as PadWindow).pad!;
+      pad.buttons[index] = { pressed, touched: pressed, value: pressed ? 1 : 0 };
+      pad.timestamp++;
+    },
+    [index, pressed] as const,
+  );
+}
+/** Presses a pad button long enough for the game to see it, then releases it. */
+async function padTap(page: Page, index: number): Promise<void> {
+  await padButton(page, index, true);
+  await frames(page);
+  await padButton(page, index, false);
+  await frames(page);
+}
+async function padAxis(page: Page, axis: number, value: number): Promise<void> {
+  await page.evaluate(
+    ([axis, value]) => {
+      (window as PadWindow).pad!.axes[axis] = value;
+    },
+    [axis, value] as const,
+  );
+}
+const focused = (page: Page): Promise<string> =>
+  page.evaluate(() => {
+    const el = document.activeElement as HTMLElement | null;
+    return el ? `${el.id}|${el.dataset.padAction ?? ''}` : '';
+  });
+test('a PlayStation controller drives the menus, the game and its own glyphs', async ({ page }) => {
+  await page.goto('/?debug=1&renderer=webgl2');
+  await expect(page.locator('body')).toHaveAttribute('data-ready', 'true');
+  await plugPad(
+    page,
+    'DualSense Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 0ce6)',
+    'standard',
+    [0, 0, 0, 0],
+  );
+  await expect(page.getByText('Manette connectée : DualSense Wireless Controller')).toBeVisible();
+  // ✕ on « Nouvelle partie », then on the first slot: no keyboard, no mouse.
+  await padTap(page, 0);
+  await expect(page.locator('#slot-0')).toBeVisible();
+  await expect.poll(() => focused(page)).toContain('slot-0');
+  await padTap(page, 0);
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'PLAYING');
+  const s = await snapshot(page);
+  expect(s.device).toBe('gamepad');
+  expect(s.pad).toMatchObject({ family: 'playstation', profile: 'standard' });
+  // The press that started the game did not also jump.
+  expect(s.player.y).toBeLessThan(1.5);
+  // Prompts use the pad's glyphs: the stick first, then the PlayStation buttons.
+  await expect(page.locator('#hint kbd').first()).toHaveText('◀');
+  const origin = (await snapshot(page)).player.x;
+  await padAxis(page, 0, 1);
+  await expect.poll(async () => (await snapshot(page)).player.x).toBeGreaterThan(origin + 1);
+  await padAxis(page, 0, 0);
+  await page.evaluate(() => window.eidra!.teleport(16));
+  await expect(page.locator('#hint')).toContainText('Sauter');
+  await expect(page.locator('#hint kbd').first()).toHaveText('✕');
+  await padButton(page, 0, true);
+  await expect.poll(async () => (await snapshot(page)).player.y).toBeGreaterThan(1.5);
+  await padButton(page, 0, false);
+  // Options pauses, ○ resumes.
+  await padTap(page, 9);
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'PAUSED');
+  await expect(page.locator('.control-list')).toContainText('□');
+  await padTap(page, 1);
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'PLAYING');
+});
+test('an unmapped controller plays through its hat and is remapped with the pad alone', async ({
+  page,
+}) => {
+  await page.goto('/?debug=1&renderer=webgl2');
+  await expect(page.locator('body')).toHaveAttribute('data-ready', 'true');
+  // A DirectInput pad the browser does not map: POV hat on axis 9, resting at 1.29.
+  await plugPad(
+    page,
+    'Generic USB Joystick (Vendor: 0079 Product: 0006)',
+    '',
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 1.2857],
+  );
+  await padTap(page, 0);
+  await padTap(page, 0);
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'PLAYING');
+  expect((await snapshot(page)).pad).toMatchObject({ family: 'generic', profile: 'generic' });
+  await expect.poll(async () => (await snapshot(page)).player.grounded).toBe(true);
+  const before = (await snapshot(page)).player.x;
+  await padAxis(page, 9, -0.4286); // hat right
+  await expect.poll(async () => (await snapshot(page)).player.x).toBeGreaterThan(before + 1);
+  await padAxis(page, 9, 1.2857);
+  // Start → Réglages → the Manette tab, all with the pad.
+  await padTap(page, 9);
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'PAUSED');
+  for (let i = 0; i < 6 && !(await focused(page)).startsWith('settings|'); i++) {
+    await padAxis(page, 9, 0.1429); // hat down
+    await frames(page);
+    await padAxis(page, 9, 1.2857);
+    await frames(page);
+  }
+  await padTap(page, 0);
+  await expect(page.locator('.settings-panel')).toBeVisible();
+  for (let i = 0; i < 4; i++) await padTap(page, 5);
+  await expect(page.locator('#pad-status')).toContainText('Generic USB Joystick');
+  await expect(page.locator('#pad-status')).toContainText('Générique');
+  // Down to the first row of bindings, then left to « Sauter ».
+  const hat = async (value: number): Promise<void> => {
+    await padAxis(page, 9, value);
+    await frames(page);
+    await padAxis(page, 9, 1.2857);
+    await frames(page);
+  };
+  for (let i = 0; i < 8 && (await focused(page)).endsWith('|'); i++) await hat(0.1429);
+  if (!(await focused(page)).endsWith('|jump')) await hat(0.7143);
+  expect(await focused(page)).toContain('|jump');
+  await padTap(page, 0);
+  await expect(page.locator('[data-pad-action="jump"] kbd')).toHaveText('Appuyez…');
+  // Button 8 of this pad now jumps.
+  await padTap(page, 7);
+  await expect(page.locator('[data-pad-action="jump"] kbd')).toHaveText('R2');
+  expect((await snapshot(page)).settings.padBindings.jump).toBe('b7');
+  // East button: back to the pause menu, then back into the game.
+  await padTap(page, 1);
+  await expect(page.locator('.pause-panel')).toBeVisible();
+  await padTap(page, 1);
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'PLAYING');
+  await padButton(page, 7, true);
+  await expect.poll(async () => (await snapshot(page)).player.y).toBeGreaterThan(1.5);
+  await padButton(page, 7, false);
+});
+test('the controller rumbles on a blow, and unplugging it pauses the game', async ({ page }) => {
+  await start(page);
+  await plugPad(
+    page,
+    'Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e)',
+    'standard',
+    [0, 0, 0, 0],
+  );
+  await padTap(page, 2);
+  expect((await snapshot(page)).device).toBe('gamepad');
+  // A fall into the bridge's chasm hurts: the pad rumbles.
+  await page.evaluate(() => window.eidra!.teleport(98, 3));
+  await expect
+    .poll(() => page.evaluate(() => (window as PadWindow).pad!.vibrationActuator.effects))
+    .toContain('dual-rumble');
+  await page.evaluate(() => {
+    const pad = (window as PadWindow).pad!;
+    pad.connected = false;
+    Object.defineProperty(navigator, 'getGamepads', { configurable: true, value: () => [] });
+    window.dispatchEvent(Object.assign(new Event('gamepaddisconnected'), { gamepad: pad }));
+  });
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'PAUSED');
+  await expect(page.getByText('Manette déconnectée : Xbox Wireless Controller.')).toBeVisible();
+});

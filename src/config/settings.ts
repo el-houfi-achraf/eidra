@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { FamilySchema, PadTokenSchema } from '../../game-data/input/controllers';
 export const SettingsSchema = z.object({
   preset: z.enum(['LOW', 'MEDIUM', 'HIGH', 'ULTRA']).default('MEDIUM'),
   master: z.number().min(0).max(1).default(0.65),
@@ -16,6 +17,14 @@ export const SettingsSchema = z.object({
   /** Contextual control prompts (tutorial). */
   hints: z.boolean().default(true),
   bindings: z.record(z.string(), z.string()).default({}),
+  /** Controller layout overrides, by action (`b0`…, or a direction). */
+  padBindings: z.record(z.string(), PadTokenSchema).default({}),
+  /** Radial dead zone of the left stick. */
+  deadzone: z.number().min(0.05).max(0.5).default(0.25),
+  /** Vibration strength; 0 turns it off. */
+  vibration: z.number().min(0).max(1).default(0.7),
+  /** Button glyphs: follow the controller in hand, or a fixed family. */
+  glyphs: z.union([z.literal('auto'), FamilySchema]).default('auto'),
 });
 export type Settings = z.infer<typeof SettingsSchema>;
 export const defaultSettings = (): Settings => SettingsSchema.parse({});

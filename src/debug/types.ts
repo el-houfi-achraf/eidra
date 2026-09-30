@@ -42,6 +42,10 @@ export interface DebugSnapshot {
   memories: string[];
   flags: string[];
   gamepad: boolean;
+  /** Device of the latest input; prompts follow it. */
+  device: 'keyboard' | 'gamepad';
+  /** The controller in hand: family of its glyphs and the layout used to read it. */
+  pad: { name: string; family: string; profile: string } | null;
   meshes: number;
   bodies: number;
   renderer: string;

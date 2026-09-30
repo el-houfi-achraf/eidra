@@ -1,5 +1,9 @@
 import type { Settings } from '../config/settings';
 import { InputAction, actionLabels, defaultBindings, keyLabel } from '../player/InputAction';
+import type { MenuInput } from '../player/InputManager';
+import type { PadInfo } from '../player/Gamepad';
+import { defaultPadBindings, familyNames } from '../../game-data/input/controllers';
+import type { PadFamily, PadToken } from '../../game-data/input/controllers';
 import type { SaveData } from '../save/SaveManager';
 import type { GameSession, TitleKind } from '../core/GameSession';
 import {
@@ -25,7 +29,33 @@ export interface MenuActions {
   advance: () => void;
   respawn: () => void;
   offer: () => void;
+  /** Waits for a controller input to remap; null when cancelled. */
+  capturePad: (done: (token: PadToken | null) => void) => void;
+  cancelPadCapture: () => void;
+  /** The controller in hand and the glyph of a binding for it. */
+  pad: () => { info: PadInfo | null; glyph: (token: PadToken | undefined) => string };
+  rumbleTest: () => void;
 }
+/** Controller actions the player may remap; moving, aiming down and pause stay fixed. */
+const padActions = [
+  InputAction.Jump,
+  InputAction.Attack,
+  InputAction.Charge,
+  InputAction.Heal,
+  InputAction.Dash,
+  InputAction.Parry,
+  InputAction.Remanence,
+  InputAction.Echo,
+  InputAction.Interact,
+  InputAction.Map,
+] as const;
+/** Inputs that keep their role: the stick directions used to move and aim, and start. */
+const reservedPad: readonly PadToken[] = ['left', 'right', 'down', 'b9'];
+const focusable = 'button:not(:disabled), input:not(:disabled), select:not(:disabled)';
+const padStatus = (info: PadInfo | null): string =>
+  info
+    ? `Manette : ${info.name} · ${familyNames[info.family]}${info.profile?.id === 'generic' ? ' · disposition générique' : ''}`
+    : 'Aucune manette active — branchez-en une et appuyez sur un bouton.';
 const mark =
   '<svg viewBox="0 0 48 64" aria-hidden="true"><path d="M24 3 44 32 24 61 4 32Z M24 13 35 32 24 51 13 32Z M24 3V20 M24 44V61"/></svg>';
 const escape = (text: string): string =>
@@ -89,7 +119,11 @@ export class MenuUI {
   private typing: { element: HTMLElement; text: string; shown: number } | null = null;
   private returnTo: () => void = () => undefined;
   private keyCapture: ((e: KeyboardEvent) => void) | null = null;
+  private padCapturing = false;
+  private currentSettings: Settings | null = null;
   private reducedMotion = false;
+  /** Latest input device, for the few prompts that differ between keyboard and pad. */
+  private device: 'keyboard' | 'gamepad' = 'keyboard';
   constructor(private actions: MenuActions) {
     this.root = document.getElementById('interface')!;
   }
@@ -111,6 +145,12 @@ export class MenuUI {
   }
   setReducedMotion(value: boolean): void {
     this.reducedMotion = value;
+  }
+  /** Follows the device in hand: glyph style of the prompts and visible focus for pads. */
+  setDevice(device: 'keyboard' | 'gamepad', family: PadFamily): void {
+    this.device = device;
+    if (document.body.dataset.device !== device) document.body.dataset.device = device;
+    if (document.body.dataset.pad !== family) document.body.dataset.pad = family;
   }
   /** Cinematic card for a new area, a boss introduction or a victory. */
   title(kind: TitleKind, title: string, subtitle: string): void {
@@ -305,6 +345,7 @@ export class MenuUI {
   }
   settings(settings: Settings, back: () => void, tab = 'display'): void {
     this.returnTo = back;
+    this.currentSettings = settings;
     const slider = (
       id: keyof Settings,
       label: string,
@@ -321,6 +362,7 @@ export class MenuUI {
       ['audio', 'Audio'],
       ['access', 'Accessibilité'],
       ['controls', 'Commandes'],
+      ['gamepad', 'Manette'],
     ];
     const presetInfo: Record<Settings['preset'], string> = {
       LOW: 'Performances : sans étalonnage, ciel ni rayons',
@@ -328,6 +370,17 @@ export class MenuUI {
       HIGH: 'Ombres et anti-crénelage MSAA',
       ULTRA: 'Résolution supérieure et ombres fines',
     };
+    const pad = this.actions.pad();
+    const padBindings = { ...defaultPadBindings, ...settings.padBindings } as Record<
+      string,
+      PadToken
+    >;
+    const families: [Settings['glyphs'], string][] = [
+      ['auto', 'Automatique'],
+      ...(Object.entries(familyNames) as [PadFamily, string][]),
+    ];
+    const padPanel = (): string =>
+      `<p id="pad-status" class="pad-status ${pad.info ? 'connected' : ''}">${escape(padStatus(pad.info))}</p><label class="setting"><span>Symboles des boutons<small>Suivre la manette en main ou imposer une famille</small></span><select id="glyphs">${families.map(([id, name]) => `<option value="${id}" ${settings.glyphs === id ? 'selected' : ''}>${name}</option>`).join('')}</select></label>${slider('deadzone', 'Zone morte du stick', 0.05, 0.5, 0.05, 'percent')}<div class="setting-with-action">${slider('vibration', 'Vibrations', 0, 1, 0.1, 'percent')}<button id="rumble-test" class="text-button">Tester</button></div><div class="bindings pad-bindings">${padActions.map((action) => `<button class="binding" data-pad-action="${action}"><span>${actionLabels[action]}</span><kbd>${escape(pad.glyph(padBindings[action]))}</kbd></button>`).join('')}</div><p class="muted small">Stick gauche ou croix : se déplacer (à mi-course pour marcher), bas pour viser. Start : pause. Pour réassigner, choisissez une action puis appuyez sur le bouton voulu ; Start annule.</p><button id="reset-pad" class="text-button">Rétablir la disposition manette</button>`;
     const panels: Record<string, string> = {
       display: `<label class="setting"><span>Qualité<small id="preset-info">${presetInfo[settings.preset]}</small></span><select id="preset">${['LOW', 'MEDIUM', 'HIGH', 'ULTRA'].map((p) => `<option ${p === settings.preset ? 'selected' : ''}>${p}</option>`).join('')}</select></label>${slider('brightness', 'Luminosité', 0.7, 1.5, 0.05, 'x')}${slider('contrast', 'Contraste', 0.8, 1.5, 0.05, 'x')}${slider('shake', 'Secousses', 0, 1, 0.1, 'percent')}${slider('cameraSensitivity', 'Réactivité caméra', 0.5, 2, 0.1, 'x')}${toggle('reducedMotion', 'Mouvements réduits', 'Coupe secousses, zooms et balancements')}${toggle('chromaticAberration', 'Aberration chromatique')}`,
       audio: `${slider('master', 'Volume général', 0, 1, 0.05, 'percent')}${slider('music', 'Musique & ambiance', 0, 1, 0.05, 'percent')}${slider('effects', 'Effets sonores', 0, 1, 0.05, 'percent')}`,
@@ -339,9 +392,8 @@ export class MenuUI {
           (action) =>
             `<button class="binding" data-action="${action}"><span>${actionLabels[action]}</span><kbd>${escape(keyLabel(settings.bindings[action] ?? defaultBindings[action]))}</kbd></button>`,
         )
-        .join(
-          '',
-        )}</div><p class="muted small">Manette : A saut · X attaque (bas + X en l’air : plongée) · B esquive · Y Rémanence · LB parade · RB Écho · RT interaction, maintenir pour se recueillir · LT charge · Start pause.</p>`,
+        .join('')}</div><p class="muted small">La manette se règle dans l’onglet Manette.</p>`,
+      gamepad: padPanel(),
     };
     this.root.innerHTML = `<div class="modal-scrim"></div><section class="panel settings-panel"><div class="panel-heading"><div><p class="eyebrow">À VOTRE RYTHME</p><h2>Réglages</h2></div><button id="back" class="text-button">Terminé ↗</button></div><div class="tabs" role="tablist" aria-label="Catégories de réglages">${tabs.map(([id, name]) => `<button role="tab" id="tab-${id}" aria-selected="${id === tab}" aria-controls="panel-${id}" class="tab ${id === tab ? 'active' : ''}">${name}</button>`).join('')}</div>${tabs.map(([id]) => `<div class="tab-panel" role="tabpanel" id="panel-${id}" aria-labelledby="tab-${id}" ${id === tab ? '' : 'hidden'}>${panels[id]}</div>`).join('')}<div class="settings-footer"><button id="reset-settings" class="text-button">Rétablir les valeurs par défaut</button></div></section>`;
     const show = (id: string): void => {
@@ -369,6 +421,8 @@ export class MenuUI {
       'contrast',
       'shake',
       'cameraSensitivity',
+      'deadzone',
+      'vibration',
     ] as const) {
       const input = this.root.querySelector<HTMLInputElement>('#' + key);
       if (!input) continue;
@@ -397,12 +451,58 @@ export class MenuUI {
       if (info) info.textContent = presetInfo[settings.preset];
       this.actions.settings(settings);
     });
+    this.root.querySelector<HTMLSelectElement>('#glyphs')?.addEventListener('change', (event) => {
+      settings.glyphs = (event.target as HTMLSelectElement).value as Settings['glyphs'];
+      this.actions.settings(settings);
+      this.refreshPad();
+    });
+    this.bind('rumble-test', this.actions.rumbleTest);
+    this.bind('reset-pad', () => {
+      settings.padBindings = {};
+      this.actions.settings(settings);
+      this.settings(settings, back, 'gamepad');
+      this.root.querySelector<HTMLElement>('#reset-pad')?.focus();
+    });
+    this.root.querySelectorAll<HTMLButtonElement>('[data-pad-action]').forEach((button) =>
+      button.addEventListener('click', () => {
+        if (this.padCapturing) return;
+        this.cancelCapture();
+        const action = button.dataset.padAction as InputAction;
+        button.classList.add('capturing');
+        button.querySelector('kbd')!.textContent = 'Appuyez…';
+        this.padCapturing = true;
+        this.actions.capturePad((token) => {
+          this.padCapturing = false;
+          const glyph = this.actions.pad().glyph;
+          if (token && reservedPad.includes(token))
+            this.notice(`${glyph(token)} reste réservé au déplacement et à la pause.`);
+          else if (token) {
+            const effective = { ...defaultPadBindings, ...settings.padBindings } as Record<
+              string,
+              PadToken
+            >;
+            const other = padActions.find((a) => a !== action && effective[a] === token);
+            if (other && effective[action]) {
+              settings.padBindings[other] = effective[action];
+              this.notice(`${actionLabels[other]} prend ${glyph(effective[action])}.`);
+            }
+            settings.padBindings[action] = token;
+            this.actions.settings(settings);
+          }
+          // Still in the controller tab: redraw it and keep the focus on the action.
+          if (!this.root.querySelector('#pad-status')) return;
+          this.settings(settings, back, 'gamepad');
+          this.root.querySelector<HTMLElement>(`[data-pad-action="${action}"]`)?.focus();
+        });
+      }),
+    );
     this.bind('reset-settings', () => {
       Object.assign(settings, defaultSettings());
       this.actions.settings(settings);
       this.settings(settings, back, tab);
     });
-    this.root.querySelectorAll<HTMLButtonElement>('.binding').forEach((button) =>
+    // Keyboard bindings only: the controller's have their own capture below.
+    this.root.querySelectorAll<HTMLButtonElement>('.binding[data-action]').forEach((button) =>
       button.addEventListener('click', () => {
         this.cancelCapture();
         const action = button.dataset.action as InputAction;
@@ -431,23 +531,105 @@ export class MenuUI {
     );
     this.bind('back', () => {
       this.cancelCapture();
+      if (this.padCapturing) this.actions.cancelPadCapture();
       this.returnTo();
     });
     this.focus();
   }
-  navigate(direction: number, activate: boolean): void {
-    if (this.keyCapture) return;
-    const controls = [...this.root.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
-    if (direction && controls.length) {
-      const index = controls.indexOf(document.activeElement as HTMLButtonElement);
-      controls[(index + direction + controls.length) % controls.length]?.focus();
+  /** Updates the controller tab when a pad is plugged in, removed or its glyphs change. */
+  refreshPad(): void {
+    const status = this.root.querySelector<HTMLElement>('#pad-status');
+    if (!status || this.padCapturing) return;
+    const pad = this.actions.pad();
+    status.textContent = padStatus(pad.info);
+    status.classList.toggle('connected', pad.info !== null);
+    const settings = this.currentSettings;
+    if (!settings) return;
+    const bindings = { ...defaultPadBindings, ...settings.padBindings } as Record<string, PadToken>;
+    this.root.querySelectorAll<HTMLElement>('[data-pad-action]').forEach((button) => {
+      const kbd = button.querySelector('kbd');
+      if (kbd) kbd.textContent = pad.glyph(bindings[button.dataset.padAction ?? '']);
+    });
+  }
+  /**
+   * Controller navigation of every menu: directions move the focus spatially, left
+   * and right also adjust sliders and lists, the south button activates, the east
+   * button goes back, the bumpers switch tabs.
+   */
+  navigate(menu: MenuInput): void {
+    if (this.keyCapture || this.padCapturing) return;
+    const focused = document.activeElement;
+    const active =
+      focused instanceof HTMLElement && focused !== document.body && this.root.contains(focused)
+        ? focused
+        : null;
+    if (menu.back) {
+      this.root.querySelector<HTMLButtonElement>('#back, #resume')?.click();
+      return;
     }
-    if (
-      activate &&
-      document.activeElement instanceof HTMLButtonElement &&
-      this.root.contains(document.activeElement)
-    )
-      document.activeElement.click();
+    if (menu.previous || menu.next) {
+      const tabs = [...this.root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+      const index = tabs.findIndex((t) => t.getAttribute('aria-selected') === 'true');
+      const next = tabs[(index + (menu.next ? 1 : -1) + tabs.length) % tabs.length];
+      next?.click();
+      next?.focus();
+      return;
+    }
+    if (!active) {
+      if (menu.x || menu.y || menu.confirm) this.focus();
+      return;
+    }
+    if (menu.x && active instanceof HTMLInputElement && active.type === 'range') {
+      const step = Number(active.step) || 0.1;
+      const value = Math.max(
+        Number(active.min),
+        Math.min(Number(active.max), Number(active.value) + menu.x * step),
+      );
+      active.value = String(Math.round(value / step) * step);
+      active.dispatchEvent(new Event('input', { bubbles: true }));
+      return;
+    }
+    if (menu.x && active instanceof HTMLSelectElement) {
+      this.cycle(active, menu.x);
+      return;
+    }
+    if (menu.x || menu.y) this.move(active, menu.x, menu.y);
+    else if (menu.confirm) {
+      if (active instanceof HTMLSelectElement) this.cycle(active, 1);
+      else if (!(active instanceof HTMLInputElement && active.type === 'range')) active.click();
+    }
+  }
+  private cycle(select: HTMLSelectElement, direction: number): void {
+    const count = select.options.length;
+    select.selectedIndex = (select.selectedIndex + direction + count) % count;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  /** Moves the focus to the nearest control in a direction, wrapping vertically. */
+  private move(from: HTMLElement, x: number, y: number): void {
+    const items = [...this.root.querySelectorAll<HTMLElement>(focusable)].filter(
+      (el) => el.offsetParent !== null,
+    );
+    const a = from.getBoundingClientRect();
+    const ax = a.left + a.width / 2,
+      ay = a.top + a.height / 2;
+    let best: HTMLElement | undefined;
+    let score = Number.POSITIVE_INFINITY;
+    for (const el of items) {
+      if (el === from) continue;
+      const r = el.getBoundingClientRect();
+      const dx = r.left + r.width / 2 - ax,
+        dy = r.top + r.height / 2 - ay;
+      const along = x ? dx * x : dy * y;
+      if (along <= 4) continue;
+      const value = along + (x ? Math.abs(dy) : Math.abs(dx)) * 2.5;
+      if (value < score) {
+        score = value;
+        best = el;
+      }
+    }
+    if (!best && y) best = y > 0 ? items[0] : items.at(-1);
+    best?.focus();
+    best?.scrollIntoView({ block: 'nearest' });
   }
   private cancelCapture(): void {
     if (this.keyCapture) {
@@ -456,7 +638,10 @@ export class MenuUI {
     }
   }
   dialogue(session: GameSession, label?: Label): void {
-    const key = label ? label(InputAction.Interact) : 'E';
+    // On a pad, the south button advances; on a keyboard, the interaction key.
+    const key = label
+      ? label(this.device === 'gamepad' ? InputAction.Jump : InputAction.Interact)
+      : 'E';
     this.root.innerHTML = `<div class="cinematic-bars"></div><section class="dialogue"><p class="eyebrow">${escape(session.narrative.speaker)}</p><p class="dialogue-line"></p><button id="advance" class="text-button">Continuer <kbd>${escape(key)}</kbd> →</button></section>`;
     const line = this.root.querySelector<HTMLElement>('.dialogue-line')!;
     this.stopTyping();
