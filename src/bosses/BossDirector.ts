@@ -38,6 +38,8 @@ export class BossDirector {
   /** Ground marks of a `rain` or an `eruption`; the arrival of a `blink` or a `leap`. */
   targets: number[] = [];
   private current: BossPattern;
+  /** Pattern forced for the next turn of the rotation (debug, tests). */
+  private queued: string | null = null;
   constructor(
     readonly data: BossData,
     /** Horizontal bounds of the arena, for marks and blinks. */
@@ -172,6 +174,11 @@ export class BossDirector {
   }
   /** Moves to the next pattern of the current phase's rotation. */
   private advance(): void {
+    if (this.queued) {
+      const id = this.queued;
+      this.queued = null;
+      if (this.cycle().some((p) => p.id === id)) return this.select(id);
+    }
     const cycle = this.cycle();
     this.rotation = (this.rotation + 1) % cycle.length;
     this.current = cycle[this.rotation]!;
@@ -221,6 +228,13 @@ export class BossDirector {
     if (index < 0) throw new Error(`Pattern ${id} is not in phase ${this.phase}'s rotation`);
     this.rotation = index;
     this.current = cycle[index]!;
+  }
+  /** Makes `id` the next pattern: at once while approaching, else after this one. */
+  queue(id: string): void {
+    if (!this.cycle().some((p) => p.id === id))
+      throw new Error(`Pattern ${id} is not in phase ${this.phase}'s rotation`);
+    if (['dormant', 'intro', 'approach'].includes(this.state)) this.select(id);
+    else this.queued = id;
   }
   private enter(state: BossState): void {
     this.state = state;

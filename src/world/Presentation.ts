@@ -34,7 +34,9 @@ import { cardData } from '../../game-data/abilities/abilities';
 import { Afterimages } from '../vfx/Afterimages';
 import { Motes } from '../vfx/Motes';
 import { LightRays } from '../vfx/LightRays';
-import { bossPose, enemyPose, heroPose } from '../animation/Poses';
+import { bossPose, enemyPose, gaitPose, heroPose, withGait } from '../animation/Poses';
+import { BossSignatures } from '../vfx/BossSignatures';
+import { LEAP_TIME } from '../bosses/BossDirector';
 import { damp } from '../core/math';
 import { VENT_HEIGHT, ventProgress, ventState } from '../combat/Hazards';
 import { proceduralTexture } from '../vfx/textures';
@@ -67,6 +69,7 @@ export class Presentation {
   private bossViews = new Map<string, BossView>();
   private bossCue: Mesh;
   private rainMarkers: { floor: Mesh; beam: Mesh }[] = [];
+  private signatures: BossSignatures;
   private slash: SlashArc;
   /** Eidra's cards: orbit, shield, thrown and bursting. */
   private cards: CardHalo;
@@ -156,6 +159,7 @@ export class Presentation {
     this.afterimages = new Afterimages(scene, p);
     this.motes = new Motes(scene, p);
     this.rays = new LightRays(scene);
+    this.signatures = new BossSignatures(scene, p, this.effects, this.camera);
     this.bossCue = MeshBuilder.CreateBox(
       'guardian-telegraph',
       { width: 1, height: 0.035, depth: 4 },
@@ -678,7 +682,7 @@ export class Presentation {
       const dying = boss.health > 0 ? vanish : visual.dissolve;
       const visible = boss.health > 0 || dying < 1;
       visual.view.root.setEnabled(visible);
-      const { pose, attack } = bossPose({
+      const key = bossPose({
         state: director.state,
         timer: director.timer,
         kind,
@@ -686,6 +690,19 @@ export class Presentation {
         recover: director.pattern.recover,
         intro: data.intro,
       });
+      // Each boss carries itself its own way: heavy steps, hovering, bounds, gliding.
+      const gait = gaitPose({
+        movement: data.movement,
+        state: boss.health > 0 ? director.state : 'dead',
+        timer: director.timer,
+        time: this.time,
+        leap: encounter.leap ? Math.min(1, director.timer / LEAP_TIME) : null,
+      });
+      if (boss.health > 0) this.signatures.footfall(encounter, gait.step);
+      const pose = withGait(key.pose, gait.pose);
+      const airborne = encounter.leap !== null;
+      // The Keeper's banner leaves its back while it stands planted in the floor.
+      visual.view.carryBanner(encounter.standard === null);
       if (visible)
         visual.view.update(
           boss.x,
@@ -693,7 +710,7 @@ export class Presentation {
           director.direction,
           this.time,
           director.state === 'approach' ? director.speed : 0,
-          attack,
+          key.attack,
           false,
           settings.reducedMotion,
           {
@@ -705,30 +722,53 @@ export class Presentation {
             channel: director.state === 'transition' ? 1 : 0,
             hit: this.flashes.get(boss.id) ?? 0,
             dying,
-            grounded: true,
+            grounded: !airborne,
           },
         );
+      this.signatures.renderReflections(
+        encounter,
+        this.time,
+        settings.reducedMotion,
+        (x) => Math.sign(px - x) || 1,
+        pose,
+        key.attack,
+      );
     }
+    this.signatures.update(
+      dt,
+      session.enemies.bosses,
+      { x: px, y: session.actor.y },
+      this.time,
+      settings.reducedMotion,
+    );
     // Telegraphs of the boss currently fighting.
     const active = session.activeBoss;
     const director = active?.director;
     const warning = director?.state === 'windup';
     const kind = director?.pattern.kind;
-    const marked = warning && (kind === 'rain' || kind === 'blink');
-    const lane = warning && !marked && kind !== 'volley';
+    // Ground marks: the rain, the blink's arrival, the bound's mark and the line of fire.
+    // The bound's mark stays until the landing; the line's marks until each geyser bursts.
+    const flight = director?.state === 'attack' && (kind === 'leap' || kind === 'eruption');
+    const marked =
+      (warning &&
+        (kind === 'rain' || kind === 'blink' || kind === 'leap' || kind === 'eruption')) ||
+      flight;
+    const lane = warning && !marked && kind !== 'volley' && kind !== 'command' && kind !== 'mirror';
     this.bossCue.setEnabled(Boolean(lane));
     if (active && director && lane) {
       this.bossCue.position.set(active.actor.x + director.direction * 2, 0.055, 0);
-      this.bossCue.scaling.x = kind === 'slam' || kind === 'nova' ? 22 : kind === 'charge' ? 14 : 8;
+      this.bossCue.scaling.x =
+        kind === 'slam' || kind === 'nova' || kind === 'standard' ? 22 : kind === 'charge' ? 14 : 8;
       this.bossCue.visibility = 0.2 + (director.timer / director.windup) * 0.55;
     }
     this.rainMarkers.forEach((marker, i) => {
       const x = director?.targets[i];
-      const show = Boolean(marked) && x !== undefined;
+      const burst = flight && kind === 'eruption' && i < (director?.waves ?? 0);
+      const show = Boolean(marked) && x !== undefined && !burst;
       marker.floor.setEnabled(show);
       marker.beam.setEnabled(show && kind === 'rain');
       if (show && director && x !== undefined) {
-        const t = director.timer / director.windup;
+        const t = flight ? 1 : director.timer / director.windup;
         marker.floor.position.set(x, 0.06, 0);
         marker.floor.visibility = 0.3 + t * 0.6;
         marker.beam.position.set(x, 7, 0.4);
@@ -737,6 +777,7 @@ export class Presentation {
     });
   }
   dispose(): void {
+    this.signatures.dispose();
     this.effects.dispose();
     this.slash.dispose();
     this.cards.dispose();

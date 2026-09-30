@@ -84,7 +84,7 @@ export interface DebugAPI {
   setResonance: (value: number) => void;
   /** Defaults to the Faceless Guardian. */
   setBossHealth: (value: number, id?: string) => void;
-  /** Makes a boss use `pattern` next (it must be in its current phase's rotation). */
+  /** Makes a boss use `pattern` next, at once or after its current blow (it must be in its current phase's rotation). */
   forceBossPattern: (id: string, pattern: string) => void;
   setEnemyHealth: (id: string, value: number) => void;
   save: () => Promise<void>;

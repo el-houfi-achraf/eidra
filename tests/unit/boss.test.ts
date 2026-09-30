@@ -185,6 +185,19 @@ describe('Faceless Guardian director', () => {
     expect(Math.max(...b.targets)).toBeLessThanOrEqual(BOUNDS[1]);
     expect(new Set(b.targets).size).toBeGreaterThan(2);
   });
+  it('plays a queued pattern next: at once while approaching, else after its blow', () => {
+    const b = awake(guardianData, 2);
+    b.queue('command');
+    expect(b.pattern.id).toBe('command');
+    toWindup(b, phaseHealth[1]!);
+    b.queue('rain');
+    // The command still plays out; the rain comes right after it.
+    expect(b.pattern.id).toBe('command');
+    const steps = run(b, phaseHealth[1]!, 5);
+    expect(steps).toContain('rain:windup');
+    expect(steps.indexOf('rain:windup')).toBeGreaterThan(steps.indexOf('command:recover'));
+    expect(() => b.queue('nova')).toThrow();
+  });
   it('breaks a combo when staggered', () => {
     const b = awake(guardianData, 2);
     b.select('sweep');

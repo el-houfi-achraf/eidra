@@ -88,6 +88,10 @@ export class CharacterView {
   private hand: TransformNode;
   private weapon: Mesh | null = null;
   private legs: TransformNode[] = [];
+  /** A banner carried on the back, apart from the body so it can be planted. */
+  private banner: Mesh | null = null;
+  /** Pivot of the orbiting shards, petals or embers. */
+  private orbit: TransformNode | null = null;
   private ribbons: Ribbon[] = [];
   private ribbonGroups: RibbonGroup[] = [];
   private materials: (Material | null)[] = [];
@@ -112,6 +116,12 @@ export class CharacterView {
       this.body.renderOutline = true;
       this.body.outlineWidth = 0.03;
       this.body.outlineColor = INK;
+    }
+    if (look.accessory === 'banner') {
+      const banner = new PuppetGeometry();
+      this.buildAccessory(banner);
+      this.banner = this.adopt(banner.build(scene, `${kind}-banner`));
+      this.banner.material = look.ghost ? p.ghost : p.puppet;
     }
     const glow: StandardMaterial =
       look.glow === 'amber' ? p.danger : look.glow === 'crimson' ? p.crimson : p.crystal;
@@ -155,6 +165,7 @@ export class CharacterView {
         mesh.material = look.ghost ? p.ghost : p.puppet;
         this.legs.push(pivot);
       }
+    if (look.satellites) this.buildSatellites(look.satellites, glow);
     if (look.scarf)
       this.addRibbon(
         [-0.14, (look.cloak?.shoulder ?? 0.3) - 0.02, -0.02],
@@ -208,6 +219,10 @@ export class CharacterView {
     });
     this.root.scaling.setAll(look.scale);
     this.materials = this.meshes.map((m) => m.material);
+  }
+  /** Shows or hides the banner on its back (planted elsewhere meanwhile). */
+  carryBanner(carried: boolean): void {
+    if (this.banner && this.banner.isEnabled(false) !== carried) this.banner.setEnabled(carried);
   }
   private adopt(mesh: Mesh, parent: TransformNode = this.root): Mesh {
     mesh.parent = parent;
@@ -354,16 +369,19 @@ export class CharacterView {
           );
         }
         const spikes = look.crown.spikes;
+        // Tall crowns become crests or horns: longer, broader and swept outwards.
+        const tall = look.crown.height;
+        const spread = 0.07 * (1 + (tall - 1) * 0.4);
         for (let k = 0; k < spikes; k++) {
           const a = (k / spikes) * Math.PI * 2 + 0.2;
-          const h = 0.1 + 0.07 * ((k * 5) % 3) * 0.5;
+          const h = (0.1 + 0.07 * ((k * 5) % 3) * 0.5) * tall;
           const out = (d: number, dy: number, da = 0): Vec3 => [
             Math.cos(a + da) * (radius + d),
             y + dy,
             Math.sin(a + da) * (radius + d),
           ];
-          const apex = out(0.05, h);
-          const base = [out(0.02, 0, -0.07), out(0.02, 0, 0.07), out(-0.04, 0, 0)];
+          const apex = out(0.05 * tall, h);
+          const base = [out(0.02, 0, -spread), out(0.02, 0, spread), out(-0.04, 0, 0)];
           const centre: Vec3 = [0, y + h / 3, 0];
           for (let e = 0; e < 3; e++) g.tri(base[e]!, base[(e + 1) % 3]!, apex, gold, centre);
         }
@@ -423,7 +441,7 @@ export class CharacterView {
         );
       }
     }
-    this.buildAccessory(g);
+    if (look.accessory !== 'banner') this.buildAccessory(g);
     return g;
   }
   /** Splashes of red across the front of the robe: jagged blots trailed by droplets. */
@@ -541,6 +559,30 @@ export class CharacterView {
       default:
         break;
     }
+  }
+  /** Shards, petals or embers around the body: one mesh turning on a tilted ring. */
+  private buildSatellites(s: NonNullable<Appearance['satellites']>, glow: StandardMaterial): void {
+    const g = new PuppetGeometry();
+    const color = hexToRgb(s.color);
+    for (let k = 0; k < s.count; k++) {
+      const a = (k / s.count) * Math.PI * 2;
+      const at: Vec3 = [Math.cos(a) * s.radius, Math.sin(k * 2.1) * 0.08, Math.sin(a) * s.radius];
+      const tone = shade(color, 0.85 + (0.3 * ((k * 3) % 4)) / 3);
+      if (s.shape === 'shard') g.box(at, [0.05, 0.24, 0.035], tone, 0.35 * (k % 2 ? 1 : -1));
+      else if (s.shape === 'petal') g.ellipsoid(at, [0.1, 0.05, 0.025], tone, 3, 6);
+      else g.box(at, [0.06, 0.06, 0.06], tone, Math.PI / 4);
+    }
+    this.orbit = new TransformNode(`${this.kind}-orbit`, this.scene);
+    this.orbit.parent = this.root;
+    this.orbit.position.y = (this.look.cloak?.shoulder ?? 0.3) - 0.1;
+    this.orbit.rotation.x = 0.32;
+    const ember = s.shape === 'ember';
+    const mesh = this.adopt(
+      g.build(this.scene, `${this.kind}-satellites`, undefined, !ember),
+      this.orbit,
+    );
+    // Embers glow; shards and petals are painted like the body.
+    mesh.material = ember ? glow : this.look.ghost ? this.p.ghost : this.p.puppet;
   }
   private buildEyes(): PuppetGeometry {
     const look = this.look;
@@ -859,6 +901,11 @@ export class CharacterView {
           ? 0.45 + 2.9 * raised
           : 0.3 + swing * 0.12 + held * 2.6 - kneel * 0.9 + (held ? jitter * 0.6 : 0);
     this.hand.position.y = -0.04 + this.body.position.y;
+    if (this.orbit) {
+      this.orbit.rotation.y = time * 0.8 * (reducedMotion ? 0.25 : 1);
+      this.orbit.position.y =
+        (this.look.cloak?.shoulder ?? 0.3) - 0.1 + Math.sin(time * 1.3 + this.seed) * 0.05 * motion;
+    }
     if (this.core) {
       const glow = 1 + (pose.channel ?? 0) * 1.6;
       this.core.scaling.setAll((1 + Math.sin(time * (pose.channel ? 14 : 2)) * 0.1) * glow);

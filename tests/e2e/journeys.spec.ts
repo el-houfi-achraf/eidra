@@ -280,6 +280,41 @@ test('guardians bar the way until they are defeated', async ({ page }) => {
   await page.evaluate(() => window.eidra!.setBossHealth(0));
   await expect.poll(async () => (await snapshot(page)).gates).not.toContain('obedience-right');
 });
+test('each boss fights with its own ability and way of moving', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await start(page);
+  const boss = async (id: string) => (await snapshot(page)).bosses.find((b) => b.id === id)!;
+  expect((await snapshot(page)).bosses.map((b) => b.movement)).toEqual([
+    'march',
+    'hover',
+    'leap',
+    'glide',
+  ]);
+  // The Keeper plants its standard, which keeps pulsing waves.
+  await page.evaluate(() => window.eidra!.teleport(150.5));
+  await expect.poll(async () => (await boss('keeper')).state).not.toBe('dormant');
+  await page.evaluate(() => window.eidra!.forceBossPattern('keeper', 'standard'));
+  await expect
+    .poll(async () => (await boss('keeper')).effects.standard, { timeout: 45000 })
+    .not.toBeNull();
+  await page.evaluate(() => window.eidra!.setBossHealth(0, 'keeper'));
+  await expect.poll(async () => (await boss('keeper')).effects.standard).toBeNull();
+  // Ilyra splits into reflections; striking the true one dispels them.
+  await page.evaluate(() => window.eidra!.teleport(373));
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'CUTSCENE');
+  await skipDialogue(page);
+  await expect.poll(async () => (await boss('ilyra')).state).not.toBe('dormant');
+  await page.evaluate(() => window.eidra!.setBossHealth(360, 'ilyra'));
+  await expect.poll(async () => (await boss('ilyra')).phase).toBe(2);
+  await page.evaluate(() => window.eidra!.forceBossPattern('ilyra', 'reflections'));
+  await expect
+    .poll(async () => (await boss('ilyra')).effects.reflections.length, { timeout: 45000 })
+    .toBe(2);
+  await page.evaluate(() => window.eidra!.setBossHealth(340, 'ilyra'));
+  await expect.poll(async () => (await boss('ilyra')).effects.reflections).toEqual([]);
+  expect(errors).toEqual([]);
+});
 test('a sector exit stays sealed until its guardian falls, then stays open', async ({ page }) => {
   await start(page);
   // Between the Veilleur of the awakening chamber and the chamber's exit.

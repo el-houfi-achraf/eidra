@@ -454,10 +454,14 @@ export class EnemyManager {
     const { actor: boss, director } = encounter;
     const pattern = director.pattern;
     const fighting = boss.health > 0 && !['dormant', 'dead'].includes(director.state);
-    // Standard: planted where the bearer stands, it pulses until it falls.
+    // Standard: driven into the floor beside its bearer, away from Eidra, it pulses
+    // until it falls.
     if (director.trigger && pattern.kind === 'standard')
       encounter.standard = {
-        x: boss.x,
+        x: Math.max(
+          encounter.arena.roam[0],
+          Math.min(encounter.arena.roam[1], boss.x - director.direction * (boss.radius + 0.6)),
+        ),
         life: pattern.duration ?? 5,
         next: 0,
         damage: pattern.damage,

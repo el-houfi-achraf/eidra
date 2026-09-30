@@ -257,7 +257,7 @@ export class Game {
         this.settings.reducedMotion,
       );
       this.audio.listen(this.session.actor.x, this.session.actor.y);
-      // Guardian fights (the Keeper included) share the combat score.
+      // Every guardian fight, boss or arena elite, shares the combat score.
       const fight = this.session.bossBar !== null;
       this.audio.update(dt, this.settings, fight, this.state.state !== 'PLAYING');
       this.debug?.recordCPU(performance.now() - cpuStart);
@@ -547,7 +547,7 @@ export class Game {
       forceBossPattern: (id: string, pattern: string) => {
         const encounter = this.session.enemies.encounter(id);
         if (!encounter) throw new Error(`Invalid debug boss ${id}`);
-        encounter.director.select(pattern);
+        encounter.director.queue(pattern);
       },
       setEnemyHealth: (id: string, value: number) => {
         const enemy = this.session.enemies.entities.get(id)?.actor;

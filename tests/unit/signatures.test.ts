@@ -78,14 +78,16 @@ describe('Keeper: the standard', () => {
     });
     expect(pulses).toBe(Math.ceil(pattern.duration! / STANDARD_INTERVAL));
   });
-  it('stays planted while its bearer fights on, and falls with the reset', () => {
+  it('stands beside its bearer, away from Eidra, and stays while the Keeper fights on', () => {
     const m = new EnemyManager();
     const player = makeCombatant('eidra', 100, 151, 1);
     const keeper = wake(m, 'keeper', 'standard');
     until(m, player, () => keeper.standard !== null);
     const planted = keeper.standard!.x;
-    player.x = 156;
-    until(m, player, () => Math.abs(keeper.actor.x - planted) > 1.5);
+    // Eidra is on its left: the banner stands on its right, clear of the body.
+    expect(planted - keeper.actor.x).toBeGreaterThan(keeper.actor.radius);
+    player.x = 149.5;
+    until(m, player, () => Math.abs(keeper.actor.x - planted) > 2);
     expect(keeper.standard?.x).toBe(planted);
     keeper.reset();
     expect(keeper.standard).toBeNull();

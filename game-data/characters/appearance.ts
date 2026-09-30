@@ -48,9 +48,13 @@ export const AppearanceSchema = z.object({
   /** Studs down the front edge of the cloak. */
   studs: z.object({ color: Hex, count: z.number().int().min(1).max(10) }).nullable(),
   legs: z.object({ length: z.number().positive(), color: Hex }).nullable(),
-  /** Circlet of thorns worn over the hood. */
+  /** Circlet of thorns worn over the hood; `height` stretches them into crests or horns. */
   crown: z
-    .object({ color: Hex, spikes: z.number().int().min(4).max(16) })
+    .object({
+      color: Hex,
+      spikes: z.number().int().min(4).max(16),
+      height: z.number().positive().default(1),
+    })
     .nullable()
     .default(null),
   /** Long strands of hair falling from the hood, animated like the scarf. */
@@ -73,6 +77,16 @@ export const AppearanceSchema = z.object({
     .default(null),
   /** Painted spatter across the cloak, denser towards the hem. */
   spatter: Hex.nullable().default(null),
+  /** Shards, petals or embers slowly orbiting the body (bosses). */
+  satellites: z
+    .object({
+      shape: z.enum(['shard', 'petal', 'ember']),
+      count: z.number().int().min(1).max(12),
+      radius: z.number().positive(),
+      color: Hex,
+    })
+    .nullable()
+    .default(null),
   /** Floating cards orbiting the character (Eidra's resonance made visible). */
   cards: z.object({ color: Hex, trim: Hex }).nullable().default(null),
   weapon: z.enum(['blade', 'staff', 'halberd', 'greatblade', 'none']),
@@ -209,6 +223,8 @@ export const appearances = {
     ghost: false,
     glow: 'amber',
   }),
+  // Act I — the Porteur du dernier ordre: deep blue livery trimmed with gold, a golden
+  // crest over the hood, a cape and the banner of an order that no longer exists.
   keeper: AppearanceSchema.parse({
     scale: 1.6,
     cloak: {
@@ -218,21 +234,25 @@ export const appearances = {
       bottom: -0.48,
       pleats: 9,
       hemDepth: 0.14,
-      color: '#52303a',
-      lining: '#b8924f',
+      color: '#2a3350',
+      lining: '#c9a55f',
     },
-    hood: { radius: 0.29, tip: 1.2, lean: 0.12, color: '#42262e', trim: '#c9a55f' },
+    hood: { radius: 0.29, tip: 1.2, lean: 0.12, color: '#1d2236', trim: '#c9a55f' },
     mask: { width: 0.2, height: 0.25, y: 0.6, color: '#e7dcc2', eyes: 'twin', crack: true },
     collar: { color: '#c9a55f', points: 7 },
     scarf: null,
     studs: { color: '#e0bf73', count: 6 },
-    legs: { length: 0.42, color: '#120c0d' },
+    legs: { length: 0.42, color: '#0d0f18' },
+    crown: { color: '#d8b060', spikes: 5, height: 1.8 },
+    mantle: { color: '#1f2438', strips: 3, length: 1.1 },
     weapon: 'greatblade',
     accessory: 'banner',
     accent: '#ff914d',
     ghost: false,
     glow: 'amber',
   }),
+  // Act I finale — the Faceless Guardian: a faceless mask, broken rings and shards
+  // of its old command drifting around it.
   boss: AppearanceSchema.parse({
     scale: 2.7,
     cloak: {
@@ -251,6 +271,8 @@ export const appearances = {
     scarf: null,
     studs: null,
     legs: { length: 0.34, color: '#0d1111' },
+    mantle: { color: '#2c3533', strips: 4, length: 0.9 },
+    satellites: { shape: 'shard', count: 7, radius: 1.05, color: '#c9bd98' },
     weapon: 'none',
     accessory: 'rings',
     accent: '#ff914d',
@@ -307,7 +329,8 @@ export const appearances = {
     ghost: false,
     glow: 'amber',
   }),
-  // Act II elite — charred armour, three eyes, a greatblade longer than its bearer.
+  // Act II — the Sentinelle: charred armour, horns, three eyes, a soot-stained robe,
+  // embers circling it and a greatblade longer than its bearer.
   warden: AppearanceSchema.parse({
     scale: 1.85,
     cloak: {
@@ -326,6 +349,10 @@ export const appearances = {
     scarf: null,
     studs: { color: '#e08a4a', count: 7 },
     legs: { length: 0.38, color: '#0c0807' },
+    crown: { color: '#cbb48c', spikes: 4, height: 2.4 },
+    mantle: { color: '#6a2410', strips: 3, length: 1.0 },
+    spatter: '#1a0e0a',
+    satellites: { shape: 'ember', count: 5, radius: 0.78, color: '#ff7a3a' },
     weapon: 'greatblade',
     accessory: 'none',
     accent: '#ff7a3a',
@@ -351,6 +378,9 @@ export const appearances = {
     scarf: null,
     studs: null,
     legs: null,
+    hair: { color: '#f1d9de', strands: 4, length: 1.3 },
+    crown: { color: '#f4c2cf', spikes: 14, height: 0.6 },
+    satellites: { shape: 'petal', count: 6, radius: 0.8, color: '#f4c2cf' },
     weapon: 'blade',
     accessory: 'veil',
     accent: '#ffb1c0',
