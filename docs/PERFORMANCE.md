@@ -108,6 +108,22 @@ Protocole standard : 64 / 26 draw calls, identiques ; 60 474 / 32 151 triangles 
 
 Première mesure A / B avec neuf cartes en orbite : +28 draw calls et +10 à 17 ms. Deux corrections : les rubans d'un personnage (cheveux, cape) partagent un maillage par matériau, et les cartes sont des instances matérielles (un appel par type) ; les draw calls reviennent à ceux de `main` (±2). Une mesure isolée (même build, résonance pleine avec et sans cartes affichées) montre ensuite que les cartes ne coûtent presque rien (≈ +0,5 ms CPU, dans le bruit) : le surcoût restant vient de l'état « résonance pleine » qui existait déjà (animations CSS du réceptacle du HUD, coûteuses en rendu logiciel seulement), et `main` ne pouvait pas être mis dans cet état pour la comparaison. À résonance nulle, les deux builds sont équivalents (149 / 4,9 contre 153 / 4,1 ms dans la chambre d'éveil).
 
+### Neuvième itération : quatre boss, quatre capacités
+
+Comparaison A / B dans la même session (build `main` contre ce build, servis côte à côte), MEDIUM, 1280 × 720, SwiftShader, **une partie neuve par scène** (sinon les combats d'une scène tuent Eidra avant la suivante et faussent la mesure), médiane de 40 images, moyenne de deux passages. Avant → après :
+
+| Scène                        | Frame (ms)    | CPU (ms)  | Draw calls |
+| ---------------------------- | ------------- | --------- | ---------- |
+| Chambre d'éveil (10)         | 169,7 → 167,9 | 4,5 → 4,2 | 66 → 66    |
+| Arène du Porteur (150,5)     | 182,8 → 174,3 | 6,4 → 5,7 | 90 → 94    |
+| Arène du Gardien (186)       | 168,6 → 169,4 | 6,1 → 5,5 | 72 → 76    |
+| Arène de la Sentinelle (336) | 164,2 → 166,4 | 6,2 → 5,6 | 88 → 98    |
+| Arène d'Ilyra (380, phase 1) | 160,9 → 158,3 | 4,9 → 5,3 | 72 → 78    |
+
+Temps d'image et CPU dans le bruit. Les draw calls supplémentaires viennent des nouvelles pièces des boss, chacune en un seul maillage mais aussi dessinée dans la carte d'ombres ou le calque de lueur : satellites (un maillage par boss), cape en rubans, bannière séparée du corps, et, pendant le combat, marques et ondes. Les effets de signature (œil, huit colonnes de geysers) sont créés une fois et désactivés hors usage ; l'étendard et les reflets ne sont construits qu'à leur première apparition. La première mesure, faite dans une seule partie enchaînant les scènes, donnait 72 → 28 draw calls chez Ilyra : Eidra y était morte et reconstituée à l'ancrage ; le protocole ci-dessus l'évite.
+
+Protocole standard : 64 / 26 draw calls et 60 474 / 32 151 triangles, identiques ; CPU 4,0 / 2,4 ms et rendu logiciel 148,4 / 46,9 ms en MEDIUM / LOW. Allers-retours de streaming : 320 / 316 meshes (+2 / +9 : l'œil et les colonnes de geysers, moins la marionnette d'élite du Porteur qui n'est plus chargée avec son secteur), 7 / 6 ressources physiques, 2 / 1 chunks, stables. Bundle principal : 1,96 Mo minifié / 488 ko gzip (+5 ko).
+
 Mesures brutes : [performance.json](evidence/performance.json) (dernière itération).
 
 ## Optimisation et stabilité
