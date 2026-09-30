@@ -79,7 +79,8 @@ export const ashChunks = [
     end: 361,
     seed: 167,
     platforms: [{ x: 341, y: -1, w: 40, h: 2 }],
-    enemies: [{ id: 'cinder-warden', kind: 'warden', x: 347, patrol: [326, 356] }],
+    // The Sentinelle de cendre is a boss (game-data/bosses/warden.ts).
+    enemies: [],
     hazards: [
       { id: 'vent-4', x: 340.5, width: 1.6, period: 4, active: 1.2, offset: 0.5, damage: 20 },
     ],

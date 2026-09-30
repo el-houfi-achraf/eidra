@@ -1,0 +1,77 @@
+import { BossSchema } from './schema';
+/**
+ * La Sentinelle de cendre, guardian of the Brazier (Act II). She closes in by leaping
+ * and chains lunging cuts; her signature is the eruption, a line of fire geysers
+ * racing along the floor from her plunged blade.
+ */
+export const wardenData = BossSchema.parse({
+  id: 'cinder-warden',
+  name: 'LA SENTINELLE DE CENDRE',
+  subtitle: 'Elle garde encore les braises',
+  appearance: 'warden',
+  arena: 'brazier',
+  health: 380,
+  contact: 18,
+  spawn: { x: 347, y: 1.57 },
+  radius: 0.83,
+  height: 3.33,
+  speed: 2.4,
+  movement: 'leap',
+  intro: 1.8,
+  transition: 1.4,
+  phases: [0.5],
+  haste: [1, 0.78],
+  patterns: [
+    {
+      id: 'slash',
+      kind: 'sweep',
+      windup: 0.8,
+      recover: 1.0,
+      damage: 24,
+      range: 4,
+      combo: { pattern: 'slash-back', phase: 1 },
+      cue: 'ENTAILLE — PARADE OU ESQUIVE',
+    },
+    {
+      id: 'slash-back',
+      kind: 'sweep',
+      followUp: true,
+      windup: 0.6,
+      recover: 1.0,
+      damage: 22,
+      range: 4,
+      combo: { pattern: 'thrust', phase: 2 },
+      cue: 'REVERS — ESQUIVEZ',
+    },
+    {
+      id: 'thrust',
+      kind: 'charge',
+      followUp: true,
+      windup: 0.6,
+      recover: 1.2,
+      damage: 24,
+      range: 3,
+      cue: 'ESTOC — ESQUIVEZ',
+    },
+    {
+      id: 'pounce',
+      kind: 'leap',
+      windup: 0.9,
+      recover: 1.1,
+      damage: 26,
+      range: 2.8,
+      combo: { pattern: 'eruption', phase: 2 },
+      cue: 'BOND — QUITTEZ LA MARQUE',
+    },
+    {
+      id: 'eruption',
+      kind: 'eruption',
+      windup: 1.1,
+      recover: 1.3,
+      damage: 22,
+      range: 1.7,
+      count: 6,
+      cue: 'ÉRUPTION — ÉVITEZ LA LIGNE DE FEU',
+    },
+  ],
+});

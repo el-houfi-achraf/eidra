@@ -262,7 +262,7 @@ test('guardians bar the way until they are defeated', async ({ page }) => {
   // Pressed against the gate (capsule radius 0.33), never through it.
   expect(keeperSide).toBeGreaterThan(157.7);
   expect(keeperSide).toBeLessThan(158.4);
-  await page.evaluate(() => window.eidra!.setEnemyHealth('keeper', 0));
+  await page.evaluate(() => window.eidra!.setBossHealth(0, 'keeper'));
   await expect.poll(async () => (await snapshot(page)).gates).not.toContain('last-order-right');
   expect((await snapshot(page)).gates).not.toContain('last-order-left');
   await page.keyboard.down('KeyD');

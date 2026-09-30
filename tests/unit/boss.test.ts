@@ -36,12 +36,21 @@ function run(b: BossDirector, health: number, seconds: number, playerX = 180): s
 }
 describe('boss data', () => {
   it('validates every boss of the roster against an existing arena', () => {
-    expect(bossRoster.map((b) => b.id)).toEqual(['faceless-guardian', 'ilyra']);
-    for (const boss of bossRoster) {
+    expect(bossRoster.map((b) => b.id)).toEqual([
+      'keeper',
+      'faceless-guardian',
+      'cinder-warden',
+      'ilyra',
+    ]);
+    for (const boss of bossRoster)
       expect(arenas.some((a) => a.id === boss.arena && a.guardian === boss.id)).toBe(true);
-      expect(boss.health).toBeGreaterThan(400);
-      expect(boss.phases).toHaveLength(2);
-    }
+    // Each act closes on its longest fight, in three phases.
+    const [keeper, guardian, warden, ilyra] = bossRoster.map((b) => b.health);
+    expect(keeper!).toBeLessThan(guardian!);
+    expect(warden!).toBeLessThan(ilyra!);
+    expect(guardian!).toBeLessThan(ilyra!);
+    expect(guardianData.phases).toHaveLength(2);
+    expect(ilyraData.phases).toHaveLength(2);
   });
   it('rejects inconsistent phases and combos', () => {
     expect(BossSchema.safeParse({ ...guardianData, haste: [1, 0.8] }).success).toBe(false);
@@ -54,6 +63,13 @@ describe('boss data', () => {
     // The first phase must have something to do.
     const late = guardianData.patterns.map((p) => ({ ...p, phase: 2 }));
     expect(BossSchema.safeParse({ ...guardianData, patterns: late }).success).toBe(false);
+    // Pattern ids name one pattern each; lasting abilities need a duration.
+    const twins = [...guardianData.patterns, guardianData.patterns[0]!];
+    expect(BossSchema.safeParse({ ...guardianData, patterns: twins }).success).toBe(false);
+    const endless = guardianData.patterns.map((p) =>
+      p.kind === 'command' ? { ...p, kind: 'mirror' } : p,
+    );
+    expect(BossSchema.safeParse({ ...guardianData, patterns: endless }).success).toBe(false);
   });
 });
 describe('Faceless Guardian director', () => {
@@ -83,8 +99,8 @@ describe('Faceless Guardian director', () => {
       return b.cycle().map((p) => p.id);
     };
     expect(ids(1)).toEqual(['sweep', 'slam', 'charge']);
-    expect(ids(2)).toEqual(['sweep', 'slam', 'charge', 'rain']);
-    expect(ids(3)).toEqual(['sweep', 'slam', 'charge', 'rain', 'blink', 'nova']);
+    expect(ids(2)).toEqual(['sweep', 'slam', 'charge', 'rain', 'command']);
+    expect(ids(3)).toEqual(['sweep', 'slam', 'charge', 'rain', 'command', 'blink', 'nova']);
   });
   it('shortens its telegraphs as the fight goes on', () => {
     const windups = [1, 2, 3].map((phase) => {
@@ -133,7 +149,8 @@ describe('Faceless Guardian director', () => {
     toWindup(b, phaseHealth[2]!, 180, -1);
     // Coming from the right, it reappears on her left.
     expect(b.targets).toHaveLength(1);
-    expect(b.targets[0]).toBeCloseTo(180 - guardianData.patterns[4]!.range);
+    const blink = guardianData.patterns.find((p) => p.id === 'blink')!;
+    expect(b.targets[0]).toBeCloseTo(180 - blink.range);
     const steps = run(b, phaseHealth[2]!, 2.4);
     expect(steps.slice(0, 3)).toEqual(['blink:windup', 'blink:attack', 'sweep:windup']);
   });

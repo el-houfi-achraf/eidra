@@ -453,6 +453,15 @@ export class Game {
         phase: director.phase,
         pattern: director.pattern.id,
         targets: [...director.targets],
+        movement: encounter.data.movement,
+        x: encounter.actor.x,
+        effects: {
+          standard: encounter.standard?.x ?? null,
+          geysers: encounter.geysers.map((g) => g.x),
+          reflections: encounter.reflections.map((r) => r.actor.x),
+          gaze: encounter.gaze !== null,
+          leaping: encounter.leap !== null,
+        },
       };
     };
     const api: DebugAPI = {
@@ -534,6 +543,11 @@ export class Game {
         const boss = this.session.enemies.encounter(id)?.actor;
         if (!boss || !Number.isFinite(value)) throw new Error(`Invalid debug boss ${id}`);
         boss.health = Math.max(0, Math.min(boss.maxHealth, value));
+      },
+      forceBossPattern: (id: string, pattern: string) => {
+        const encounter = this.session.enemies.encounter(id);
+        if (!encounter) throw new Error(`Invalid debug boss ${id}`);
+        encounter.director.select(pattern);
       },
       setEnemyHealth: (id: string, value: number) => {
         const enemy = this.session.enemies.entities.get(id)?.actor;

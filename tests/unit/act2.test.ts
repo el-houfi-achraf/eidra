@@ -13,10 +13,33 @@ import {
   ventProgress,
   ventState,
 } from '../../src/combat/Hazards';
-import { enemyData } from '../../game-data/enemies/roster';
+import { EnemySchema, enemyData } from '../../game-data/enemies/roster';
 import { moods } from '../../game-data/zones/moods';
 import { chunks, landmarks, pits, route, stages } from '../../game-data/zones/laboratory';
 const vents = chunks.flatMap((c) => c.hazards);
+/**
+ * A heavy elite, as the data may describe one: a combo, a lunge and an enrage
+ * threshold (the arena guardians are bosses now, D032).
+ */
+const elite = EnemySchema.parse({
+  id: 'elite',
+  name: 'Élite',
+  health: 280,
+  damage: 26,
+  speed: 1.9,
+  range: 2.8,
+  detection: 12,
+  stagger: 0.1,
+  windup: 0.9,
+  recover: 1.3,
+  drops: 14,
+  ranged: false,
+  scale: 1.85,
+  contact: 18,
+  combo: 3,
+  lunge: 3.2,
+  enrage: 0.5,
+});
 const board = (over: Partial<Blackboard> = {}): Blackboard => ({
   distance: 1,
   homeDistance: 0,
@@ -63,22 +86,22 @@ describe('ember vents', () => {
 });
 describe('elites and Act II enemies', () => {
   it('chain a combo whose follow-ups wind up faster', () => {
-    const keeper = new EnemyFSM(enemyData.keeper);
-    const times = blows(keeper, board({ health: 180, maxHealth: 180 }), 2);
-    expect(times.length).toBe(2);
+    const keeper = new EnemyFSM(elite);
+    const times = blows(keeper, board({ health: 280, maxHealth: 280 }), 2.6);
+    expect(times.length).toBe(elite.combo);
     const gap = times[1]! - times[0]!;
-    expect(gap).toBeCloseTo(STRIKE + enemyData.keeper.windup * FOLLOW_UP, 1);
-    expect(gap).toBeLessThan(enemyData.keeper.windup);
+    expect(gap).toBeCloseTo(STRIKE + elite.windup * FOLLOW_UP, 1);
+    expect(gap).toBeLessThan(elite.windup);
   });
   it('enrage below their threshold: one more blow, quicker windups', () => {
-    const calm = new EnemyFSM(enemyData.warden);
+    const calm = new EnemyFSM(elite);
     calm.update(0.01, board({ health: 280, maxHealth: 280 }));
     expect(calm.enraged).toBe(false);
-    const angry = new EnemyFSM(enemyData.warden);
+    const angry = new EnemyFSM(elite);
     angry.update(0.01, board({ health: 100, maxHealth: 280 }));
     expect(angry.enraged).toBe(true);
-    expect(angry.combo).toBe(enemyData.warden.combo + 1);
-    expect(angry.windup).toBeCloseTo(enemyData.warden.windup * ENRAGED_HASTE);
+    expect(angry.combo).toBe(elite.combo + 1);
+    expect(angry.windup).toBeCloseTo(elite.windup * ENRAGED_HASTE);
     expect(angry.pace).toBeGreaterThan(1);
     // Plain enemies never enrage.
     const crawler = new EnemyFSM(enemyData.crawler);
@@ -86,9 +109,9 @@ describe('elites and Act II enemies', () => {
     expect(crawler.enraged).toBe(false);
   });
   it('lose their combo when staggered', () => {
-    const warden = new EnemyFSM(enemyData.warden);
+    const warden = new EnemyFSM(elite);
     const b = board({ health: 280, maxHealth: 280 });
-    expect(blows(warden, b, enemyData.warden.windup + 0.4)).toHaveLength(1);
+    expect(blows(warden, b, elite.windup + 0.4)).toHaveLength(1);
     warden.update(0.01, { ...b, stagger: 0.2 });
     expect(warden.state).toBe('STAGGER');
     expect(warden.strikes).toBe(0);

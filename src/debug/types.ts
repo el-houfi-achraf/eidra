@@ -8,6 +8,20 @@ export interface BossSnapshot {
   phase: number;
   pattern: string;
   targets: number[];
+  /** How it moves: march, hover, leap or glide. */
+  movement: string;
+  x: number;
+  /** Lasting effects of its signature ability. */
+  effects: {
+    /** Where its standard stands. */
+    standard: number | null;
+    geysers: number[];
+    /** Positions of its standing reflections. */
+    reflections: number[];
+    /** A command is watching Eidra. */
+    gaze: boolean;
+    leaping: boolean;
+  };
 }
 export interface DebugSnapshot {
   state: string;
@@ -70,6 +84,8 @@ export interface DebugAPI {
   setResonance: (value: number) => void;
   /** Defaults to the Faceless Guardian. */
   setBossHealth: (value: number, id?: string) => void;
+  /** Makes a boss use `pattern` next (it must be in its current phase's rotation). */
+  forceBossPattern: (id: string, pattern: string) => void;
   setEnemyHealth: (id: string, value: number) => void;
   save: () => Promise<void>;
 }
