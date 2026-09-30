@@ -11,7 +11,7 @@ import type { Palette } from '../world/Palette';
 import { appearances } from '../../game-data/characters/appearance';
 import type { Appearance, CharacterKind } from '../../game-data/characters/appearance';
 import { PuppetGeometry, hexToRgb } from './PuppetGeometry';
-import type { RGB } from './PuppetGeometry';
+import type { RGB, Vec3 } from './PuppetGeometry';
 import { SecondaryChain } from './SecondaryChain';
 export type { CharacterKind };
 /** Purely visual state derived from the simulation each frame. */
@@ -45,14 +45,28 @@ export interface Pose {
   tremble?: number;
   /** 0..1 kneeling rest at an anchor. */
   kneel?: number;
+  /** Staff angle in radians (0 upright, negative towards the facing side), when a move sets it. */
+  swing?: number;
+  /** Forward reach of the hand in metres (thrusts). */
+  reach?: number;
+}
+/** Every strip of a character sharing a material is one mesh: one draw call, one upload. */
+interface RibbonGroup {
+  mesh: Mesh;
+  positions: Float32Array;
 }
 interface Ribbon {
   chain: SecondaryChain;
-  mesh: Mesh;
   anchor: TransformNode;
   width: number;
-  positions: Float32Array;
+  color: RGB;
+  translucent: boolean;
+  group?: RibbonGroup;
+  /** Index of its first coordinate in the group's positions. */
+  offset: number;
 }
+/** Nodes of a strip's secondary-motion chain. */
+const RIBBON_NODES = 7;
 const INK = Color3.FromHexString('#050b0c');
 const WARNING = Color3.FromHexString('#ff914d');
 const GOLD = Color3.FromHexString('#e3c47a');
@@ -75,6 +89,7 @@ export class CharacterView {
   private weapon: Mesh | null = null;
   private legs: TransformNode[] = [];
   private ribbons: Ribbon[] = [];
+  private ribbonGroups: RibbonGroup[] = [];
   private materials: (Material | null)[] = [];
   private look: Appearance;
   private flashing = false;
@@ -98,7 +113,8 @@ export class CharacterView {
       this.body.outlineWidth = 0.03;
       this.body.outlineColor = INK;
     }
-    const glow: StandardMaterial = look.glow === 'amber' ? p.danger : p.crystal;
+    const glow: StandardMaterial =
+      look.glow === 'amber' ? p.danger : look.glow === 'crimson' ? p.crimson : p.crystal;
     const eyes = this.buildEyes();
     if (eyes.triangles) {
       this.eyes = this.adopt(eyes.build(scene, `${kind}-eyes`, undefined, false));
@@ -146,6 +162,32 @@ export class CharacterView {
         look.scarf.width,
         look.scarf.color,
       );
+    // The cape streams behind in ragged strips; long hair falls from the hood.
+    if (look.mantle) {
+      const m = look.mantle;
+      const shoulder = look.cloak?.shoulder ?? 0.3;
+      for (let k = 0; k < m.strips; k++) {
+        const t = m.strips > 1 ? k / (m.strips - 1) : 0.5;
+        this.addRibbon(
+          [-0.12 - 0.1 * t, shoulder - 0.04 - 0.12 * t, 0.1 + 0.08 * (1 - t)],
+          m.length * (0.82 + 0.3 * Math.sin(k * 2.3 + 1)),
+          0.36 - 0.06 * t,
+          m.color,
+        );
+      }
+    }
+    if (look.hair) {
+      const h = look.hair;
+      for (let k = 0; k < h.strands; k++) {
+        const t = h.strands > 1 ? k / (h.strands - 1) : 0.5;
+        this.addRibbon(
+          [-0.14 - 0.08 * t, look.mask.y - 0.02 - 0.12 * t, 0.08 + 0.08 * t],
+          h.length * (0.9 + 0.2 * Math.cos(k * 1.7)),
+          0.15 - 0.03 * t,
+          h.color,
+        );
+      }
+    }
     if (look.accessory === 'veil')
       for (const [side, length] of [
         [-1, 0.75],
@@ -159,9 +201,10 @@ export class CharacterView {
           '#bfe8da',
           true,
         );
+    this.buildRibbons();
     // Ribbons live in world space; keep them in step with the root's visibility.
     this.root.onEnabledStateChangedObservable.add((enabled) => {
-      for (const ribbon of this.ribbons) ribbon.mesh.setEnabled(enabled);
+      for (const group of this.ribbonGroups) group.mesh.setEnabled(enabled);
     });
     this.root.scaling.setAll(look.scale);
     this.materials = this.meshes.map((m) => m.material);
@@ -180,19 +223,32 @@ export class CharacterView {
     if (c) {
       const color = hexToRgb(c.color);
       const segments = c.pleats * 4;
-      const rings = [0, 0.22, 0.5, 0.78, 1].map(
+      const spatter = look.spatter ? hexToRgb(look.spatter) : null;
+      // Spattered robes get finer rings so the stains read as painted blotches.
+      const steps = spatter
+        ? [0, 0.1, 0.22, 0.35, 0.5, 0.64, 0.78, 0.9, 1]
+        : [0, 0.22, 0.5, 0.78, 1];
+      const rings = steps.map(
         (t) =>
           [c.top + (c.hem - c.top) * t ** 0.75, c.shoulder - (c.shoulder - c.bottom) * t] as const,
       );
       // Valleys between pleats are darker so the folds read even in flat colour.
       const fold = (j: number): number =>
         0.84 + 0.16 * (0.5 + 0.5 * Math.cos(c.pleats * ((j + 0.5) / segments) * Math.PI * 2));
+      // The hem is soaked in irregular patches; the splashes above are painted decals.
+      const stain = (i: number, j: number): RGB | null => {
+        if (!spatter) return null;
+        const hash = Math.abs(Math.sin(i * 12.9898 + j * 78.233 + this.seed) * 43758.5453) % 1;
+        const t = i / (rings.length - 2);
+        if (t < 0.7 || hash > (t - 0.6) * 1.3) return null;
+        return shade(spatter, 0.7 + 0.35 * ((hash * 7) % 1));
+      };
       g.lathe(rings, {
         segments,
         pleats: c.pleats,
         pleatDepth: 0.09,
         hemDepth: c.hemDepth,
-        color: (_i, j) => shade(color, fold(j)),
+        color: (i, j) => stain(i, j) ?? shade(color, fold(j)),
       });
       g.lathe(
         rings.slice(2).map(([r, y]) => [r * 0.95, y] as const),
@@ -283,6 +339,35 @@ export class CharacterView {
             a + Math.PI / 2,
           );
         }
+      if (look.crown) {
+        // A circlet of thorns ringing the hood above the brow.
+        const gold = hexToRgb(look.crown.color);
+        const y = mask.y + 0.25;
+        const radius = r * 0.74;
+        for (let k = 0; k < 20; k++) {
+          const a = (k / 20) * Math.PI * 2;
+          g.box(
+            [Math.cos(a) * radius, y, Math.sin(a) * radius],
+            [0.09, 0.03, 0.03],
+            shade(gold, 0.85),
+            0,
+          );
+        }
+        const spikes = look.crown.spikes;
+        for (let k = 0; k < spikes; k++) {
+          const a = (k / spikes) * Math.PI * 2 + 0.2;
+          const h = 0.1 + 0.07 * ((k * 5) % 3) * 0.5;
+          const out = (d: number, dy: number, da = 0): Vec3 => [
+            Math.cos(a + da) * (radius + d),
+            y + dy,
+            Math.sin(a + da) * (radius + d),
+          ];
+          const apex = out(0.05, h);
+          const base = [out(0.02, 0, -0.07), out(0.02, 0, 0.07), out(-0.04, 0, 0)];
+          const centre: Vec3 = [0, y + h / 3, 0];
+          for (let e = 0; e < 3; e++) g.tri(base[e]!, base[(e + 1) % 3]!, apex, gold, centre);
+        }
+      }
     } else {
       // Hoodless figures carry the mask on a dark head.
       g.ellipsoid(
@@ -317,8 +402,70 @@ export class CharacterView {
         [0.2, 0.19, 0.17],
       );
     }
+    if (look.spatter && c) this.paintSpatter(g, hexToRgb(look.spatter));
+    if (look.hair && hood) {
+      // Two long locks frame the mask and fall over the chest.
+      const color = hexToRgb(look.hair.color);
+      for (const s of [-1, 1]) {
+        const x = 0.05 + s * mask.width * 1.02;
+        const top = mask.y + mask.height * 0.75,
+          bottom = mask.y - mask.height * 2.3;
+        g.plate(
+          [
+            [x - 0.035, top],
+            [x + 0.035, top],
+            [x + 0.05 + s * 0.02, (top + bottom) / 2],
+            [x + s * 0.03, bottom],
+            [x - 0.02 + s * 0.015, (top + bottom) / 2],
+          ],
+          maskZ - 0.01,
+          color,
+        );
+      }
+    }
     this.buildAccessory(g);
     return g;
+  }
+  /** Splashes of red across the front of the robe: jagged blots trailed by droplets. */
+  private paintSpatter(g: PuppetGeometry, color: RGB): void {
+    const c = this.look.cloak!;
+    let seed = 97 + this.seed * 31;
+    const rng = (): number => {
+      seed = (seed * 16807) % 2147483647;
+      return seed / 2147483647;
+    };
+    // Where the robe's front surface is, just proud of its folds.
+    const front = (x: number, y: number): number => {
+      const r = cloakRadius(this.look, y) * 1.1;
+      return -Math.sqrt(Math.max(0.001, r * r - x * x)) - 0.01;
+    };
+    const blot = (cx: number, cy: number, size: number, tone: number): void => {
+      const points: [number, number][] = [];
+      for (let k = 0; k < 9; k++) {
+        const a = (k / 9) * Math.PI * 2;
+        const r = size * (k % 2 ? 0.45 + rng() * 0.3 : 0.8 + rng() * 0.5);
+        points.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r * 1.1]);
+      }
+      g.plate(points, front(cx, cy), shade(color, tone));
+    };
+    for (let k = 0; k < 14; k++) {
+      // Denser and larger towards the hem.
+      const t = Math.sqrt(rng());
+      const y = c.shoulder - 0.18 - t * (c.shoulder - c.bottom - 0.28);
+      const half = cloakRadius(this.look, y) * 0.62;
+      const x = (rng() * 2 - 1) * half;
+      const size = 0.025 + t * 0.035 + rng() * 0.02;
+      const tone = 0.8 + rng() * 0.35;
+      blot(x, y, size, tone);
+      // Droplets flung away from the blot.
+      const a = rng() * Math.PI * 2;
+      for (let d = 1; d <= 3; d++) {
+        const dist = size * (1.4 + d * 0.9);
+        const dx = x + Math.cos(a + d * 0.3) * dist,
+          dy = y + Math.sin(a + d * 0.3) * dist;
+        if (Math.abs(dx) < cloakRadius(this.look, dy) * 0.66) blot(dx, dy, size * 0.28, tone);
+      }
+    }
   }
   private buildAccessory(g: PuppetGeometry): void {
     const look = this.look;
@@ -527,6 +674,46 @@ export class CharacterView {
         g.box([0, -0.38, 0], [0.055, 0.7, 0.025], ivory);
         g.box([0, -0.76, 0], [0.039, 0.039, 0.025], ivory, Math.PI / 4);
         break;
+      case 'staff': {
+        // Ornate golden staff, held at the grip; its foot rests on the ground when idle.
+        const shaft = hexToRgb('#8a6a2e'),
+          bright = hexToRgb('#e0bb62'),
+          gem = hexToRgb('#b3202c');
+        g.box([0, 0.05, 0], [0.042, 1.76, 0.042], shade(shaft, 1.15));
+        for (const y of [-0.52, 0.32, 0.8]) g.box([0, y, 0], [0.07, 0.05, 0.07], bright);
+        g.box([0, -0.86, 0], [0.06, 0.06, 0.04], bright, Math.PI / 4);
+        // Head: a four-pointed star inside a ring, a crimson gem at its heart.
+        const cy = 1.1;
+        for (let k = 0; k < 14; k++) {
+          const a = (k / 14) * Math.PI * 2;
+          g.box(
+            [Math.cos(a) * 0.14, cy + Math.sin(a) * 0.14, 0],
+            [0.07, 0.026, 0.03],
+            bright,
+            a + Math.PI / 2,
+          );
+        }
+        for (let k = 0; k < 4; k++) {
+          const a = (k / 4) * Math.PI * 2;
+          g.box(
+            [Math.cos(a) * 0.12, cy + Math.sin(a) * 0.12, 0],
+            [0.05, 0.2, 0.035],
+            bright,
+            a + Math.PI / 2,
+          );
+        }
+        for (let k = 0; k < 4; k++) {
+          const a = (k / 4) * Math.PI * 2 + Math.PI / 4;
+          g.box(
+            [Math.cos(a) * 0.08, cy + Math.sin(a) * 0.08, 0],
+            [0.035, 0.1, 0.03],
+            shade(bright, 0.85),
+            a + Math.PI / 2,
+          );
+        }
+        g.ellipsoid([0, cy, -0.01], [0.05, 0.05, 0.04], gem, 3, 6);
+        break;
+      }
       case 'halberd':
         g.box([0, -0.1, 0], [0.04, 1.7, 0.04], [0.3, 0.24, 0.17]);
         g.box([0.1, 0.6, 0], [0.2, 0.16, 0.03], [0.72, 0.7, 0.62]);
@@ -549,40 +736,54 @@ export class CharacterView {
     hex: string,
     translucent = this.look.ghost,
   ): void {
-    const nodes = 7;
     const node = new TransformNode(`${this.kind}-ribbon-anchor`, this.scene);
     node.parent = this.root;
     node.position.set(...anchor);
-    const positions = new Float32Array(nodes * 2 * 3);
-    const indices: number[] = [];
-    for (let i = 0; i < nodes - 1; i++) {
-      const a = i * 2;
-      indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
-    }
-    const [r, g, b] = hexToRgb(hex);
-    const colors: number[] = [];
-    for (let i = 0; i < nodes * 2; i++) {
-      const tone = i % 2 ? 0.78 : 1;
-      colors.push(r * tone, g * tone, b * tone, 1);
-    }
-    const data = new VertexData();
-    data.positions = positions;
-    data.indices = indices;
-    data.colors = colors;
-    data.normals = Array.from({ length: nodes * 2 }, () => [0, 0, -1]).flat();
-    const mesh = new Mesh(`${this.kind}-ribbon`, this.scene);
-    data.applyToMesh(mesh, true);
-    mesh.material = translucent ? this.p.ghostDouble : this.p.puppetDouble;
-    mesh.alwaysSelectAsActiveMesh = true;
-    mesh.isPickable = false;
-    this.meshes.push(mesh);
     this.ribbons.push({
-      chain: new SecondaryChain(nodes, length / (nodes - 1)),
-      mesh,
+      chain: new SecondaryChain(RIBBON_NODES, length / (RIBBON_NODES - 1)),
       anchor: node,
       width,
-      positions,
+      color: hexToRgb(hex),
+      translucent,
+      offset: 0,
     });
+  }
+  /** Merges the strips into one dynamic mesh per material. */
+  private buildRibbons(): void {
+    for (const translucent of [false, true]) {
+      const strips = this.ribbons.filter((r) => r.translucent === translucent);
+      if (!strips.length) continue;
+      const vertices = RIBBON_NODES * 2;
+      const positions = new Float32Array(strips.length * vertices * 3);
+      const indices: number[] = [];
+      const colors: number[] = [];
+      const group: RibbonGroup = { mesh: new Mesh(`${this.kind}-ribbons`, this.scene), positions };
+      strips.forEach((strip, k) => {
+        const base = k * vertices;
+        strip.group = group;
+        strip.offset = base * 3;
+        for (let i = 0; i < RIBBON_NODES - 1; i++) {
+          const a = base + i * 2;
+          indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+        }
+        const [r, g, b] = strip.color;
+        for (let i = 0; i < vertices; i++) {
+          const tone = i % 2 ? 0.78 : 1;
+          colors.push(r * tone, g * tone, b * tone, 1);
+        }
+      });
+      const data = new VertexData();
+      data.positions = positions;
+      data.indices = indices;
+      data.colors = colors;
+      data.normals = Array.from({ length: strips.length * vertices }, () => [0, 0, -1]).flat();
+      data.applyToMesh(group.mesh, true);
+      group.mesh.material = translucent ? this.p.ghostDouble : this.p.puppetDouble;
+      group.mesh.alwaysSelectAsActiveMesh = true;
+      group.mesh.isPickable = false;
+      this.meshes.push(group.mesh);
+      this.ribbonGroups.push(group);
+    }
   }
   update(
     x: number,
@@ -626,11 +827,14 @@ export class CharacterView {
     this.lastX = x;
     if (moved < 1) this.stride += (moved / (0.95 * s)) * Math.PI * 2;
     const walk = Math.min(1, Math.abs(speed) / 4) * motion;
+    // In the air: tucked on the way up, spread at the apex, reaching down to land.
+    const rise = Math.max(0, Math.min(1, ((pose.vy ?? 0) + 3) / 6));
+    const apex = 1 - Math.abs(rise * 2 - 1);
     this.legs.forEach((leg, i) => {
       const sign = i === 0 ? 1 : -1;
       leg.rotation.z =
         pose.grounded === false
-          ? (sign > 0 ? 0.55 : -0.3) * motion
+          ? (sign > 0 ? 0.25 + 0.65 * rise + 0.1 * apex : -0.2 + 0.55 * rise - 0.45 * apex) * motion
           : kneel > 0
             ? (sign > 0 ? 1.3 : -0.2) * kneel
             : Math.sin(this.stride + (i === 0 ? 0 : Math.PI)) * 0.65 * walk;
@@ -641,10 +845,19 @@ export class CharacterView {
     // Blade: resting low, raised then swept forward over the attack.
     const raised = Math.max(0, Math.min(1, (attack - 0.05) / 0.27));
     const held = (pose.raise ?? 0) * motion;
-    this.hand.rotation.z =
-      attack > 0
-        ? 0.45 + 2.9 * raised
-        : 0.3 + swing * 0.12 + held * 2.6 - kneel * 0.9 + (held ? jitter * 0.6 : 0);
+    if (this.look.weapon === 'staff') {
+      // Staff: upright at rest, angled back while running, driven by the move otherwise.
+      const running = Math.max(0, Math.min(1, (Math.abs(speed) - 4) / 2.5));
+      const rest = -0.08 + swing * 0.06 + running * 0.95 - kneel * 0.08;
+      // Without a scripted move (the Echo), a swing sweeps from behind to the front.
+      this.hand.rotation.z =
+        pose.swing !== undefined ? pose.swing : attack > 0 ? -1.9 + 2.8 * raised : rest;
+      this.hand.position.x = 0.34 + (pose.reach ?? 0) * motion;
+    } else
+      this.hand.rotation.z =
+        attack > 0
+          ? 0.45 + 2.9 * raised
+          : 0.3 + swing * 0.12 + held * 2.6 - kneel * 0.9 + (held ? jitter * 0.6 : 0);
     this.hand.position.y = -0.04 + this.body.position.y;
     if (this.core) {
       const glow = 1 + (pose.channel ?? 0) * 1.6;
@@ -665,6 +878,8 @@ export class CharacterView {
     this.root.setEnabled(true);
     this.root.computeWorldMatrix(true);
     for (const ribbon of this.ribbons) this.updateRibbon(ribbon, dt, time, side, speed, s);
+    for (const group of this.ribbonGroups)
+      group.mesh.updateVerticesData(VertexBuffer.PositionKind, group.positions, false, false);
     const white = (pose.hit ?? 0) > 0 || dying > 0;
     if (white !== this.flashing || white) {
       this.flashing = white;
@@ -690,7 +905,11 @@ export class CharacterView {
     ribbon.anchor.computeWorldMatrix(true);
     const anchor = ribbon.anchor.getAbsolutePosition();
     const chain = ribbon.chain;
-    if (dt === 0) chain.reset(anchor.x, anchor.y);
+    // A first frame or a teleport (respawn, shortcut) settles the strip at once; a dash,
+    // even at a slow frame rate, moves less than this in one frame.
+    const root = chain.nodes[0]!;
+    if (dt === 0 || Math.hypot(root.x - anchor.x, root.y - anchor.y) > 2.5)
+      chain.reset(anchor.x, anchor.y);
     // Trails behind the character, flutters, and streams further when running.
     chain.step(dt, anchor.x, anchor.y, {
       gravity: 4,
@@ -698,7 +917,7 @@ export class CharacterView {
       damping: 0.88,
     });
     const nodes = chain.nodes;
-    const out = ribbon.positions;
+    const out = ribbon.group!.positions;
     for (let i = 0; i < nodes.length; i++) {
       const prev = nodes[Math.max(0, i - 1)]!,
         next = nodes[Math.min(nodes.length - 1, i + 1)]!;
@@ -711,12 +930,14 @@ export class CharacterView {
       const nx = (-ty / length) * half,
         ny = (tx / length) * half;
       const node = nodes[i]!;
-      out.set([node.x + nx, node.y + ny, anchor.z, node.x - nx, node.y - ny, anchor.z], i * 6);
+      out.set(
+        [node.x + nx, node.y + ny, anchor.z, node.x - nx, node.y - ny, anchor.z],
+        ribbon.offset + i * 6,
+      );
     }
-    ribbon.mesh.updateVerticesData(VertexBuffer.PositionKind, out, false, false);
   }
   dispose(): void {
-    for (const ribbon of this.ribbons) ribbon.mesh.dispose();
+    for (const group of this.ribbonGroups) group.mesh.dispose();
     this.root.dispose(false);
   }
 }

@@ -405,6 +405,41 @@ test('Recueillement: resonance earned by real strikes mends Eidra', async ({ pag
   expect((await snapshot(page)).resonance).toBeLessThan(33);
 });
 
+test('a tap throws a card at a Veilleur; holding the same input mends instead', async ({
+  page,
+}) => {
+  await start(page);
+  // Four cards orbit Eidra: enough for two throws.
+  await page.evaluate(() => {
+    window.eidra!.teleport(26);
+    window.eidra!.setResonance(44);
+  });
+  await expect.poll(async () => (await snapshot(page)).player.grounded).toBe(true);
+  const target = (await snapshot(page)).enemies.find((e) => e.id === 'watcher-1')!;
+  expect(target.x).toBeGreaterThan(27);
+  await page.keyboard.press('KeyF');
+  await expect.poll(async () => (await snapshot(page)).resonance).toBe(22);
+  await expect
+    .poll(async () => (await snapshot(page)).enemies.find((e) => e.id === 'watcher-1')?.health)
+    .toBeLessThan(target.health);
+  await expect.poll(async () => (await snapshot(page)).cards).toHaveLength(0);
+  // Held, the same input channels Recueillement and throws nothing.
+  await page.evaluate(() => {
+    window.eidra!.teleport(12);
+    window.eidra!.setResonance(33);
+    window.eidra!.damage(40);
+  });
+  await expect.poll(async () => (await snapshot(page)).player.grounded).toBe(true);
+  const wounded = (await snapshot(page)).player.health;
+  await page.keyboard.down('KeyF');
+  await expect
+    .poll(async () => (await snapshot(page)).player.health, { timeout: 20000 })
+    .toBeGreaterThan(wounded);
+  await page.keyboard.up('KeyF');
+  const after = await snapshot(page);
+  expect(after.resonance).toBe(0);
+  expect(after.cards).toHaveLength(0);
+});
 test('anchor altar trades shards for vitality that survives a reload', async ({ page }) => {
   await start(page);
   await page.evaluate(() => {

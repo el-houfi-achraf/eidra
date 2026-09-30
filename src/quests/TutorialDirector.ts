@@ -6,6 +6,8 @@ export interface HintContext {
   flags: ReadonlySet<string>;
   /** Hurt and able to afford a Recueillement. */
   wounded: boolean;
+  /** Enough resonance to throw a card. */
+  cards?: boolean;
 }
 export const hintFlag = (id: string): string => `tutorial:${id}`;
 /** Chooses the contextual prompt to show and retires prompts once performed. */
@@ -21,7 +23,8 @@ export class TutorialDirector {
           hint.requires.every((id) => context.abilities.has(id)) &&
           context.x >= hint.from &&
           context.x <= hint.to &&
-          (!hint.wounded || context.wounded),
+          (!hint.wounded || context.wounded) &&
+          (!hint.cards || context.cards === true),
       ) ?? null;
     return this.active;
   }

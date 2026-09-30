@@ -48,42 +48,80 @@ export const AppearanceSchema = z.object({
   /** Studs down the front edge of the cloak. */
   studs: z.object({ color: Hex, count: z.number().int().min(1).max(10) }).nullable(),
   legs: z.object({ length: z.number().positive(), color: Hex }).nullable(),
-  weapon: z.enum(['blade', 'halberd', 'greatblade', 'none']),
+  /** Circlet of thorns worn over the hood. */
+  crown: z
+    .object({ color: Hex, spikes: z.number().int().min(4).max(16) })
+    .nullable()
+    .default(null),
+  /** Long strands of hair falling from the hood, animated like the scarf. */
+  hair: z
+    .object({
+      color: Hex,
+      strands: z.number().int().min(1).max(5),
+      length: z.number().positive(),
+    })
+    .nullable()
+    .default(null),
+  /** Tattered cape streaming from the shoulders, in ragged animated strips. */
+  mantle: z
+    .object({
+      color: Hex,
+      strips: z.number().int().min(1).max(5),
+      length: z.number().positive(),
+    })
+    .nullable()
+    .default(null),
+  /** Painted spatter across the cloak, denser towards the hem. */
+  spatter: Hex.nullable().default(null),
+  /** Floating cards orbiting the character (Eidra's resonance made visible). */
+  cards: z.object({ color: Hex, trim: Hex }).nullable().default(null),
+  weapon: z.enum(['blade', 'staff', 'halberd', 'greatblade', 'none']),
   accessory: z.enum(['none', 'urn', 'banner', 'halo', 'rings', 'veil']),
   accent: Hex,
   /** Translucent memory figures (the Echo, Mira). */
   ghost: z.boolean(),
-  /** Eye and core glow: Lumérite for allies, amber for hostile memories. */
-  glow: z.enum(['lumerite', 'amber']),
+  /** Eye and core glow: Lumérite for allies, amber for hostile memories, crimson for Eidra. */
+  glow: z.enum(['lumerite', 'amber', 'crimson']),
 });
 export type Appearance = z.infer<typeof AppearanceSchema>;
+/**
+ * Eidra: dark hood crowned with golden thorns, white mask with crimson eyes, long
+ * black hair, an ivory robe spattered with red over a tattered crimson cape, an
+ * ornate golden staff, and her resonance as red cards orbiting her.
+ */
 const eidra = {
   scale: 1,
   cloak: {
-    top: 0.2,
-    hem: 0.54,
+    top: 0.19,
+    hem: 0.56,
     shoulder: 0.36,
-    bottom: -0.46,
-    pleats: 7,
-    hemDepth: 0.13,
-    color: '#2f5561',
-    lining: '#7fb5a8',
+    bottom: -0.6,
+    pleats: 9,
+    hemDepth: 0.2,
+    color: '#dcd0bb',
+    lining: '#5c0f17',
   },
-  hood: { radius: 0.3, tip: 1.12, lean: 0.22, color: '#284a54', trim: '#c9a55f' },
-  mask: { width: 0.2, height: 0.24, y: 0.6, color: '#efe8d4', eyes: 'twin', crack: true },
-  collar: { color: '#c9a55f', points: 6 },
-  scarf: { color: '#d9f1e5', length: 1, width: 0.15 },
-  studs: { color: '#e4c77f', count: 5 },
-  legs: { length: 0.42, color: '#0b1618' },
-  weapon: 'blade',
+  hood: { radius: 0.3, tip: 0.98, lean: 0.16, color: '#1f1315' },
+  mask: { width: 0.2, height: 0.24, y: 0.6, color: '#f4efe8', eyes: 'twin', crack: true },
+  collar: { color: '#3a1117', points: 7 },
+  scarf: null,
+  studs: { color: '#d9b25e', count: 5 },
+  legs: { length: 0.42, color: '#1d0c0f' },
+  crown: { color: '#d9b25e', spikes: 11 },
+  hair: { color: '#140c0e', strands: 3, length: 1.05 },
+  mantle: { color: '#4a0c14', strips: 3, length: 1.15 },
+  spatter: '#8e1822',
+  cards: { color: '#9e1b27', trim: '#e0b85c' },
+  weapon: 'staff',
   accessory: 'none',
-  accent: '#8effdb',
+  accent: '#e23a44',
   ghost: false,
-  glow: 'lumerite',
+  glow: 'crimson',
 } as const;
 export const appearances = {
   eidra: AppearanceSchema.parse(eidra),
-  echo: AppearanceSchema.parse({ ...eidra, ghost: true, scarf: null }),
+  // Her Echo: the same silhouette as a translucent memory, without the orbiting cards.
+  echo: AppearanceSchema.parse({ ...eidra, ghost: true, cards: null, mantle: null }),
   mira: AppearanceSchema.parse({
     scale: 1.05,
     cloak: {

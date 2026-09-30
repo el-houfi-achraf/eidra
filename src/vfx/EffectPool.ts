@@ -64,6 +64,7 @@ export class EffectPool {
       memory: this.p.crystal,
       dust: this.p.trim,
       heal: this.p.ivory,
+      crimson: this.p.crimson,
     }[kind];
   }
   burst(x: number, y: number, kind: BurstKind, count = 10): void {

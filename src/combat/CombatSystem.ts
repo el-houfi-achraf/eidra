@@ -247,10 +247,11 @@ export class CombatSystem {
         force: 0,
         direction: facing,
       };
+    // The charged blow bursts cards ahead of the staff: a longer reach.
     return {
-      x: player.x + facing * (charged ? 1.4 : 1),
+      x: player.x + facing * (charged ? 1.9 : 1),
       y: player.y,
-      width: charged ? 3.3 : 2.4,
+      width: charged ? 3.8 : 2.4,
       height: 2.5,
       damage: (charged ? 32 : this.comboIndex === 3 ? 18 : 12) * multiplier,
       stagger: (charged ? 0.6 : 0.15) + (this.empowered ? 0.4 : 0),
