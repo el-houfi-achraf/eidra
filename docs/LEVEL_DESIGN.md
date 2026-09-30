@@ -12,6 +12,16 @@ Favoriser des boucles courtes, des vues sur les passages inaccessibles et un ret
 
 Chaque secteur a une ambiance et un motif de décor décrits dans `game-data/zones/moods.ts` (voir ART_DIRECTION) ; le décor en est généré à partir de la graine du secteur, sans placement manuel. Un nouveau secteur doit y recevoir une entrée (test unitaire).
 
+## Acte II : Les Failles de cendre
+
+Les données sont dans `game-data/zones/ashes.ts`, ajoutées à la suite du laboratoire sur la même route (x = 201 → 411).
+
+1. La Porte de Nhalis (201–241) : ancrage x = 205, transmission de Sael, deux Rampants sur sol plein, deux corniches.
+2. Les Champs de braise (241–281) : trois colonnes de feu (x = 246 / 255 / 264,5, période 3,2 s, décalées de 1,1 s) à traverser entre deux éruptions ; Porte-braise à distance, Rampant, Porteur de cendres ; fragment d'Ilyan sur la corniche haute (x = 257,5) ; Seconde impulsion (x = 277) devant la sortie scellée (x = 279,5).
+3. La Faille (281–321) : ancrage x = 283,5 sur la berge proche, cinq corniches de 2,4 m au-dessus du vide ; deux montées (2,6 m et 2,8 m) dépassent un saut simple (2,5 m) et exigent le double saut ; deux Souvenirs errants survolent le gouffre ; fragment de Vaela au-dessus de la plus haute corniche. Tomber ramène à x = 284,5.
+4. Le Brasier (321–361) : ancrage x = 322,5 juste avant l'arène (une défaite ne renvoie pas de l'autre côté de la Faille), arène de la Sentinelle de cendre, une colonne de feu au centre.
+5. Le Jardin du déni (361–411) : ancrage x = 364, arène d'Ilyra, puis la fin de l'acte au-delà de x = 408,5.
+
 ## Monde complet (planifié)
 
 Laboratory of Awakening ↔ Ash Rifts ↔ Glass Gardens ↔ Still Sea ↔ Drowned Archives ↔ Cathedral of Voices ↔ Broken Observatory ↔ Inverted Palace ↔ Heart of Remembrance. Des boucles transversales et raccourcis doivent remplacer une simple chaîne avant production. Fast travel tardif.
@@ -33,6 +43,9 @@ Le pont du souvenir comporte trois plateformes disparues séparées par de petit
 | Chambre d'éveil       | Veilleur                            | 39         |
 | Galerie des veilleurs | Souvenir errant, Porteur de cendres | 70         |
 | Pont du souvenir      | Veilleur du pont                    | 119,8      |
+| Porte de Nhalis       | deux Rampants                       | 239        |
+| Champs de braise      | Porte-braise, Rampant, Porteur      | 279,5      |
+| La Faille             | deux Souvenirs errants              | 320        |
 
 Chaque sortie est dans son propre secteur, sur sol plein, à plus de 2 m d'un ancrage ; l'ancrage de Mira (x = 73) récompense la galerie, la relique de Memory Step (x = 119) reste à portée devant la sortie du pont. Un secteur qui reçoit des ennemis hors arène doit déclarer une étape (test unitaire).
 
@@ -40,6 +53,8 @@ Chaque sortie est dans son propre secteur, sur sol plein, à plus de 2 m d'un an
 | ---------------- | ------------------------ | ------------- | ----- | --------------- |
 | Le dernier ordre | Porteur du dernier ordre | 147,5 / 158,6 | 149,5 | 149 – 157,2     |
 | L'obéissance     | Gardien Sans Visage      | 164 / 196     | 166   | 167 – 192       |
+| Le Brasier       | Sentinelle de cendre     | 324 / 358     | 326,5 | 326 – 356       |
+| Le déni          | Ilyra                    | 369,5 / 407,5 | 372   | 372 – 405       |
 
 Le fragment de Seris et sa corniche sont dans l'antichambre (x = 144,5), avant l'arène du Porteur : aucune dalle basse à l'intérieur ne peut couper un corps de près de 3 m. L'ancrage du seuil (x = 160) est la récompense du Porteur. Le Veilleur du pont patrouille entre 112 et 119,5 pour laisser une zone d'atterrissage sûre au bout des plateformes du souvenir. Toute nouvelle dalle doit être vérifiée par le test « never lets a laboratory enemy overlap a solid slab ».
 

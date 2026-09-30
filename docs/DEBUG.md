@@ -11,11 +11,13 @@ eidra.unlock('remanence');
 eidra.unlock('memory-step');
 eidra.damage(20);
 eidra.setBossHealth(150);
+eidra.setBossHealth(300, 'ilyra');
+eidra.teleport(373); // arène d'Ilyra (Acte II)
 eidra.setEnemyHealth('keeper', 0);
 await eidra.save();
 ```
 
-`snapshot().player.invulnerable` donne les secondes d'invulnérabilité restantes. `snapshot().gates` liste les portes qui barrent le chemin (`echo`, `stage-awakening` / `-watchers` / `-palimpsest`, `last-order-left` / `-right`, `obedience-left` / `-right`). `setEnemyHealth` vise un ennemi chargé par son identifiant de spawn.
+`snapshot().player.invulnerable` donne les secondes d'invulnérabilité restantes. `snapshot().gates` liste les portes qui barrent le chemin (`echo`, `stage-<secteur>` pour chaque étape, `<arène>-left` / `-right` pour `last-order`, `obedience`, `brazier` et `denial`). `snapshot().boss` décrit le Gardien Sans Visage ; `snapshot().bosses` décrit chaque boss (vie, état, phase, pattern en cours, marques au sol). `setBossHealth(valeur, id)` vise le Gardien par défaut, ou le boss nommé (`ilyra`). `setEnemyHealth` vise un ennemi chargé par son identifiant de spawn (`keeper`, `cinder-warden`…).
 
 Les commandes modifient la partie actuelle : réserver un emplacement aux tests. Elles ne sont pas requises pour terminer le parcours. L'API n'est pas une interface réseau.
 

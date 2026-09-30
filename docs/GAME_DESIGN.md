@@ -2,9 +2,11 @@
 
 Metroidvania solo 2.5D. Piliers : exploration, combat lisible, mémoire physique, atmosphère monumentale. Qualité avant quantité. Aucun emprunt d'assets ou de personnages à une licence existante.
 
-## Vertical slice — Le laboratoire oublié
+## Deux actes jouables
 
-Objectif de durée : 15–20 minutes, à confirmer par playtests humains. Réveil, apprentissage du mouvement, premières rencontres, Mira, acquisition de Rémanence, retour vers un passage oublié, Memory Step, sentinelle et Gardien Sans Visage. Le slice n'est pas le jeu complet.
+**Acte I — Le laboratoire oublié.** Réveil, apprentissage du mouvement, premières rencontres, Mira, acquisition de Rémanence, retour vers un passage oublié, Memory Step, Porteur du dernier ordre et Gardien Sans Visage. L'adieu de Mira ouvre la porte de Nhalis.
+
+**Acte II — Les Failles de cendre.** Rampants qui bondissent, Porte-braise qui tirent des salves, colonnes de feu à traverser en rythme, Seconde impulsion (double saut), la Faille à franchir de corniche en corniche sous les Souvenirs errants, la Sentinelle de cendre, puis Ilyra au Jardin du déni et l'épilogue. Objectif de durée : 35–50 minutes pour les deux actes, à confirmer par playtests humains. Les deux actes ne sont pas le jeu complet.
 
 ## Boucle
 
@@ -27,7 +29,7 @@ Un tutoriel contextuel remplace le long texte de départ : une invite (glyphe de
 
 ## Arènes et contact
 
-Aucune étape ne se contourne : la sortie de chaque secteur reste scellée tant que ses gardiens vivent — le Veilleur de la chambre d'éveil, le Souvenir errant et le Porteur de cendres de la galerie, le Veilleur du pont — puis le Porteur du dernier ordre et le Gardien Sans Visage gardent leurs arènes. Approcher d'une sortie scellée affiche le nombre de gardiens restants ; la vaincre ouvre la porte, l'annonce et sauvegarde. Une étape vaincue le reste, même si ses ennemis reviennent après une mort. La carte indique l'état de chaque sortie (⊘ scellée, ⊙ ouverte).
+Aucune étape ne se contourne : la sortie de chaque secteur reste scellée tant que ses gardiens vivent — le Veilleur de la chambre d'éveil, le Souvenir errant et le Porteur de cendres de la galerie, le Veilleur du pont — puis le Porteur du dernier ordre et le Gardien Sans Visage gardent leurs arènes. Dans l'Acte II : les deux Rampants de la Porte de Nhalis ; le Porte-braise, le Rampant et le Porteur de cendres des Champs de braise ; les deux Souvenirs errants de la Faille ; puis la Sentinelle de cendre et Ilyra dans leurs arènes. Approcher d'une sortie scellée affiche le nombre de gardiens restants ; la vaincre ouvre la porte, l'annonce et sauvegarde. Une étape vaincue le reste, même si ses ennemis reviennent après une mort. La carte indique l'état de chaque sortie (⊘ scellée, ⊙ ouverte).
 
 Un gardien d'arène ne se contourne pas non plus : franchir le seuil de son arène fait surgir une porte derrière Eidra, et celle du fond reste close tant qu'il vit (carte de titre, notification, caméra qui cadre toute l'arène, barre de vie en bas de l'écran — y compris pour le Porteur du dernier ordre). La victoire rabat les deux portes. Mourir rouvre l'entrée ; le gardien attend. Les corps ennemis blessent au contact, ce qui empêche de les traverser sans l'esquive ; l'esquive reste le moyen de passer à travers une attaque.
 
@@ -35,13 +37,23 @@ Un gardien d'arène ne se contourne pas non plus : franchir le seuil de son arè
 
 Chaque coup ennemi suit anticipation → frappe → récupération : recul et arme levée (contour ambre, frisson dans les derniers instants), fente vers l'avant, puis affaissement qui ouvre une fenêtre de riposte. Un ennemi qui repère Eidra sursaute ; un ennemi touché recule. Le Gardien donne à chaque pattern une silhouette propre : recul pour le balayage, cabrage puis impact poussiéreux pour l'onde, accroupissement pour la charge, lévitation pour la pluie. Eidra s'incline dans ses coups et ses esquives, soulève de la poussière en courant et en sautant, s'agenouille à l'ancrage ; à la mort son masque se brise en éclats avant l'écran de défaite, et elle se reforme de lumière à l'ancrage. Les pouvoirs retrouvés et les gardiens vaincus irradient des lames de lumière. Le HUD tressaute sous les coups et bat comme un cœur quand la vie est basse.
 
-## Gardien Sans Visage
+## Boss
 
-Phase 1 : balayage, onde au sol, charge. Sous 50 % de vie, une transition blindée de 1,6 s (rugissement, onde de choc) ouvre la phase 2 : télégraphes raccourcis de 15 % et **pluie d'éclats**, cinq impacts marqués au sol et au plafond autour de la position d'Eidra, espacés de 2,6 m. Le Gardien est également blindé pendant son introduction. Chaque pattern est annoncé dans la barre de vie (« ONDE — SAUTEZ », « PLUIE D'ÉCLATS — QUITTEZ LES MARQUES »).
+Chaque boss est décrit par des données (D027) : trois phases séparées par une transition blindée (rugissement, onde de choc), une rotation de patterns qui s'élargit à chaque phase, des télégraphes qui raccourcissent et des enchaînements (le pattern suivant part sans récupération, avec une anticipation plus courte). Chaque pattern reste annoncé dans la barre de vie et par une silhouette propre ; les repères de phase sont tracés sur la barre. Un boss est blindé pendant son introduction et ses transitions ; l'étourdir interrompt un enchaînement.
+
+**Gardien Sans Visage** (460 PV). Phase 1 : balayage, onde au sol, charge. Sous 60 % : télégraphes ×0,82, **pluie d'éclats** (cinq impacts marqués autour d'Eidra, espacés de 2,6 m) et balayage enchaîné d'une charge. Sous 28 % : télégraphes ×0,68, **disparition** (une marque montre où il réapparaît, derrière Eidra ou du côté libre si un mur l'en empêche) suivie d'un balayage puis d'une charge, **ondes successives** (trois paires d'ondes à sauter en rythme, toutes les 0,45 s) et onde suivie de la pluie.
+
+**Ilyra** (560 PV), rapide et fuyante. Phase 1 : pétales (six marques), reflet (charge), voile (trois éclats en éventail visés sur Eidra). Sous 66 % : le reflet revient en sens inverse, ronces (onde), disparition suivie d'une taille. Sous 33 % : floraison (quatre paires d'ondes).
+
+**Élites** (D028). Le Porteur du dernier ordre enchaîne deux coups avec élan, trois quand il enrage sous 50 % ; la Sentinelle de cendre en enchaîne trois (quatre en rage). La rage raccourcit anticipations et récupérations et accélère la poursuite.
+
+## Dangers
+
+Colonnes de feu : une braise rougeoie au sol, s'agite 0,7 s avant l'éruption, puis une colonne de 7 m brûle (18 à 20 dégâts, non parable, repousse). Les trois colonnes des Champs de braise éclatent à tour de rôle. Tomber dans la Faille coûte 20 PV et ramène au bord.
 
 ## Mémoire
 
-Rémanence révèle des structures disparues ; Memory Step rejoue une trace temporelle pour maintenir un mécanisme. Les autres capacités sont prévues après validation du slice.
+Rémanence révèle des structures disparues ; Memory Step rejoue une trace temporelle pour maintenir un mécanisme ; la Seconde impulsion (Acte II) permet un second saut en l'air, indispensable pour franchir la Faille. Les autres capacités sont prévues plus tard.
 
 ## Critères d'acceptation
 

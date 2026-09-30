@@ -18,6 +18,10 @@ Mira cherche Aren, son frère. Elle est morte depuis des siècles, le sait, et r
 
 Se souvenir n'est pas empêcher quelque chose de disparaître. C'est accepter que ce qui a existé continue à influencer ce qui viendra.
 
-## Slice
+## Acte I
 
-Mira évoque une porte qu'Aren laissait ouverte. La mémoire du laboratoire montre l'obéissance des premiers gardiens. Le Gardien Sans Visage protège un ordre dont l'auteur a disparu. Les révélations majeures et les fins ne sont pas présentées comme implémentées tant que la campagne n'existe pas.
+Mira évoque une porte qu'Aren laissait ouverte. La mémoire du laboratoire montre l'obéissance des premiers gardiens. Le Gardien Sans Visage protège un ordre dont l'auteur a disparu. À sa chute, Mira fait ses adieux : « dis-lui que j'ai laissé la porte ouverte ».
+
+## Acte II — Les Failles de cendre (déni)
+
+Sael guide Eidra au-delà de la porte : Nhalis brûle encore sous la cendre, et Ilyra refuse de voir ce qui est arrivé. Les forges ont tout consumé sans que personne ne pose de question (fragment d'Ilyan) ; Vaela a franchi la Faille pour qu'on la voie partir, et on a détourné les yeux (fragment de Vaela). Ilyra garde un jardin de dormeurs qu'elle dit en paix et veut fermer les yeux d'Eidra. Vaincue, elle regarde enfin ; Mira annonce les Jardins de verre, qui « n'oublient rien ». Les révélations majeures et les fins restent hors des deux actes jouables.
