@@ -147,14 +147,19 @@ describe('guardians inside their arenas', () => {
   it('confines the Guardian to its arena and only wakes it past the trigger', () => {
     const manager = new EnemyManager();
     const arena = arenas.find((a) => a.guardian === 'faceless-guardian')!;
+    const guardian = manager.encounter('faceless-guardian')!;
     const player = makeCombatant('eidra', 100, arena.trigger - 1, 1);
+    player.invulnerable = 99;
     manager.update(1 / 60, player, () => undefined);
-    expect(manager.director.state).toBe('dormant');
+    expect(guardian.director.state).toBe('dormant');
+    player.x = arena.trigger + 1;
+    manager.update(1 / 60, player, () => undefined);
+    expect(guardian.director.state).not.toBe('dormant');
+    // Lured far beyond its gates, it stays in its arena.
     player.x = arena.right + 20;
     for (let i = 0; i < 1200; i++) manager.update(1 / 60, player, () => undefined);
-    expect(manager.director.state).not.toBe('dormant');
-    expect(manager.boss.x).toBeLessThanOrEqual(arena.roam[1]);
-    expect(manager.boss.x).toBeGreaterThanOrEqual(arena.roam[0]);
+    expect(guardian.actor.x).toBeLessThanOrEqual(arena.roam[1]);
+    expect(guardian.actor.x).toBeGreaterThanOrEqual(arena.roam[0]);
   });
   it('hurts a player who walks into a body, without allowing a parry', () => {
     const manager = new EnemyManager();

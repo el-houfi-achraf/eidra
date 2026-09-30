@@ -20,6 +20,6 @@ export class QuestManager {
       (q) =>
         !this.completed.has(q.id) && q.requires.every((f) => flags.has(f)) && q.type === 'main',
     );
-    return q?.title ?? 'Rejoindre la porte des Failles de cendre';
+    return q?.title ?? 'Explorer Nhalis librement';
   }
 }

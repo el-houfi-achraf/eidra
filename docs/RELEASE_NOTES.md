@@ -69,3 +69,12 @@ Enregistrements explicites des composants modulaires Babylon (physique, particul
 ## Reprise
 
 Lire README, ROADMAP et AGENT_RULES, lancer `npm ci`, puis `npm run check` et les E2E. Conserver les sauvegardes version 2. Ne pas réécrire les systèmes fonctionnels pour une préférence d'implémentation.
+
+### Sixième itération : boss plus difficiles et Acte II
+
+- **Boss** : moteur piloté par les données (D027) — trois phases, télégraphes qui raccourcissent, enchaînements. Le Gardien Sans Visage (460 PV) ajoute la disparition derrière Eidra suivie d'un balayage, les ondes successives à sauter en rythme, et enchaîne balayage → charge, onde → pluie.
+- **Élites** (D028) : le Porteur du dernier ordre et la Sentinelle de cendre enchaînent des coups avec élan et enragent à mi-vie.
+- **Acte II — Les Failles de cendre** (D029) : cinq secteurs (Porte de Nhalis, Champs de braise, la Faille, le Brasier, Jardin du déni), quatre ancrages (dont un avant chaque arène), deux nouveaux ennemis (Rampant, Porte-braise), colonnes de feu, Seconde impulsion (double saut) et la Faille, fragments d'Ilyan et de Vaela, transmission de Sael, la Sentinelle de cendre, **Ilyra** (trois phases), épilogue et écran « Fin de l'Acte II ».
+- **Décor** : cinq nouvelles ambiances et deux motifs (cheminées et braseros, jardin d'arbres morts).
+- **UX** : quêtes de l'Acte II, carte et en-tête du HUD par acte, invite du double saut.
+- Sauvegarde v2 inchangée ; une partie qui avait atteint l'ancienne fin reprend sur la route de l'Acte II.

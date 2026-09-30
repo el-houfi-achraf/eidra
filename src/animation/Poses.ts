@@ -1,6 +1,8 @@
 import type { Pose } from './CharacterView';
 import type { EnemyState } from '../ai/EnemyFSM';
+import { NOVA_INTERVAL } from '../bosses/BossDirector';
 import type { BossState } from '../bosses/BossDirector';
+import type { PatternKind } from '../../game-data/bosses/schema';
 import type { AttackKind } from '../combat/CombatSystem';
 /**
  * Readable, exaggerated key poses derived from simulation state: every blow is
@@ -74,53 +76,79 @@ export function enemyPose(e: EnemyPoseInput): Posed {
 export interface BossPoseInput {
   state: BossState;
   timer: number;
-  pattern: string;
-  /** Effective windup of the current pattern (shortened in phase 2). */
+  kind: PatternKind;
+  /** Effective windup of the current pattern (shortened by phase and chaining). */
   windup: number;
   recover: number;
+  /** Length of the introduction, seconds. */
+  intro?: number;
 }
 export function bossPose(b: BossPoseInput): Posed {
   const pose: Pose = {};
   let attack = 0;
   if (b.state === 'intro') {
     // Rises from a crouch, shudders, then lifts its arms.
-    const t = clamp01(b.timer / 2.2);
+    const t = clamp01(b.timer / (b.intro ?? 2.2));
     pose.squash = 0.4 * (1 - easeOut(clamp01(t * 1.6)));
     pose.tremble = 0.05 * (1 - t);
     pose.raise = clamp01((t - 0.65) / 0.25);
   } else if (b.state === 'windup') {
     const k = easeOut(clamp01(b.timer / b.windup));
-    if (b.pattern === 'sweep') {
+    if (b.kind === 'sweep') {
       pose.lean = -0.3 * k;
       pose.raise = k;
       pose.squash = 0.06 * k;
-    } else if (b.pattern === 'slam') {
+    } else if (b.kind === 'slam' || b.kind === 'nova') {
       pose.squash = -0.16 * k;
       pose.lift = 0.6 * k;
       pose.lean = -0.12 * k;
       pose.raise = k;
-    } else if (b.pattern === 'charge') {
+      // The nova gathers with a growing shiver.
+      pose.tremble = b.kind === 'nova' ? 0.05 * k : 0;
+    } else if (b.kind === 'charge') {
       pose.squash = 0.2 * k;
       pose.lean = 0.3 * k;
       pose.tremble = k > 0.9 ? 0.04 : 0;
+    } else if (b.kind === 'volley') {
+      // Draws back, arms high, before casting the fan of shards.
+      pose.lean = -0.25 * k;
+      pose.lift = 0.35 * k;
+      pose.raise = k;
+      pose.tremble = 0.02 * k;
+    } else if (b.kind === 'blink') {
+      // Folds inward as it fades out.
+      pose.squash = 0.3 * k;
+      pose.tremble = 0.03;
     } else {
       pose.lift = 1.3 * k;
       pose.raise = k;
       pose.tremble = 0.02;
     }
   } else if (b.state === 'attack') {
-    const a = clamp01(b.timer / (b.pattern === 'charge' ? 0.7 : 0.24));
-    if (b.pattern === 'sweep') {
+    const a = clamp01(b.timer / (b.kind === 'charge' ? 0.7 : 0.24));
+    if (b.kind === 'sweep') {
       pose.lean = 0.42 * (1 - 0.5 * a);
       pose.offset = 0.7 * easeOut(clamp01(a * 2));
       attack = 0.32 * (1 - a);
-    } else if (b.pattern === 'slam') {
+    } else if (b.kind === 'slam') {
       pose.squash = 0.3 * (1 - a);
       pose.lean = 0.1;
-    } else if (b.pattern === 'charge') {
+    } else if (b.kind === 'nova') {
+      // One stamp per wave.
+      const beat = (b.timer % NOVA_INTERVAL) / NOVA_INTERVAL;
+      pose.squash = 0.28 * (1 - beat);
+      pose.tremble = 0.03;
+    } else if (b.kind === 'charge') {
       pose.lean = 0.45;
       pose.squash = 0.12;
       pose.tremble = 0.02;
+    } else if (b.kind === 'volley') {
+      pose.lean = 0.3 * (1 - a);
+      pose.offset = -0.3 * (1 - a);
+      attack = 0.32 * (1 - a);
+    } else if (b.kind === 'blink') {
+      // Unfolds where it lands.
+      pose.squash = -0.18 * (1 - a);
     } else {
       pose.lift = 1.3 * (1 - a);
       pose.raise = 1 - a;

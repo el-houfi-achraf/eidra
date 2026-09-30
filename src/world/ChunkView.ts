@@ -6,7 +6,7 @@ import { PhysicsAggregate } from '@babylonjs/core/Physics/v2/physicsAggregate';
 import { PhysicsShapeType } from '@babylonjs/core/Physics/v2/IPhysicsEnginePlugin';
 import type { Scene } from '@babylonjs/core/scene';
 import type { ChunkData } from '../../game-data/zones/laboratory';
-import { checkpoints, landmarks, shortcuts } from '../../game-data/zones/laboratory';
+import { checkpoints, chunks, landmarks, shortcuts } from '../../game-data/zones/laboratory';
 import type { Palette } from './Palette';
 import type { DisposableChunk } from './SceneManager';
 import { paintScenery } from './Scenery';
@@ -130,8 +130,9 @@ export class ChunkView implements DisposableChunk {
       this.box('memory-seal', 130, 0.035, 0, 2.4, 0.05, 3.6, p.gold);
       this.box('seal-line', 135, 0.01, -1.8, 10, 0.05, 0.07, p.trim);
     }
-    if (data.id === 'obedience') {
-      this.box('exit', 199, 3, 0, 1, 7, 5, p.dark);
+    // The world's far end: a wall after the last sector.
+    if (data === chunks.at(-1)) {
+      this.box('exit', data.end - 1, 3, 0, 1, 7, 5, p.dark);
       this.bodies.push(
         new PhysicsAggregate(this.meshes.at(-1)!, PhysicsShapeType.BOX, { mass: 0 }, scene),
       );

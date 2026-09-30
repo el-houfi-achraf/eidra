@@ -4,6 +4,9 @@ import type { EnemyPoseInput } from '../../src/animation/Poses';
 import type { EnemyState } from '../../src/ai/EnemyFSM';
 import { enemyData } from '../../game-data/enemies/roster';
 import { guardianData } from '../../game-data/bosses/guardian';
+import { ilyraData } from '../../game-data/bosses/ilyra';
+import type { PatternKind } from '../../game-data/bosses/schema';
+import { NOVA_INTERVAL } from '../../src/bosses/BossDirector';
 
 const watcher = enemyData.watcher;
 const melee = (state: EnemyState, timer: number, flash = 0): EnemyPoseInput => ({
@@ -61,7 +64,7 @@ describe('guardian key poses', () => {
     return bossPose({
       state: 'windup',
       timer: data.windup,
-      pattern,
+      kind: data.kind,
       windup: data.windup,
       recover: data.recover,
     }).pose;
@@ -80,20 +83,31 @@ describe('guardian key poses', () => {
     expect(rain.lift!).toBeGreaterThan(slam.lift!);
   });
   it('rises from a crouch during its introduction', () => {
-    const start = bossPose({ state: 'intro', timer: 0, pattern: 'sweep', windup: 1, recover: 1 });
-    const end = bossPose({ state: 'intro', timer: 2.2, pattern: 'sweep', windup: 1, recover: 1 });
+    const start = bossPose({ state: 'intro', timer: 0, kind: 'sweep', windup: 1, recover: 1 });
+    const end = bossPose({ state: 'intro', timer: 2.2, kind: 'sweep', windup: 1, recover: 1 });
     expect(start.pose.squash!).toBeGreaterThan(0.35);
     expect(end.pose.squash).toBeCloseTo(0);
     expect(end.pose.raise).toBeCloseTo(1);
   });
+  it('gives the Act II patterns their own silhouettes', () => {
+    const pose = (kind: PatternKind, state: 'windup' | 'attack', timer: number) =>
+      bossPose({ state, timer, kind, windup: 1, recover: 1 }).pose;
+    // The volley draws back, the blink folds inward, the nova stamps once per wave.
+    expect(pose('volley', 'windup', 1).lean!).toBeLessThan(-0.2);
+    expect(pose('blink', 'windup', 1).squash!).toBeGreaterThan(0.25);
+    const stamp = pose('nova', 'attack', 0).squash!;
+    expect(stamp).toBeGreaterThan(0.2);
+    expect(pose('nova', 'attack', NOVA_INTERVAL).squash!).toBeCloseTo(stamp);
+    expect(pose('nova', 'attack', NOVA_INTERVAL * 0.9).squash!).toBeLessThan(0.05);
+  });
   it('keeps every pose within readable bounds', () => {
-    for (const pattern of guardianData.patterns)
+    for (const pattern of [...guardianData.patterns, ...ilyraData.patterns])
       for (const state of ['intro', 'windup', 'attack', 'recover', 'transition'] as const)
         for (const timer of [0, 0.1, 0.3, 0.7, 1.5, 3]) {
           const { pose, attack } = bossPose({
             state,
             timer,
-            pattern: pattern.id,
+            kind: pattern.kind,
             windup: pattern.windup,
             recover: pattern.recover,
           });

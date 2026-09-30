@@ -15,19 +15,54 @@ export interface Blackboard {
   homeDistance: number;
   health: number;
   stagger: number;
+  /** Full health, to know when the enemy enrages. */
+  maxHealth?: number;
 }
+/** Seconds an enemy stays in its ATTACK state. */
+export const STRIKE = 0.2;
+/** A chained blow winds up this much faster than the first. */
+export const FOLLOW_UP = 0.45;
+/** Enraged windups and recoveries shrink by this factor. */
+export const ENRAGED_HASTE = 0.7;
 export class EnemyFSM {
   state: EnemyState = 'IDLE';
   timer = 0;
   attackTriggered = false;
+  /** Blows landed in the current combo. */
+  strikes = 0;
+  enraged = false;
   constructor(readonly data: EnemyData) {}
+  /** Blows in a combo; an enraged elite adds one. */
+  get combo(): number {
+    return this.data.combo + (this.enraged && this.data.combo > 1 ? 1 : 0);
+  }
+  /** Windup of the next blow: follow-ups and rage shorten it. */
+  get windup(): number {
+    return (
+      this.data.windup * (this.enraged ? ENRAGED_HASTE : 1) * (this.strikes > 0 ? FOLLOW_UP : 1)
+    );
+  }
+  get recover(): number {
+    return this.data.recover * (this.enraged ? ENRAGED_HASTE : 1);
+  }
+  /** Chase speed multiplier. */
+  get pace(): number {
+    return this.enraged ? 1.3 : 1;
+  }
   update(dt: number, board: Blackboard): void {
     this.attackTriggered = false;
+    if (
+      this.data.enrage > 0 &&
+      board.maxHealth &&
+      board.health <= board.maxHealth * this.data.enrage
+    )
+      this.enraged = true;
     if (board.health <= 0) {
       this.enter('DEAD');
       return;
     }
     if (board.stagger > 0) {
+      this.strikes = 0;
       this.enter('STAGGER');
       return;
     }
@@ -46,16 +81,24 @@ export class EnemyFSM {
         else if (board.distance <= this.data.range) this.enter('ALERT');
         break;
       case 'ALERT':
-        if (this.timer >= this.data.windup) {
+        if (this.timer >= this.windup) {
+          this.strikes++;
           this.enter('ATTACK');
           this.attackTriggered = true;
         }
         break;
       case 'ATTACK':
-        if (this.timer > 0.2) this.enter('RECOVER');
+        // A combo commits: the next blow winds up at once, wherever Eidra went.
+        if (this.timer > STRIKE) {
+          if (this.strikes < this.combo) this.enter('ALERT');
+          else {
+            this.strikes = 0;
+            this.enter('RECOVER');
+          }
+        }
         break;
       case 'RECOVER':
-        if (this.timer > this.data.recover) this.enter('CHASE');
+        if (this.timer > this.recover) this.enter('CHASE');
         break;
       case 'STAGGER':
         this.enter('RECOVER');

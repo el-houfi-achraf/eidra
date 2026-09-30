@@ -1,17 +1,61 @@
 import { enemyData } from '../../game-data/enemies/roster';
 import type { EnemyData } from '../../game-data/enemies/roster';
-import { guardianData } from '../../game-data/bosses/guardian';
-import { EnemyFSM } from '../ai/EnemyFSM';
+import { bossRoster } from '../../game-data/bosses/roster';
+import type { BossData } from '../../game-data/bosses/schema';
+import { EnemyFSM, STRIKE } from '../ai/EnemyFSM';
 import { BossDirector } from '../bosses/BossDirector';
 import { makeCombatant } from '../combat/CombatSystem';
 import type { Combatant, Hitbox } from '../combat/CombatSystem';
 import { arenas, chunks } from '../../game-data/zones/laboratory';
-import type { ChunkData } from '../../game-data/zones/laboratory';
+import type { Arena, ChunkData } from '../../game-data/zones/laboratory';
 import { walkableSpan, clampToGates } from './Terrain';
 import type { Solid } from './Terrain';
 /** Solid (non-memory) slabs of the whole laboratory, used to bound enemy movement. */
 const solids: Solid[] = chunks.flatMap((chunk) => chunk.platforms.filter((p) => !p.memory));
-const guardianArena = arenas.find((arena) => arena.guardian === 'faceless-guardian')!;
+/**
+ * A boss fight: the body, its director and whether it has fallen for good. Bosses
+ * are not streamed with the sectors; they wait, dormant, in their arena.
+ */
+export class BossEncounter {
+  readonly actor: Combatant;
+  readonly arena: Arena;
+  director: BossDirector;
+  /** Fallen for good (persists in the save). */
+  defeated = false;
+  /** Its victory has been celebrated and rewarded. */
+  rewarded = false;
+  constructor(readonly data: BossData) {
+    const arena = arenas.find((a) => a.id === data.arena);
+    if (!arena) throw new Error(`Boss ${data.id} has no arena ${data.arena}`);
+    this.arena = arena;
+    this.actor = makeCombatant(
+      data.id,
+      data.health,
+      data.spawn.x,
+      data.spawn.y,
+      data.radius,
+      data.height,
+    );
+    this.director = new BossDirector(data, this.bounds);
+  }
+  /** Where its blows may land: the arena, inside its gates. */
+  get bounds(): [number, number] {
+    return [this.arena.left + 1, this.arena.right - 1];
+  }
+  /** Awake and fighting. */
+  get active(): boolean {
+    return !this.defeated && !['dormant', 'dead'].includes(this.director.state);
+  }
+  reset(): void {
+    this.director = new BossDirector(this.data, this.bounds);
+    this.actor.health = this.defeated ? 0 : this.data.health;
+    this.actor.x = this.data.spawn.x;
+    this.actor.invulnerable = 0;
+    this.actor.stagger = 0;
+    this.actor.knockback = 0;
+    this.rewarded = this.defeated;
+  }
+}
 export interface EnemyEntity {
   actor: Combatant;
   fsm: EnemyFSM;
@@ -35,11 +79,11 @@ export interface Projectile {
 export class EnemyManager {
   readonly entities = new Map<string, EnemyEntity>();
   readonly defeated = new Set<string>();
-  readonly boss = makeCombatant('faceless-guardian', guardianData.health, 183, 2.4, 1.7, 4.8);
-  director = new BossDirector();
+  readonly bosses = bossRoster.map((data) => new BossEncounter(data));
   projectiles: Projectile[] = [];
-  bossDefeated = false;
-  bossRewarded = false;
+  encounter(id: string): BossEncounter | undefined {
+    return this.bosses.find((b) => b.data.id === id);
+  }
   sync(data: ChunkData[]): void {
     const ids = new Set(data.flatMap((chunk) => chunk.enemies.map((e) => e.id)));
     for (const id of this.entities.keys()) if (!ids.has(id)) this.entities.delete(id);
@@ -87,12 +131,17 @@ export class EnemyManager {
         homeDistance: Math.abs(a.x - entity.home),
         health: a.health,
         stagger: a.stagger,
+        maxHealth: a.maxHealth,
       });
       if (a.health <= 0) {
         this.defeated.add(a.id);
         continue;
       }
-      if (entity.fsm.state === 'CHASE') a.x += entity.facing * entity.data.speed * dt;
+      if (entity.fsm.state === 'CHASE')
+        a.x += entity.facing * entity.data.speed * entity.fsm.pace * dt;
+      // A lunge carries the body forward during the blow.
+      if (entity.fsm.state === 'ATTACK' && entity.data.lunge > 0 && entity.fsm.timer <= STRIKE)
+        a.x += entity.facing * (entity.data.lunge / STRIKE) * dt;
       if (entity.fsm.state === 'RETURN')
         a.x += Math.sign(entity.home - a.x) * entity.data.speed * dt;
       if (entity.fsm.state === 'PATROL') a.x += Math.sin(entity.fsm.timer * 2) * dt * 0.5;
@@ -106,17 +155,18 @@ export class EnemyManager {
             sourceId: a.id,
             x: a.x,
             y: a.y,
-            vx: (delta / len) * 7,
-            vy: ((player.y - a.y) / len) * 7,
+            vx: (delta / len) * entity.data.projectileSpeed,
+            vy: ((player.y - a.y) / len) * entity.data.projectileSpeed,
             life: 3,
             damage: entity.data.damage,
           });
         } else
           onAttack(
             {
-              x: a.x + entity.facing * entity.data.range * 0.5,
+              // The blow reaches as far as the lunge carries it.
+              x: a.x + entity.facing * (entity.data.range + entity.data.lunge) * 0.5,
               y: a.y,
-              width: entity.data.range,
+              width: entity.data.range + entity.data.lunge,
               height: 2.2,
               damage: entity.data.damage,
               stagger: 0.22,
@@ -127,82 +177,7 @@ export class EnemyManager {
           );
       }
     }
-    if (!this.bossDefeated && player.x > guardianArena.trigger) this.director.activate();
-    const boss = this.boss,
-      direction = Math.sign(player.x - boss.x) || -1;
-    this.director.update(
-      dt,
-      boss.health,
-      Math.abs(player.x - boss.x),
-      direction,
-      boss.stagger,
-      player.x,
-    );
-    if (this.director.state === 'approach' && boss.stagger <= 0)
-      boss.x += direction * (this.director.phase === 2 ? 3.2 : 2.4) * dt;
-    if (this.director.state === 'attack' && this.director.pattern.id === 'charge')
-      boss.x += this.director.direction * 13 * dt;
-    boss.x = Math.max(guardianArena.roam[0], Math.min(guardianArena.roam[1], boss.x));
-    if (
-      boss.health > 0 &&
-      !['dormant', 'dead'].includes(this.director.state) &&
-      touching(boss, player) &&
-      !(plunging && boss.y < player.y)
-    )
-      onAttack(contact(boss, player, guardianData.contact), boss);
-    if (this.director.trigger) {
-      const pattern = this.director.pattern;
-      if (pattern.id === 'rain')
-        for (const x of this.director.targets)
-          this.projectiles.push({
-            sourceId: boss.id,
-            x,
-            y: 11,
-            vx: 0,
-            vy: -15,
-            life: 0.8,
-            damage: pattern.damage,
-          });
-      else if (pattern.id === 'slam')
-        for (const sign of [-1, 1])
-          this.projectiles.push({
-            sourceId: boss.id,
-            x: boss.x,
-            y: 0.45,
-            vx: sign * 9,
-            vy: 0,
-            life: 3,
-            damage: pattern.damage,
-          });
-      else
-        onAttack(
-          {
-            x: boss.x + this.director.direction * pattern.range * 0.4,
-            y: boss.y,
-            width: pattern.range,
-            height: 4.5,
-            damage: pattern.damage,
-            stagger: 0.25,
-            force: 6,
-            direction: this.director.direction,
-          },
-          boss,
-        );
-    }
-    if (this.director.state === 'attack' && this.director.pattern.id === 'charge')
-      onAttack(
-        {
-          x: boss.x,
-          y: boss.y,
-          width: 3,
-          height: 4.5,
-          damage: this.director.pattern.damage,
-          stagger: 0.3,
-          force: 6,
-          direction: this.director.direction,
-        },
-        boss,
-      );
+    for (const encounter of this.bosses) this.fight(encounter, dt, player, onAttack, plunging);
     for (const p of this.projectiles) {
       p.x += p.vx * dt;
       p.y += p.vy * dt;
@@ -219,26 +194,136 @@ export class EnemyManager {
             force: 2,
             direction: Math.sign(p.vx),
           },
-          this.entities.get(p.sourceId)?.actor ?? boss,
+          this.entities.get(p.sourceId)?.actor ??
+            this.encounter(p.sourceId)?.actor ??
+            this.bosses[0]!.actor,
         );
         p.life = 0;
       }
     }
     this.projectiles = this.projectiles.filter((p) => p.life > 0);
   }
+  /** One boss fight: waking, moving within the arena, contact and its patterns' blows. */
+  private fight(
+    encounter: BossEncounter,
+    dt: number,
+    player: Combatant,
+    onAttack: (hit: Hitbox, source: Combatant) => void,
+    plunging: boolean,
+  ): void {
+    const { actor: boss, arena, data } = encounter;
+    // Far from its arena, a boss simply waits.
+    if (player.x < arena.left - 30 || player.x > arena.right + 30) return;
+    if (!encounter.defeated && player.x > arena.trigger && player.x < arena.right)
+      encounter.director.activate();
+    const director = encounter.director,
+      direction = Math.sign(player.x - boss.x) || -1;
+    director.update(
+      dt,
+      boss.health,
+      Math.abs(player.x - boss.x),
+      direction,
+      boss.stagger,
+      player.x,
+    );
+    const kind = director.pattern.kind;
+    if (director.state === 'approach' && boss.stagger <= 0)
+      boss.x += direction * director.speed * dt;
+    if (director.state === 'attack' && kind === 'charge') boss.x += director.direction * 13 * dt;
+    // A blink lands where its mark was shown, then the boss faces Eidra again.
+    if (director.trigger && kind === 'blink') {
+      boss.x = director.targets[0] ?? boss.x;
+      director.direction = Math.sign(player.x - boss.x) || -director.direction;
+    }
+    boss.x = Math.max(arena.roam[0], Math.min(arena.roam[1], boss.x));
+    const vanished = kind === 'blink' && director.state === 'windup' && director.timer > 0.2;
+    if (
+      boss.health > 0 &&
+      !['dormant', 'dead'].includes(director.state) &&
+      !vanished &&
+      touching(boss, player) &&
+      !(plunging && boss.y < player.y)
+    )
+      onAttack(contact(boss, player, data.contact), boss);
+    if (director.trigger) {
+      const pattern = director.pattern;
+      if (pattern.kind === 'rain')
+        for (const x of director.targets)
+          this.projectiles.push({
+            sourceId: boss.id,
+            x,
+            y: 11,
+            vx: 0,
+            vy: -15,
+            life: 0.8,
+            damage: pattern.damage,
+          });
+      else if (pattern.kind === 'slam' || pattern.kind === 'nova')
+        for (const sign of [-1, 1])
+          this.projectiles.push({
+            sourceId: boss.id,
+            x: boss.x,
+            y: 0.45,
+            vx: sign * 9,
+            vy: 0,
+            life: 3,
+            damage: pattern.damage,
+          });
+      else if (pattern.kind === 'volley') {
+        // A fan of shards aimed at Eidra from the boss's head.
+        const originY = boss.y + boss.height * 0.3;
+        const aim = Math.atan2(player.y - originY, player.x - boss.x);
+        const half = (pattern.count - 1) / 2;
+        for (let i = 0; i < pattern.count; i++) {
+          const angle = aim + (i - half) * 0.22;
+          this.projectiles.push({
+            sourceId: boss.id,
+            x: boss.x,
+            y: originY,
+            vx: Math.cos(angle) * 9,
+            vy: Math.sin(angle) * 9,
+            life: 2.5,
+            damage: pattern.damage,
+          });
+        }
+      } else if (pattern.kind === 'sweep' || pattern.kind === 'charge')
+        onAttack(
+          {
+            x: boss.x + director.direction * pattern.range * 0.4,
+            y: boss.y,
+            width: pattern.range,
+            height: boss.height * 0.95,
+            damage: pattern.damage,
+            stagger: 0.25,
+            force: 6,
+            direction: director.direction,
+          },
+          boss,
+        );
+    }
+    if (director.state === 'attack' && kind === 'charge')
+      onAttack(
+        {
+          x: boss.x,
+          y: boss.y,
+          width: 3,
+          height: boss.height * 0.95,
+          damage: director.pattern.damage,
+          stagger: 0.3,
+          force: 6,
+          direction: director.direction,
+        },
+        boss,
+      );
+  }
   get actors(): Combatant[] {
-    return [...this.entities.values()].map((e) => e.actor).concat(this.boss);
+    return [...this.entities.values()].map((e) => e.actor).concat(this.bosses.map((b) => b.actor));
   }
   reset(): void {
     this.entities.clear();
     this.defeated.clear();
     this.projectiles = [];
-    this.director = new BossDirector();
-    this.boss.health = this.bossDefeated ? 0 : guardianData.health;
-    this.boss.x = 183;
-    this.boss.invulnerable = 0;
-    this.boss.stagger = 0;
-    this.bossRewarded = this.bossDefeated;
+    for (const encounter of this.bosses) encounter.reset();
   }
 }
 

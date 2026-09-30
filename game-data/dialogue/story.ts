@@ -55,6 +55,50 @@ export const dialogues = {
       'Si tu retrouves mon frère… dis-lui que j’ai laissé la porte ouverte.',
     ],
   }),
+  // Act II — Les Failles de cendre.
+  nhalis: DialogueSchema.parse({
+    speaker: 'SAEL VEYR · TRANSMISSION',
+    flag: 'heard-nhalis',
+    lines: [
+      'Prototype sept, vous avez passé la porte. Nhalis brûle encore sous la cendre.',
+      'Au fond des Failles, quelqu’un refuse toujours de regarder ce qui est arrivé. Ilyra.',
+      'Ne la laissez pas vous fermer les yeux.',
+    ],
+  }),
+  ilyan: DialogueSchema.parse({
+    speaker: 'FRAGMENT · ILYAN',
+    flag: 'memory-ilyan',
+    lines: [
+      '« Tant que les forges brûlent, personne ne demande ce qu’elles consument. »',
+      'Une chaleur ancienne dans une paume de céramique. Elle ne vous brûle pas.',
+    ],
+  }),
+  vaela: DialogueSchema.parse({
+    speaker: 'FRAGMENT · VAELA',
+    flag: 'memory-vaela',
+    lines: [
+      '« J’ai sauté par-dessus la faille pour qu’il me voie partir. Il a détourné les yeux. »',
+      'Le vide sous vos pieds garde la forme d’un pas qui n’est jamais revenu.',
+    ],
+  }),
+  ilyra: DialogueSchema.parse({
+    speaker: 'ILYRA',
+    flag: 'heard-ilyra',
+    lines: [
+      'Ne regarde pas. Tant que personne ne regarde, rien n’est arrivé.',
+      'Ils sont tous là, dans le jardin. Ils dorment. Ils vont bien.',
+      'Ferme les yeux, prototype. Je vais te montrer comme c’est doux.',
+    ],
+  }),
+  epilogue: DialogueSchema.parse({
+    speaker: 'MIRA',
+    flag: 'act2-complete',
+    lines: [
+      'Elle a regardé. Enfin.',
+      'Les cendres se sont tues. Derrière le jardin, le verre commence à chanter.',
+      'Garde tes souvenirs près de toi, Eidra. Les Jardins de verre n’oublient rien.',
+    ],
+  }),
 };
 export type DialogueId = keyof typeof dialogues;
 export const fundamentalMemories = [

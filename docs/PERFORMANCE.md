@@ -79,6 +79,25 @@ Protocole standard (`tools/benchmark.mjs`) : MEDIUM CPU 3,8 / 6,5 ms, rendu logi
 
 Trois portes de plus, désactivées une fois ouvertes. Protocole standard : mêmes draw calls et triangles (64 / 54 794 en MEDIUM, 26 / 27 921 en LOW), CPU 4,0 / 2,4 ms et rendu logiciel 154,5 / 46,8 ms, dans le bruit des mesures précédentes. Allers-retours x = 123 / 7 : 265 / 254 meshes, 7 / 6 ressources physiques (la sortie scellée de la chambre d'éveil reçoit son collider à moins de 45 m), 2 / 1 chunks, stables.
 
+### Sixième itération : boss plus complexes et Acte II
+
+Comparaison A / B dans la même session (build `main` précédent contre ce build, servis côte à côte, médiane de 40 images par scène, moyenne de deux passages), MEDIUM, 1280 × 720, SwiftShader. Frame médiane en ms, avant → après : chambre d'éveil 153,9 → 154,1 ; galerie 166,8 → 167,9 ; pont 148,9 → 148,6 ; arène du Porteur 149,3 → 149,5 ; arène du Gardien 144,5 → 143,4. CPU à ±0,5 ms, draw calls identiques à ±2 : **l'Acte I n'est pas affecté** par le moteur de boss générique ni par les dangers.
+
+Scènes de l'Acte II, même protocole, un passage par preset (frame médiane en ms / draw calls) :
+
+| Scène (x)              | LOW       | MEDIUM      | HIGH        |
+| ---------------------- | --------- | ----------- | ----------- |
+| Chambre d'éveil (10)   | 66,4 / 27 | 155,4 / 66  | 212,3 / 80  |
+| Porte de Nhalis (214)  | 42,4 / 28 | 148,9 / 72  | 191,2 / 95  |
+| Champs de braise (252) | 45,2 / 47 | 157,7 / 102 | 203,4 / 135 |
+| La Faille (284,5)      | 44,4 / 40 | 149,0 / 92  | 187,0 / 121 |
+| Le Brasier (330)       | 43,9 / 37 | 142,2 / 88  | 185,4 / 108 |
+| Jardin du déni (380)   | 43,7 / 22 | 142,9 / 64  | 188,3 / 80  |
+
+Aucune scène de l'Acte II n'est plus lente que la chambre d'éveil de référence. Les Champs de braise ont le plus de draw calls (trois colonnes de feu à deux plans chacune, cinq ennemis animés proches) sans coût mesurable sur la frame ; CPU 7,1 ms en MEDIUM contre 5,7 ms pour la chambre d'éveil (trois ennemis actifs, dont un tireur). Les colonnes et les marionnettes de boss ne sont créées qu'à proximité ; les colonnes sont libérées avec leur secteur.
+
+Protocole standard : 64 draw calls / 54 794 triangles en MEDIUM, 26 / 27 921 en LOW, identiques ; CPU 4,3 / 2,6 ms et rendu logiciel 153,3 / 64,5 ms, dans le bruit des mesures précédentes. Allers-retours x = 123 / 7 : 273 / 262 meshes (+8 : les boîtes de collision invisibles des sept portes de l'Acte II et trois marques au sol de plus pour les pluies à six marques ; la marionnette du Gardien n'est plus créée qu'à l'approche de son arène), 7 / 6 ressources physiques, 2 / 1 chunks, stables. Allers-retours dans l'Acte II (x = 262 / 214 six fois, puis 300 / 385 trois fois) : 328 / 269 puis 327 / 254 meshes, 16 / 6 puis 14 / 5 ressources physiques, stables, sans erreur. Bundle principal : 1,91 Mo minifié / 473 ko gzip.
+
 Mesures brutes : [performance.json](evidence/performance.json) (dernière itération).
 
 ## Optimisation et stabilité

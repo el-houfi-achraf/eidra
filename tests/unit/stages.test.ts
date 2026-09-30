@@ -34,8 +34,18 @@ describe('laboratory stages', () => {
       expect(stage.gate).toBeLessThan(chunk.end);
       previous = stage.gate;
     }
-    // The stages lead to the guarded arenas.
-    expect(previous).toBeLessThan(Math.min(...arenas.map((a) => a.left)));
+    // Stages and arenas alternate along the route: no sealed exit lies inside an arena,
+    // and every arena is reached through at least one cleared stage.
+    for (const arena of arenas) {
+      expect(
+        stages.some((s) => s.gate > arena.left && s.gate < arena.right),
+        arena.id,
+      ).toBe(false);
+      expect(
+        stages.some((s) => s.gate < arena.left),
+        arena.id,
+      ).toBe(true);
+    }
   });
   it('covers every sector that has enemies but no arena of its own', () => {
     const guarded = new Set(arenas.map((a) => a.guardian));

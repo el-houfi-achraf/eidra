@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import { ashArenas, ashCheckpoints, ashChunks, ashLandmarks, ashPits, ashStages } from './ashes';
+/**
+ * The world as one continuous route along x: Act I, the laboratory (below), then
+ * Act II, the Failles de cendre (`ashes.ts`).
+ */
 const PlatformSchema = z.object({
   x: z.number(),
   y: z.number(),
@@ -8,20 +13,34 @@ const PlatformSchema = z.object({
 });
 const SpawnSchema = z.object({
   id: z.string(),
-  kind: z.enum(['watcher', 'wisp', 'sentinel', 'keeper']),
+  kind: z.enum(['watcher', 'wisp', 'sentinel', 'keeper', 'crawler', 'ember', 'warden']),
   x: z.number(),
   y: z.number().default(1),
   patrol: z.tuple([z.number(), z.number()]).optional(),
 });
-export const ChunkSchema = z.object({
+/** Fire column bursting in rhythm: `active` seconds out of every `period`. */
+const HazardSchema = z.object({
   id: z.string(),
-  name: z.string(),
-  start: z.number(),
-  end: z.number(),
-  platforms: z.array(PlatformSchema),
-  enemies: z.array(SpawnSchema),
-  seed: z.number(),
+  x: z.number(),
+  width: z.number().positive(),
+  period: z.number().positive(),
+  active: z.number().positive(),
+  offset: z.number().nonnegative(),
+  damage: z.number().positive(),
 });
+export type Hazard = z.infer<typeof HazardSchema>;
+export const ChunkSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    start: z.number(),
+    end: z.number(),
+    platforms: z.array(PlatformSchema),
+    enemies: z.array(SpawnSchema),
+    hazards: z.array(HazardSchema).default([]),
+    seed: z.number(),
+  })
+  .refine((chunk) => chunk.hazards.every((h) => h.active < h.period), 'vents must rest');
 export const chunks = [
   {
     id: 'awakening',
@@ -93,12 +112,14 @@ export const chunks = [
     platforms: [{ x: 180, y: -1, w: 42, h: 2 }],
     enemies: [],
   },
+  ...ashChunks,
 ].map((value) => ChunkSchema.parse(value));
 export type ChunkData = z.infer<typeof ChunkSchema>;
 export const checkpoints = [
   { id: 'awakening', x: 7, name: 'Ancrage de l’éveil' },
   { id: 'mira', x: 73, name: 'Ancrage de Mira' },
   { id: 'threshold', x: 160, name: 'Ancrage du seuil' },
+  ...ashCheckpoints,
 ];
 export const landmarks = [
   { id: 'dash', x: 18, y: 1.2, kind: 'ability', label: 'Élan de Lumérite' },
@@ -107,6 +128,7 @@ export const landmarks = [
   { id: 'memory-step', x: 119, y: 1.4, kind: 'ability', label: 'Memory Step' },
   { id: 'kael', x: 31, y: 6.2, kind: 'memory', label: 'Fragment de Kael' },
   { id: 'seris', x: 144.5, y: 3.2, kind: 'memory', label: 'Fragment de Seris' },
+  ...ashLandmarks,
 ] as const;
 
 export const shortcuts = [
@@ -136,6 +158,8 @@ const ArenaSchema = z.object({
   guardian: z.string(),
   name: z.string(),
   subtitle: z.string(),
+  /** Title card when the guardian falls. */
+  victory: z.string(),
   /** Crossing this abscissa seals the arena behind the player. */
   trigger: z.number(),
   /** Gate positions: `left` closes behind the player, `right` bars the way on. */
@@ -155,6 +179,7 @@ export const arenas = [
     guardian: 'keeper',
     name: 'LE PORTEUR DU DERNIER ORDRE',
     subtitle: 'Il garde encore le seuil',
+    victory: 'LE DERNIER ORDRE S’ÉTEINT',
     trigger: 149.5,
     left: 147.5,
     right: 158.6,
@@ -165,11 +190,13 @@ export const arenas = [
     guardian: 'faceless-guardian',
     name: 'GARDIEN SANS VISAGE',
     subtitle: 'Celui qui n’a jamais désobéi',
+    victory: 'L’ORDRE EST ROMPU',
     trigger: 166,
     left: 164,
     right: 196,
     roam: [167, 192],
   },
+  ...ashArenas,
 ].map((arena) => ArenaSchema.parse(arena));
 const StageSchema = z.object({
   /** Sector whose exit is sealed. */
@@ -192,6 +219,7 @@ export const stages = [
   { id: 'watchers', guardians: ['wisp-1', 'sentinel-1'], gate: 70, name: 'Galerie des veilleurs' },
   // Inside the sector, within reach of Memory Step's reliquary (x = 119).
   { id: 'palimpsest', guardians: ['watcher-2'], gate: 119.8, name: 'Pont du souvenir' },
+  ...ashStages,
 ].map((stage) => StageSchema.parse(stage));
 export const stageGate = (id: string): string => `stage-${id}`;
 export const gates = [
@@ -207,3 +235,28 @@ export const progressGates: ReadonlySet<string> = new Set([
   ...stages.map((stage) => stageGate(stage.id)),
   ...arenas.map((arena) => `${arena.id}-right`),
 ]);
+const PitSchema = z.object({ from: z.number(), to: z.number(), safe: z.number() });
+/** Falling between `from` and `to` returns Eidra to the solid ground at `safe`. */
+export const pits = [{ from: 88, to: 109, safe: 84 }, ...ashPits].map((pit) =>
+  PitSchema.parse(pit),
+);
+/** Story beats tied to the route. */
+export const route = {
+  /** Mira's farewell once the Guardian has fallen, then Act II. */
+  aftermath: 197,
+  act2: {
+    x: 201.5,
+    title: 'ACTE II — LES FAILLES DE CENDRE',
+    subtitle: 'La porte de Nhalis est ouverte',
+  },
+  /** Beyond Ilyra's arena: the end of the act. */
+  finale: { boss: 'ilyra', x: 408.5, returnX: 400 },
+  /** Each act gets its own page of the map, from the first sector it contains. */
+  acts: [
+    { title: 'Le laboratoire de l’éveil', from: 0 },
+    { title: 'Les Failles de cendre', from: ashChunks[0]!.start },
+  ],
+} as const;
+/** The act a point of the route belongs to. */
+export const actAt = (x: number): (typeof route.acts)[number] =>
+  route.acts.filter((act) => x >= act.from).at(-1) ?? route.acts[0];
