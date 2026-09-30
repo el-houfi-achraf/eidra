@@ -12,12 +12,13 @@ eidra.unlock('memory-step');
 eidra.damage(20);
 eidra.setBossHealth(150);
 eidra.setBossHealth(300, 'ilyra');
+eidra.setResonance(99); // neuf cartes en orbite
 eidra.teleport(373); // arène d'Ilyra (Acte II)
 eidra.setEnemyHealth('keeper', 0);
 await eidra.save();
 ```
 
-`snapshot().device` indique le dernier périphérique utilisé (`keyboard` / `gamepad`) et `snapshot().pad` la manette en main (`name`, `family`, `profile` : `standard`, `evdev-xbox`, `evdev-playstation` ou `generic`). Les parcours E2E remplacent `navigator.getGamepads` par une manette scriptée et émettent `gamepadconnected` / `gamepaddisconnected`. `snapshot().player.invulnerable` donne les secondes d'invulnérabilité restantes. `snapshot().gates` liste les portes qui barrent le chemin (`echo`, `stage-<secteur>` pour chaque étape, `<arène>-left` / `-right` pour `last-order`, `obedience`, `brazier` et `denial`). `snapshot().boss` décrit le Gardien Sans Visage ; `snapshot().bosses` décrit chaque boss (vie, état, phase, pattern en cours, marques au sol). `setBossHealth(valeur, id)` vise le Gardien par défaut, ou le boss nommé (`ilyra`). `setEnemyHealth` vise un ennemi chargé par son identifiant de spawn (`keeper`, `cinder-warden`…).
+`snapshot().cards` liste les cartes lancées en vol (`x`, `y`). `snapshot().device` indique le dernier périphérique utilisé (`keyboard` / `gamepad`) et `snapshot().pad` la manette en main (`name`, `family`, `profile` : `standard`, `evdev-xbox`, `evdev-playstation` ou `generic`). Les parcours E2E remplacent `navigator.getGamepads` par une manette scriptée et émettent `gamepadconnected` / `gamepaddisconnected`. `snapshot().player.invulnerable` donne les secondes d'invulnérabilité restantes. `snapshot().gates` liste les portes qui barrent le chemin (`echo`, `stage-<secteur>` pour chaque étape, `<arène>-left` / `-right` pour `last-order`, `obedience`, `brazier` et `denial`). `snapshot().boss` décrit le Gardien Sans Visage ; `snapshot().bosses` décrit chaque boss (vie, état, phase, pattern en cours, marques au sol). `setBossHealth(valeur, id)` vise le Gardien par défaut, ou le boss nommé (`ilyra`). `setEnemyHealth` vise un ennemi chargé par son identifiant de spawn (`keeper`, `cinder-warden`…).
 
 Les commandes modifient la partie actuelle : réserver un emplacement aux tests. Elles ne sont pas requises pour terminer le parcours. L'API n'est pas une interface réseau.
 

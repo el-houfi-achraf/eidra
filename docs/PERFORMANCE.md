@@ -102,6 +102,12 @@ Protocole standard : 64 draw calls / 54 794 triangles en MEDIUM, 26 / 27 921 en 
 
 Aucun changement de rendu. Protocole standard : 64 / 26 draw calls et 54 794 / 27 921 triangles, identiques ; CPU 4,0 / 2,5 ms et rendu logiciel 150,2 / 65,2 ms en MEDIUM / LOW, dans le bruit des mesures précédentes ; allers-retours de streaming inchangés (273 / 262 meshes, 7 / 6 ressources physiques, 2 / 1 chunks). Lecture d'une manette par image (normalisation, quatorze liaisons, directions), mesurée sous Node : environ 3 µs, négligeable devant le budget CPU. Bundle principal : 1,93 Mo minifié / 478 ko gzip (+14 ko / +5 ko).
 
+### Huitième itération : la nouvelle Eidra
+
+Protocole standard : 64 / 26 draw calls, identiques ; 60 474 / 32 151 triangles (+5 680 / +4 230 : robe plus fine, éclaboussures, couronne, cheveux, bâton) ; CPU 4,1 / 2,5 ms et rendu logiciel 145,4 / 65,2 ms en MEDIUM / LOW, dans le bruit. Allers-retours de streaming : 318 / 307 meshes (+45 : les instances des cartes, créées une fois et réutilisées), 7 / 6 ressources physiques, 2 / 1 chunks, stables. Bundle principal : 1,95 Mo minifié / 483 ko gzip (+5 ko).
+
+Première mesure A / B avec neuf cartes en orbite : +28 draw calls et +10 à 17 ms. Deux corrections : les rubans d'un personnage (cheveux, cape) partagent un maillage par matériau, et les cartes sont des instances matérielles (un appel par type) ; les draw calls reviennent à ceux de `main` (±2). Une mesure isolée (même build, résonance pleine avec et sans cartes affichées) montre ensuite que les cartes ne coûtent presque rien (≈ +0,5 ms CPU, dans le bruit) : le surcoût restant vient de l'état « résonance pleine » qui existait déjà (animations CSS du réceptacle du HUD, coûteuses en rendu logiciel seulement), et `main` ne pouvait pas être mis dans cet état pour la comparaison. À résonance nulle, les deux builds sont équivalents (149 / 4,9 contre 153 / 4,1 ms dans la chambre d'éveil).
+
 Mesures brutes : [performance.json](evidence/performance.json) (dernière itération).
 
 ## Optimisation et stabilité

@@ -31,9 +31,10 @@ Ouvrir l'adresse indiquée par Vite, généralement http://127.0.0.1:4173. Ne pa
 | Saut                              | Espace, W ou flèche haut               | A / ✕ / B                               |
 | Attaque légère / aérienne         | J / clic gauche                        | X / □ / Y                               |
 | Plongée (rebond « pogo »)         | S ou flèche bas + attaque, en l’air    | Bas + attaque, en l’air                 |
-| Charger une attaque               | K / clic droit maintenu, puis relâcher | LT / L2 / ZL maintenu                   |
+| Charger (rafale de cartes)        | K / clic droit maintenu, puis relâcher | LT / L2 / ZL maintenu                   |
 | Esquive, après acquisition        | Maj                                    | RT / R2 / ZR                            |
 | Parade, puis riposte ×2           | L, puis attaque dans la seconde        | LB / L1 / L, puis attaque               |
+| Lancer une carte                  | F, appui bref                          | B / ○ / A, appui bref                   |
 | Recueillement (soin)              | F maintenu, immobile                   | B / ○ / A maintenu                      |
 | Rémanence, après acquisition      | Q                                      | Y / △ / X                               |
 | Memory Step, après acquisition    | R                                      | RB / R1 / R                             |
@@ -48,6 +49,8 @@ Touches remappables dans Réglages. Assistance facultative : dégâts reçus ré
 ## Contenu jouable
 
 Dix secteurs en deux actes (le laboratoire, puis les Failles de cendre) ; mouvement avec coyote time et jump buffer ; capsule Havok ; dash ; attaques légère, chargée, aérienne, plongeante (pogo) et pendant le dash, avec tampon d’entrée ; combo ; parade et riposte ; hit-stop ; Recueillement (soin alimenté par la résonance des coups portés) ; cinq archétypes ennemis (dont le Rampant qui bondit et le Porte-braise qui tire des salves) ; deux élites à combos, élans et rage ; deux boss à trois phases pilotés par les données — le Gardien Sans Visage (six patterns : balayage, onde, charge, pluie d'éclats, disparition, ondes successives) et Ilyra (pétales, reflet qui revient, voile d'éclats, ronces, disparition et taille, floraison) — avec télégraphes qui raccourcissent et enchaînements ; colonnes de feu à traverser en rythme ; Seconde impulsion (double saut) et la Faille ; Rémanence ; Écho de cinq secondes ; contrepoids ; raccourci de maintenance ; quatre souvenirs ; Mira ; transmissions de Sael ; Ilyra et l'épilogue ; ancrages et autel d’offrandes (éclats → vitalité) ; trois sauvegardes ; carte ; mort et respawn ; musique et sons originaux temporaires ; quatre presets.
+
+Eidra : capuche sombre couronnée d'épines dorées, masque blanc aux yeux pourpres, longs cheveux noirs, robe ivoire éclaboussée de rouge, cape pourpre en lambeaux, bâton doré ; sa résonance tourne autour d'elle en cartes rouges qu'elle lance d'un appui bref (en éventail de trois après une parade), qui forment un bouclier pendant la parade et jaillissent en rafale à l'attaque chargée. Combo de bâton en trois coups (balayage, arc montant, estoc), dash à traînée pourpre, poses de saut, d'apex et de chute, pogo bâton vers le bas.
 
 Personnages : silhouettes stylisées et originales pilotées par les données — capuches pointues, capes plissées à pointes, masques de céramique fêlés aux yeux lumineux qui clignent, cols dorés, écharpe et voiles animés, jambes animées selon la distance parcourue, contours encrés et ombrage cartoon. UX : tutoriel contextuel qui retire chaque invite dès que le geste est fait, réglages par onglets avec valeurs affichées et réinitialisation, notifications empilées, cartes de sauvegarde détaillées, pause avec objectif et rappel des commandes, carte en itinéraire, conseils à la mort et au chargement.
 
