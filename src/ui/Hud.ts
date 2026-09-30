@@ -7,7 +7,6 @@ import { Image } from '@babylonjs/gui/2D/controls/image';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import type { Scene } from '@babylonjs/core/scene';
 import type { GameSession } from '../core/GameSession';
-import { guardianData } from '../../game-data/bosses/guardian';
 import { focusData } from '../../game-data/abilities/abilities';
 interface FloatingNumber {
   text: TextBlock;
@@ -87,7 +86,8 @@ export class Hud {
   private barTimers = new Map<string, number>();
   private chipValue = 1;
   private bossChipValue = 1;
-  private bossMarker: Rectangle;
+  /** One notch per phase threshold of the boss fought. */
+  private bossMarkers: Rectangle[] = [];
   private shardCount = -1;
   private shardPop = 0;
   private point = new Vector3();
@@ -247,7 +247,7 @@ export class Hud {
     this.boss.top = '-64px';
     this.boss.thickness = 0;
     this.texture.addControl(this.boss);
-    this.bossLabel = new TextBlock('boss-name', guardianData.name);
+    this.bossLabel = new TextBlock('boss-name', '');
     this.bossLabel.fontSize = 17;
     this.bossLabel.fontFamily = 'Georgia, serif';
     this.bossLabel.color = '#ecd8b2';
@@ -255,7 +255,7 @@ export class Hud {
     this.bossLabel.shadowColor = '#000c';
     this.bossLabel.shadowBlur = 8;
     this.boss.addControl(this.bossLabel);
-    this.bossSubtitle = new TextBlock('boss-subtitle', guardianData.subtitle);
+    this.bossSubtitle = new TextBlock('boss-subtitle', '');
     this.bossSubtitle.fontSize = 10;
     this.bossSubtitle.color = '#9fb1a8';
     this.bossSubtitle.top = '-3px';
@@ -280,16 +280,18 @@ export class Hud {
     };
     this.bossChip = fillBar('boss-chip', '#f0e2c0');
     this.bossFill = fillBar('boss-life', '#d5af73');
-    const marker = new Rectangle('boss-phase-marker');
-    marker.width = '2px';
-    marker.height = '13px';
-    marker.thickness = 0;
-    marker.background = '#ecd8b2';
-    marker.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    marker.left = `${guardianData.phaseThreshold * 700 - 1}px`;
-    marker.top = '17px';
-    this.boss.addControl(marker);
-    this.bossMarker = marker;
+    for (let i = 0; i < 2; i++) {
+      const marker = new Rectangle('boss-phase-marker');
+      marker.width = '2px';
+      marker.height = '13px';
+      marker.thickness = 0;
+      marker.background = '#ecd8b2';
+      marker.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+      marker.top = '17px';
+      marker.isVisible = false;
+      this.boss.addControl(marker);
+      this.bossMarkers.push(marker);
+    }
     // Pooled world-space widgets: floating numbers and enemy health bars.
     for (let i = 0; i < 24; i++) {
       const block = new TextBlock('damage-number', '');
@@ -401,11 +403,16 @@ export class Hud {
     this.shardPop = Math.max(0, this.shardPop - dt * 4);
     this.shards.scaleX = this.shards.scaleY = 1 + this.shardPop * 0.35;
     this.shards.color = this.shardPop > 0 ? '#fff0c8' : '#e2c48d';
-    const director = session.enemies.director,
-      bar = session.bossBar,
-      guardian = session.bossActive;
+    const bar = session.bossBar,
+      encounter = session.activeBoss,
+      director = encounter?.director;
     this.boss.isVisible = bar !== null;
-    this.bossMarker.isVisible = guardian;
+    // Notches where the boss changes phase.
+    this.bossMarkers.forEach((marker, i) => {
+      const ratio = encounter?.data.phases[i];
+      marker.isVisible = ratio !== undefined;
+      if (ratio !== undefined) marker.left = `${ratio * 700 - 1}px`;
+    });
     if (bar) this.bossLabel.text = bar.name;
     const bossRatio = bar ? Math.max(0.001, bar.health / bar.maxHealth) : 1;
     this.bossFill.width = bossRatio;
@@ -414,21 +421,20 @@ export class Hud {
         ? bossRatio
         : Math.max(bossRatio, this.bossChipValue - dt * 0.3);
     this.bossChip.width = Math.max(0.001, this.bossChipValue);
-    const cue: Record<string, string> = {
-      sweep: 'BALAYAGE — PARADE OU ESQUIVE',
-      slam: 'ONDE — SAUTEZ',
-      charge: 'CHARGE — ESQUIVEZ',
-      rain: 'PLUIE D’ÉCLATS — QUITTEZ LES MARQUES',
-    };
-    this.bossSubtitle.text = !guardian
+    // Every windup names its counter; a phase roar announces the change.
+    const windup = director?.state === 'windup';
+    this.bossSubtitle.text = !director
       ? (bar?.subtitle ?? '')
-      : director.state === 'windup'
-        ? (cue[director.pattern.id] ?? guardianData.subtitle)
+      : windup
+        ? director.pattern.cue
         : director.state === 'transition'
-          ? 'IL SE SOUVIENT DE SA COLÈRE'
-          : guardianData.subtitle;
-    this.bossSubtitle.color = guardian && director.state === 'windup' ? '#ffb27a' : '#9fb1a8';
-    this.bossFill.background = guardian && director.phase === 2 ? '#e0895a' : '#d5af73';
+          ? director.phase === 3
+            ? 'LA FUREUR — TOUT S’ACCÉLÈRE'
+            : 'LA COLÈRE S’ÉVEILLE'
+          : (bar?.subtitle ?? '');
+    this.bossSubtitle.color = windup ? '#ffb27a' : '#9fb1a8';
+    this.bossFill.background =
+      director?.phase === 3 ? '#e0625a' : director?.phase === 2 ? '#e0895a' : '#d5af73';
     for (const n of this.numbers) {
       if (n.life <= 0) continue;
       n.life -= dt;

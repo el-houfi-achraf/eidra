@@ -408,6 +408,83 @@ function banner(
     paint,
   );
 }
+/** A cold brazier bowl on a stepped foot, still smouldering at the rim. */
+function brazier(
+  g: PaintedGeometry,
+  glow: PaintedGeometry,
+  rng: Rng,
+  x: number,
+  bottom: number,
+  z: number,
+  size: number,
+  paint: Paint,
+): void {
+  const top = bottom + size * 2.2;
+  g.ribbon(
+    [
+      [x, bottom],
+      [x, top - size * 0.6],
+    ],
+    [size * 0.5, size * 0.25],
+    z,
+    paint,
+  );
+  const xs = steps(x - size, x + size, size / 6);
+  g.band(
+    xs,
+    xs.map((px) => top - size * 0.7 * (1 - ((px - x) / size) ** 2)),
+    xs.map(() => top),
+    z,
+    paint,
+  );
+  const embers = lightPaint(0.9);
+  for (let i = 0; i < 4; i++) {
+    const ex = x + jitter(rng, size * 0.7);
+    g.triangle(
+      [ex - 0.15, top],
+      [ex + jitter(rng, 0.1), top + 0.25 + rng() * 0.3],
+      [ex + 0.15, top],
+      z - 0.02,
+      embers,
+    );
+  }
+  glow.sprite(x, top + 0.3, size * 4, size * 3, z - 0.1, glowAt(x, 0.6));
+}
+/** A dead tree: a leaning trunk that splits into bare, thinning branches. */
+function tree(
+  g: PaintedGeometry,
+  rng: Rng,
+  x: number,
+  bottom: number,
+  z: number,
+  height: number,
+  paint: Paint,
+): void {
+  const grow = (from: Point, angle: number, length: number, width: number, depth: number): void => {
+    const spine: Point[] = [];
+    const widths: number[] = [];
+    const bend = jitter(rng, 0.35);
+    for (let i = 0; i <= 5; i++) {
+      const t = i / 5;
+      const a = angle + bend * t;
+      spine.push([from[0] + Math.cos(a) * length * t, from[1] + Math.sin(a) * length * t]);
+      widths.push(width * (1 - t * 0.65));
+    }
+    g.ribbon(spine, widths, z, paint);
+    if (depth <= 0) return;
+    const end = spine.at(-1)!;
+    const branches = 2 + (rng() < 0.4 ? 1 : 0);
+    for (let i = 0; i < branches; i++)
+      grow(
+        end,
+        angle + bend + jitter(rng, 0.8),
+        length * (0.55 + rng() * 0.2),
+        width * 0.4,
+        depth - 1,
+      );
+  };
+  grow([x, bottom], Math.PI / 2 + jitter(rng, 0.15), height * 0.45, 0.35 + height * 0.04, 3);
+}
 /** Walkable slabs: dark mass, pale irregular lip along the edge, tufts and roots. */
 function dressPlatforms(g: PaintedGeometry, rng: Rng, data: ChunkData, mood: Mood): void {
   const groundPaint: Paint = (x, y) => {
@@ -674,6 +751,28 @@ export function paintScenery(data: ChunkData): Scenery {
       const bx = x + 5;
       column(far, rng, bx, LAYERS.mid, -4, 13, 2.4, mid, midCap);
     }
+  }
+  if (mood.motif === 'cinders') {
+    // Charred stacks rising into the smoke, braziers along the rubble line.
+    for (let x = x0 + 2 + rng() * 3; x < x1; x += 9 + rng() * 4) {
+      column(near, rng, x, LAYERS.back, -3, 6 + rng() * 5, 1.4 + rng() * 0.6, back, backCap);
+      brazier(near, glow, rng, x + 4.5, -0.4, LAYERS.back - 0.3, 0.6 + rng() * 0.3, backCap);
+    }
+    for (let x = x0 + rng() * 5; x < x1; x += 7 + rng() * 6) {
+      const h = 10 + rng() * 6;
+      column(far, rng, x, LAYERS.mid, -4, h, 2.6 + rng(), mid, midCap);
+      // Embers still glowing at the chimney tops.
+      glow.sprite(x, h + 0.5, 5, 4, LAYERS.mid - 0.2, glowAt(x, 0.3));
+    }
+  }
+  if (mood.motif === 'garden') {
+    // Dead trees in two ranks and the trellised arches of a forgotten garden.
+    for (let x = x0 + 1 + rng() * 3; x < x1; x += 5 + rng() * 4)
+      tree(near, rng, x, -0.8, LAYERS.back, 7 + rng() * 4, back);
+    for (let x = x0 + rng() * 4; x < x1; x += 4 + rng() * 5)
+      tree(far, rng, x, -4, LAYERS.mid, 11 + rng() * 5, mid);
+    for (let x = x0 + 6 + rng() * 4; x < x1; x += 16 + rng() * 6)
+      arch(far, rng, x, 6 + rng(), LAYERS.mid - 0.4, 3.2, 0.35, midCap, true);
   }
   // Lanterns hanging from the vault.
   for (let i = 0; i < mood.lanterns; i++) {

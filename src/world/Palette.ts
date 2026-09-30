@@ -30,6 +30,8 @@ export class Palette {
   readonly halo: StandardMaterial;
   /** Painted remembered slabs; a faint emissive lets the bloom catch them. */
   readonly paintedMemory: StandardMaterial;
+  /** Additive fire column of the ember vents. */
+  readonly flame: StandardMaterial;
   constructor(scene: Scene) {
     const make = (id: string, color: string, emission = 0, alpha = 1): StandardMaterial => {
       const m = new StandardMaterial(id, scene);
@@ -118,6 +120,24 @@ export class Palette {
     this.halo.alphaMode = Constants.ALPHA_ADD;
     this.halo.alpha = 0.99;
     this.halo.disableDepthWrite = true;
+    // Fire: white-hot at the vent, orange then red as it rises, ragged at the edges.
+    const lick = tileableNoise(29, 4, 3);
+    this.flame = new StandardMaterial('ember-vent', scene);
+    this.flame.diffuseTexture = proceduralTexture(scene, 32, 128, (u, v) => {
+      const edge = smooth(0, 0.3, u) * smooth(1, 0.7, u);
+      const body = (1 - v) ** 1.3 * (0.55 + 0.45 * lick(u, v));
+      const a = edge * body;
+      return [a, a * (0.45 + 0.4 * (1 - v)), a * 0.18 * (1 - v), 1];
+    });
+    this.flame.diffuseColor = Color3.White();
+    this.flame.ambientColor = Color3.White();
+    this.flame.emissiveColor = new Color3(0.25, 0.08, 0.02);
+    this.flame.specularColor = Color3.Black();
+    this.flame.disableLighting = true;
+    this.flame.backFaceCulling = false;
+    this.flame.fogEnabled = false;
+    this.flame.alphaMode = Constants.ALPHA_ADD;
+    this.flame.disableDepthWrite = true;
     this.shaft = new StandardMaterial('light-shaft', scene);
     // Brightest where the light enters (top, v = 1), fading downwards and at both edges.
     // Tinted per sector by the vertex colours of each shaft.

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { TutorialDirector, hintFlag } from '../../src/quests/TutorialDirector';
 import { tutorialHints } from '../../game-data/quests/tutorial';
+import { chunks } from '../../game-data/zones/laboratory';
 const context = (
   x: number,
   flags = new Set<string>(),
@@ -20,6 +21,9 @@ describe('Contextual tutorial', () => {
     expect(t.update(context(30, new Set(), ['dash']))?.id).toBe('dash');
     expect(t.update(context(86))).toBeNull();
     expect(t.update(context(86, new Set(), ['remanence']))?.id).toBe('remanence');
+    // At the edge of the rift, once the Seconde impulsion is recovered.
+    expect(t.update(context(285))).toBeNull();
+    expect(t.update(context(285, new Set(), ['double-jump']))?.id).toBe('double');
   });
   it('retires a hint once the action is performed, anywhere, and remembers it in flags', () => {
     const t = new TutorialDirector();
@@ -42,12 +46,12 @@ describe('Contextual tutorial', () => {
     flags.add('echo-gate-open');
     expect(t.update(context(130, flags, ['memory-step']))).toBeNull();
   });
-  it('validates hint data and keeps every band inside the laboratory', () => {
+  it('validates hint data and keeps every band inside the world', () => {
     expect(new Set(tutorialHints.map((h) => h.id)).size).toBe(tutorialHints.length);
     for (const hint of tutorialHints) {
       expect(hint.from).toBeLessThan(hint.to);
       expect(hint.from).toBeGreaterThanOrEqual(0);
-      expect(hint.to).toBeLessThanOrEqual(201);
+      expect(hint.to).toBeLessThanOrEqual(chunks.at(-1)!.end);
     }
   });
 });

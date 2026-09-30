@@ -34,6 +34,7 @@ import { Motes } from '../vfx/Motes';
 import { LightRays } from '../vfx/LightRays';
 import { bossPose, enemyPose, heroPose } from '../animation/Poses';
 import { damp } from '../core/math';
+import { VENT_HEIGHT, ventProgress, ventState } from '../combat/Hazards';
 import { proceduralTexture } from '../vfx/textures';
 import type { GameSession } from '../core/GameSession';
 import { presets } from '../config/settings';
@@ -41,6 +42,14 @@ import type { Settings } from '../config/settings';
 const FOG = new Color3(0.025, 0.073, 0.079);
 /** Clear and fog colours follow the sector mood; these are reused every frame. */
 const clear = new Color4(FOG.r, FOG.g, FOG.b, 1);
+interface BossView {
+  view: CharacterView;
+  /** Director state seen last frame, to catch transitions. */
+  state: string;
+  alive: boolean;
+  /** 0..1 progress of the defeat dissolve. */
+  dissolve: number;
+}
 export class Presentation {
   readonly scene: Scene;
   readonly palette: Palette;
@@ -50,7 +59,10 @@ export class Presentation {
   readonly echo: CharacterView;
   readonly mira: CharacterView;
   private enemyViews = new Map<string, { view: CharacterView; ring: Mesh }>();
-  private boss: CharacterView;
+  /** Fire columns and their ember glow, per vent of the loaded sectors. */
+  private vents = new Map<string, { column: Mesh; glow: Mesh }>();
+  /** One puppet per boss, created when Eidra nears its arena. */
+  private bossViews = new Map<string, BossView>();
   private bossCue: Mesh;
   private rainMarkers: { floor: Mesh; beam: Mesh }[] = [];
   private slash: SlashArc;
@@ -80,9 +92,6 @@ export class Presentation {
   private hurt = 0;
   private lastHealth = 0;
   private gatherClock = 0;
-  private bossState = 'dormant';
-  private bossAlive = false;
-  private bossDissolve = 1;
   private emitter = new Vector3(10, 4, 2);
   private lastTint: Tint | null = null;
   // Hero life cycle: shattering on death, reforming from light at the anchor.
@@ -134,7 +143,6 @@ export class Presentation {
     this.hero = new CharacterView(scene, p, 'eidra');
     this.echo = new CharacterView(scene, p, 'echo');
     this.mira = new CharacterView(scene, p, 'mira');
-    this.boss = new CharacterView(scene, p, 'boss');
     this.effects = new EffectPool(scene, p);
     this.slash = new SlashArc(scene, p);
     this.afterimages = new Afterimages(scene, p);
@@ -147,7 +155,8 @@ export class Presentation {
     );
     this.bossCue.material = p.danger;
     this.bossCue.setEnabled(false);
-    for (let i = 0; i < 5; i++) {
+    // Ground marks: enough for the widest rain, the first one also marks a blink.
+    for (let i = 0; i < 8; i++) {
       const floor = MeshBuilder.CreateBox(
         'rain-marker',
         { width: 1.3, height: 0.04, depth: 3.4 },
@@ -253,8 +262,8 @@ export class Presentation {
       this.shadow = p.shadows ? new ShadowGenerator(p.shadows, this.sun) : null;
       if (this.shadow) {
         this.shadow.usePercentageCloserFiltering = true;
-        for (const mesh of [...this.hero.meshes, ...this.boss.meshes])
-          this.shadow.addShadowCaster(mesh);
+        const bosses = [...this.bossViews.values()].flatMap((b) => b.view.meshes);
+        for (const mesh of [...this.hero.meshes, ...bosses]) this.shadow.addShadowCaster(mesh);
       }
     }
   }
@@ -437,7 +446,8 @@ export class Presentation {
         settings.reducedMotion,
       );
     this.renderEnemies(dt, session, settings);
-    this.renderBoss(dt, session, settings, p.x);
+    this.renderBosses(dt, session, settings, p.x);
+    this.renderVents(session);
     this.projectileViews.forEach((mesh, index) => {
       const shot = session.enemies.projectiles[index];
       mesh.setEnabled(Boolean(shot));
@@ -508,8 +518,8 @@ export class Presentation {
       const { pose, attack } = enemyPose({
         state: entity.fsm.state,
         timer: entity.fsm.timer,
-        windup: entity.data.windup,
-        recover: entity.data.recover,
+        windup: entity.fsm.windup,
+        recover: entity.fsm.recover,
         ranged: entity.data.ranged,
         flash,
       });
@@ -526,7 +536,7 @@ export class Presentation {
           { ...pose, hit: flash, warning, dying: dying ?? 0, grounded: true },
         );
       visual.ring.position.set(a.x, 0.07, 0);
-      visual.ring.scaling.setAll(1 + (warning ? entity.fsm.timer / entity.data.windup : 0));
+      visual.ring.scaling.setAll(1 + (warning ? entity.fsm.timer / entity.fsm.windup : 0));
       visual.ring.setEnabled(warning && a.health > 0);
     }
     for (const [id, visual] of this.enemyViews)
@@ -538,75 +548,142 @@ export class Presentation {
         this.flashes.delete(id);
       }
   }
-  private renderBoss(dt: number, session: GameSession, settings: Settings, px: number): void {
-    const boss = session.enemies.boss,
-      director = session.enemies.director;
-    if (director.state === 'transition' && this.bossState !== 'transition') {
-      this.effects.ring(boss.x, 3, 'damage', 14, 0.9);
-      this.camera.punch(0.1);
+  private renderVents(session: GameSession): void {
+    const live = new Set<string>();
+    for (const chunk of session.world.stream.loaded.values())
+      for (const vent of chunk.data.hazards) {
+        live.add(vent.id);
+        let view = this.vents.get(vent.id);
+        if (!view) {
+          const column = MeshBuilder.CreatePlane(
+            `${vent.id}-fire`,
+            { width: vent.width * 1.3, height: VENT_HEIGHT },
+            this.scene,
+          );
+          column.material = this.palette.flame;
+          column.isPickable = false;
+          const glow = MeshBuilder.CreatePlane(`${vent.id}-embers`, { size: 1 }, this.scene);
+          glow.material = this.palette.halo;
+          glow.isPickable = false;
+          view = { column, glow };
+          this.vents.set(vent.id, view);
+        }
+        const state = ventState(vent, session.hazardTime);
+        const t = ventProgress(vent, session.hazardTime);
+        // Warning: a low flicker at the vent; burning: the full column, fading at the end.
+        const height = state === 'burning' ? 1 : state === 'warning' ? 0.08 + t * 0.12 : 0;
+        view.column.setEnabled(height > 0);
+        view.column.scaling.y = Math.max(0.01, height);
+        view.column.position.set(vent.x, (VENT_HEIGHT * height) / 2, -0.2);
+        view.column.visibility =
+          state === 'burning' ? 0.95 - t * 0.35 : 0.5 + Math.sin(this.time * 40) * 0.3;
+        const glowSize = state === 'burning' ? 4 : 1.6 + t * 1.8;
+        view.glow.scaling.setAll(glowSize);
+        view.glow.position.set(vent.x, 0.2, -0.3);
+        view.glow.visibility = state === 'idle' ? 0.35 : 0.9;
+        if (state === 'burning' && Math.random() < 0.25)
+          this.effects.burst(vent.x, 0.5 + Math.random() * 3, 'damage', 1);
+      }
+    for (const [id, view] of this.vents)
+      if (!live.has(id)) {
+        view.column.dispose();
+        view.glow.dispose();
+        this.vents.delete(id);
+      }
+  }
+  private renderBosses(dt: number, session: GameSession, settings: Settings, px: number): void {
+    for (const encounter of session.enemies.bosses) {
+      const { actor: boss, director, data, arena } = encounter;
+      let visual = this.bossViews.get(data.id);
+      if (px < arena.left - 22 || px > arena.right + 22) {
+        visual?.view.root.setEnabled(false);
+        continue;
+      }
+      if (!visual) {
+        const view = new CharacterView(this.scene, this.palette, data.appearance as CharacterKind);
+        for (const mesh of view.meshes) this.shadow?.addShadowCaster(mesh);
+        visual = { view, state: 'dormant', alive: boss.health > 0, dissolve: 1 };
+        this.bossViews.set(data.id, visual);
+      }
+      const kind = director.pattern.kind;
+      if (director.state === 'transition' && visual.state !== 'transition') {
+        this.effects.ring(boss.x, 3, 'damage', 14, 0.9);
+        this.camera.punch(0.1);
+      }
+      // Impacts: dust rolls away from slams and from every wave of a nova.
+      if (director.trigger && (kind === 'slam' || kind === 'nova')) {
+        this.effects.burst(boss.x, 0.3, 'dust', 14);
+        this.effects.ring(boss.x, 0.6, 'damage', 6, 0.4);
+      }
+      // A blink leaves a flash where the boss was and one where it lands.
+      if (director.trigger && kind === 'blink') {
+        this.effects.ring(boss.x, boss.y, 'memory', 4, 0.5);
+        this.effects.burst(boss.x, boss.y, 'memory', 10);
+      }
+      visual.state = director.state;
+      // Only a defeat witnessed this session dissolves; a loaded victory stays hidden.
+      if (boss.health <= 0 && visual.alive) visual.dissolve = 0;
+      visual.alive = boss.health > 0;
+      visual.dissolve = Math.min(1, visual.dissolve + dt / 1.2);
+      // Vanishing during a blink's windup reads like the defeat dissolve, briefly.
+      const vanish =
+        kind === 'blink' && director.state === 'windup'
+          ? Math.min(0.9, director.timer / Math.max(0.1, director.windup))
+          : 0;
+      const dying = boss.health > 0 ? vanish : visual.dissolve;
+      const visible = boss.health > 0 || dying < 1;
+      visual.view.root.setEnabled(visible);
+      const { pose, attack } = bossPose({
+        state: director.state,
+        timer: director.timer,
+        kind,
+        windup: director.windup,
+        recover: director.pattern.recover,
+        intro: data.intro,
+      });
+      if (visible)
+        visual.view.update(
+          boss.x,
+          boss.y,
+          director.direction,
+          this.time,
+          director.state === 'approach' ? director.speed : 0,
+          attack,
+          false,
+          settings.reducedMotion,
+          {
+            ...pose,
+            warning:
+              director.state === 'windup' ||
+              director.state === 'transition' ||
+              (director.state === 'intro' && director.timer > data.intro * 0.6),
+            channel: director.state === 'transition' ? 1 : 0,
+            hit: this.flashes.get(boss.id) ?? 0,
+            dying,
+            grounded: true,
+          },
+        );
     }
-    // Impact of a slam: dust rolls away from the Guardian's feet.
-    if (
-      director.state === 'attack' &&
-      this.bossState !== 'attack' &&
-      director.pattern.id === 'slam'
-    ) {
-      this.effects.burst(boss.x, 0.3, 'dust', 14);
-      this.effects.ring(boss.x, 0.6, 'damage', 6, 0.4);
-    }
-    this.bossState = director.state;
-    // Only a defeat witnessed this session dissolves; a loaded victory stays hidden.
-    if (boss.health <= 0 && this.bossAlive) this.bossDissolve = 0;
-    this.bossAlive = boss.health > 0;
-    this.bossDissolve = Math.min(1, this.bossDissolve + dt / 1.2);
-    const dying = boss.health > 0 ? 0 : this.bossDissolve;
-    const visible = px > 145 && (boss.health > 0 || dying < 1);
-    this.boss.root.setEnabled(visible);
-    const { pose, attack } = bossPose({
-      state: director.state,
-      timer: director.timer,
-      pattern: director.pattern.id,
-      windup: director.pattern.windup * (director.phase === 2 ? 0.85 : 1),
-      recover: director.pattern.recover,
-    });
-    if (visible)
-      this.boss.update(
-        boss.x,
-        boss.y,
-        director.direction,
-        this.time,
-        director.state === 'approach' ? 2.4 : 0,
-        attack,
-        false,
-        settings.reducedMotion,
-        {
-          ...pose,
-          warning:
-            director.state === 'windup' ||
-            director.state === 'transition' ||
-            (director.state === 'intro' && director.timer > 1.4),
-          channel: director.state === 'transition' ? 1 : 0,
-          hit: this.flashes.get(boss.id) ?? 0,
-          dying,
-          grounded: true,
-        },
-      );
-    const warning = director.state === 'windup';
-    const rain = warning && director.pattern.id === 'rain';
-    this.bossCue.setEnabled(warning && !rain && session.bossActive);
-    if (warning && !rain) {
-      this.bossCue.position.set(boss.x + director.direction * 2, 0.055, 0);
-      this.bossCue.scaling.x =
-        director.pattern.id === 'slam' ? 22 : director.pattern.id === 'charge' ? 14 : 8;
-      this.bossCue.visibility = 0.2 + (director.timer / director.pattern.windup) * 0.55;
+    // Telegraphs of the boss currently fighting.
+    const active = session.activeBoss;
+    const director = active?.director;
+    const warning = director?.state === 'windup';
+    const kind = director?.pattern.kind;
+    const marked = warning && (kind === 'rain' || kind === 'blink');
+    const lane = warning && !marked && kind !== 'volley';
+    this.bossCue.setEnabled(Boolean(lane));
+    if (active && director && lane) {
+      this.bossCue.position.set(active.actor.x + director.direction * 2, 0.055, 0);
+      this.bossCue.scaling.x = kind === 'slam' || kind === 'nova' ? 22 : kind === 'charge' ? 14 : 8;
+      this.bossCue.visibility = 0.2 + (director.timer / director.windup) * 0.55;
     }
     this.rainMarkers.forEach((marker, i) => {
-      const x = director.targets[i];
-      const show = rain && x !== undefined && session.bossActive;
+      const x = director?.targets[i];
+      const show = Boolean(marked) && x !== undefined;
       marker.floor.setEnabled(show);
-      marker.beam.setEnabled(show);
-      if (show) {
-        const t = director.timer / director.pattern.windup;
+      marker.beam.setEnabled(show && kind === 'rain');
+      if (show && director && x !== undefined) {
+        const t = director.timer / director.windup;
         marker.floor.position.set(x, 0.06, 0);
         marker.floor.visibility = 0.3 + t * 0.6;
         marker.beam.position.set(x, 7, 0.4);

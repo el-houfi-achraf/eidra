@@ -9,6 +9,7 @@ export const HintActionSchema = z.enum([
   'remanence',
   'echo',
   'down',
+  'double',
 ]);
 export type HintAction = z.infer<typeof HintActionSchema>;
 const HintSchema = z.object({
@@ -87,5 +88,13 @@ export const tutorialHints = [
     to: 140,
     requires: ['memory-step'],
     until: 'echo-gate-open',
+  },
+  {
+    id: 'double',
+    action: 'double',
+    text: 'En l’air : sauter à nouveau pour atteindre les corniches',
+    from: 276,
+    to: 300,
+    requires: ['double-jump'],
   },
 ].map((hint) => HintSchema.parse(hint));

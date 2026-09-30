@@ -2,7 +2,15 @@ import type { Settings } from '../config/settings';
 import { InputAction, actionLabels, defaultBindings, keyLabel } from '../player/InputAction';
 import type { SaveData } from '../save/SaveManager';
 import type { GameSession, TitleKind } from '../core/GameSession';
-import { chunks, checkpoints, landmarks, stages } from '../../game-data/zones/laboratory';
+import {
+  actAt,
+  arenas,
+  chunks,
+  checkpoints,
+  landmarks,
+  route,
+  stages,
+} from '../../game-data/zones/laboratory';
 import { stageFlag } from '../quests/StageProgress';
 import { defaultSettings } from '../config/settings';
 import { offeringData } from '../../game-data/items/offerings';
@@ -186,7 +194,7 @@ export class MenuUI {
   }
   playing(): void {
     this.root.innerHTML =
-      '<div class="ingame"><div class="zone-label"><span class="tiny">LABORATOIRE DE L’ÉVEIL</span><p id="zone-name"></p></div><div id="objective" class="objective"></div><div id="interaction" class="interaction"></div><div id="hint" class="hint" role="status" aria-live="polite"></div><div id="abilities" class="ability-dock"></div><div id="journal-hint" class="journal-hint"></div></div>';
+      '<div class="ingame"><div class="zone-label"><span id="act-name" class="tiny"></span><p id="zone-name"></p></div><div id="objective" class="objective"></div><div id="interaction" class="interaction"></div><div id="hint" class="hint" role="status" aria-live="polite"></div><div id="abilities" class="ability-dock"></div><div id="journal-hint" class="journal-hint"></div></div>';
   }
   update(session: GameSession, label: Label, showHints = true): void {
     const hintEl = this.root.querySelector<HTMLElement>('#hint');
@@ -199,6 +207,9 @@ export class MenuUI {
         hintEl.innerHTML = `${keys.map((k) => `<kbd>${escape(k)}</kbd>`).join(hint.action === 'down' ? '<em>+</em>' : '')}<span>${escape(hint.text)}</span>`;
       hintEl.classList.toggle('visible', Boolean(hint));
     }
+    const act = this.root.querySelector('#act-name');
+    const actName = actAt(session.actor.x).title.toUpperCase();
+    if (act && act.textContent !== actName) act.textContent = actName;
     const zone = this.root.querySelector('#zone-name');
     if (zone && zone.textContent !== session.zoneName) zone.textContent = session.zoneName;
     const obj = this.root.querySelector('#objective');
@@ -499,7 +510,12 @@ export class MenuUI {
   }
   map(session: GameSession): void {
     const flags = session.narrative.flags;
-    const width = chunks.at(-1)!.end;
+    // The map shows the act Eidra is in.
+    const act = actAt(session.actor.x);
+    const next = route.acts[route.acts.indexOf(act) + 1];
+    const sectors = chunks.filter((c) => c.start >= act.from && (!next || c.start < next.from));
+    const left = sectors[0]!.start;
+    const width = sectors.at(-1)!.end - left;
     const markers = (start: number, end: number, sector: string): string => {
       const inside = (x: number) => x >= start && x < end;
       const icons: string[] = [];
@@ -513,15 +529,12 @@ export class MenuUI {
           icons.push(
             `<i class="${session.inventory.collectibles.has(m.id) ? 'found' : ''}" title="${escape(m.label)}">${m.kind === 'memory' ? '❖' : '✦'}</i>`,
           );
-      // Guardians and the sealed exit of each stage.
-      if (inside(154))
-        icons.push(
-          `<i class="${session.defeated('keeper') ? 'found' : 'danger'}" title="Porteur du dernier ordre">☗</i>`,
-        );
-      if (inside(183))
-        icons.push(
-          `<i class="${session.enemies.bossDefeated ? 'found' : 'danger'}" title="Gardien Sans Visage">☗</i>`,
-        );
+      // Guardians of the arenas and the sealed exit of each stage.
+      for (const arena of arenas)
+        if (inside((arena.left + arena.right) / 2))
+          icons.push(
+            `<i class="${session.defeated(arena.guardian) ? 'found' : 'danger'}" title="${escape(arena.name)}">☗</i>`,
+          );
       for (const stage of stages)
         if (stage.id === sector) {
           const open = flags.has(stageFlag(stage.id));
@@ -531,21 +544,26 @@ export class MenuUI {
         }
       return icons.join('');
     };
-    const nodes = chunks
+    const nodes = sectors
       .map((c) => {
         const known = session.discovered.has(c.id);
         const here = session.actor.x >= c.start && session.actor.x < c.end;
         return `<li class="route-node ${known ? 'discovered' : ''} ${here ? 'current' : ''}"><span class="node-dot"></span><strong>${known ? escape(c.name) : 'INCONNU'}</strong><span class="node-icons">${known ? markers(c.start, c.end, c.id) : ''}</span></li>`;
       })
       .join('');
-    const position = Math.max(0, Math.min(100, (session.actor.x / width) * 100));
+    const position = Math.max(0, Math.min(100, ((session.actor.x - left) / width) * 100));
     const shortcut = flags.has('echo-gate-open');
-    this.root.innerHTML = `<div class="modal-scrim"></div><section class="panel map-panel"><p class="eyebrow">CARTOGRAPHIE DE LA RÉMANENCE</p><h2>Le laboratoire de l’éveil</h2><div class="route"><div class="route-shortcut ${shortcut ? 'open' : ''}" title="Conduit de maintenance"><span>${shortcut ? 'Conduit de maintenance' : 'Passage scellé'}</span></div><div class="route-line"></div><div class="route-you" style="left:${position.toFixed(1)}%"><span>Eidra</span></div><ol class="route-nodes">${nodes}</ol></div><div class="map-key"><span>◇ Ancrage</span><span>✦ Pouvoir</span><span>❖ Fragment</span><span class="danger">☗ Gardien</span><span>⊘ Passage scellé</span><span class="mint">● Votre position</span></div><h3>Fragments retrouvés</h3><div class="memory-list">${['kael', 'seris', 'ilyan', 'vaela', 'deren', 'noa', 'aren'].map((id, i) => `<span class="${session.narrative.memories.has(id) ? 'found' : ''}"><b>0${i + 1}</b> ${session.narrative.memories.has(id) ? id.toUpperCase() : 'INCONNU'}</span>`).join('')}</div><p class="muted">◇ ${escape(session.quests.objective(flags))} · ◆ ${session.inventory.shards} éclats</p><button id="back" class="text-button">Reprendre le voyage →</button></section>`;
+    // The maintenance duct only exists in the laboratory.
+    const duct =
+      act.from === 0
+        ? `<div class="route-shortcut ${shortcut ? 'open' : ''}" title="Conduit de maintenance"><span>${shortcut ? 'Conduit de maintenance' : 'Passage scellé'}</span></div>`
+        : '';
+    this.root.innerHTML = `<div class="modal-scrim"></div><section class="panel map-panel"><p class="eyebrow">CARTOGRAPHIE DE LA RÉMANENCE</p><h2>${escape(act.title)}</h2><div class="route">${duct}<div class="route-line"></div><div class="route-you" style="left:${position.toFixed(1)}%"><span>Eidra</span></div><ol class="route-nodes">${nodes}</ol></div><div class="map-key"><span>◇ Ancrage</span><span>✦ Pouvoir</span><span>❖ Fragment</span><span class="danger">☗ Gardien</span><span>⊘ Passage scellé</span><span class="mint">● Votre position</span></div><h3>Fragments retrouvés</h3><div class="memory-list">${['kael', 'seris', 'ilyan', 'vaela', 'deren', 'noa', 'aren'].map((id, i) => `<span class="${session.narrative.memories.has(id) ? 'found' : ''}"><b>0${i + 1}</b> ${session.narrative.memories.has(id) ? id.toUpperCase() : 'INCONNU'}</span>`).join('')}</div><p class="muted">◇ ${escape(session.quests.objective(flags))} · ◆ ${session.inventory.shards} éclats</p><button id="back" class="text-button">Reprendre le voyage →</button></section>`;
     this.bind('back', this.actions.resume);
     this.focus();
   }
   ending(session: GameSession): void {
-    this.root.innerHTML = `<div class="modal-scrim"></div><section class="panel compact"><p class="eyebrow">FIN DU PRÉLUDE</p><h2>Un ordre peut<br>être oublié.</h2><p>La porte de Nhalis est ouverte.<br>Les Failles de cendre attendent encore.</p><div class="end-stats"><span>${session.narrative.memories.size}/2<br><small>SOUVENIRS</small></span><span>${Math.floor(session.playtime / 60)} min<br><small>DE VOYAGE</small></span><span>◆ ${session.inventory.shards}<br><small>ÉCLATS</small></span></div><p class="muted small">Vous avez atteint la fin de ce prototype jouable. La suite de Nhalis est en développement.</p><button id="explore" class="solid-button">Revenir explorer →</button><button id="menu" class="text-button">Menu principal</button></section>`;
+    this.root.innerHTML = `<div class="modal-scrim"></div><section class="panel compact"><p class="eyebrow">FIN DE L’ACTE II</p><h2>Un ordre peut<br>être oublié.</h2><p>Ilyra a ouvert les yeux.<br>Au-delà du jardin, Nhalis se souvient.</p><div class="end-stats"><span>${session.narrative.memories.size}/${landmarks.filter((l) => l.kind === 'memory').length}<br><small>SOUVENIRS</small></span><span>${Math.floor(session.playtime / 60)} min<br><small>DE VOYAGE</small></span><span>◆ ${session.inventory.shards}<br><small>ÉCLATS</small></span></div><p class="muted small">Vous avez traversé les deux actes de cette version. La suite de Nhalis est en développement.</p><button id="explore" class="solid-button">Revenir explorer →</button><button id="menu" class="text-button">Menu principal</button></section>`;
     this.bind('explore', this.actions.resume);
     this.bind('menu', this.actions.menu);
     this.focus();

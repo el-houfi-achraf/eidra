@@ -19,6 +19,7 @@ import { DebugOverlay } from '../debug/DebugOverlay';
 import { abilityData } from '../../game-data/abilities/abilities';
 import type { AbilityId } from '../../game-data/abilities/abilities';
 import type { DebugAPI } from '../debug/types';
+import { arenas, route } from '../../game-data/zones/laboratory';
 export class Game {
   private engine!: AbstractEngine;
   private presentation!: Presentation;
@@ -84,6 +85,7 @@ export class Game {
           dash: InputAction.Dash,
           remanence: InputAction.Remanence,
           'memory-step': InputAction.Echo,
+          'double-jump': InputAction.Jump,
         }[id as string];
         const data = abilityData[id];
         this.ui.abilityBanner(data.name, data.description, action ? this.input.label(action) : '—');
@@ -106,12 +108,13 @@ export class Game {
     });
     events.on('ENEMY_DEFEATED', (e) => {
       this.presentation.enemyDefeated(e.x, e.y, e.shards);
-      // Guardians leave a radiant burst where they fell.
-      if (e.id === 'keeper') this.presentation.radiance(e.x, e.y + 0.6, 'gold', 8);
+      // Arena guardians leave a radiant burst where they fell.
+      if (arenas.some((a) => a.guardian === e.id) && !this.session.enemies.encounter(e.id))
+        this.presentation.radiance(e.x, e.y + 0.6, 'gold', 8);
     });
-    events.on('BOSS_DEFEATED', () => {
-      const boss = this.session.enemies.boss;
-      this.presentation.radiance(boss.x, boss.y + 0.8, 'gold', 11);
+    events.on('BOSS_DEFEATED', (e) => {
+      const boss = this.session.enemies.encounter(e.id)?.actor;
+      if (boss) this.presentation.radiance(boss.x, boss.y + 0.8, 'gold', 11);
     });
     events.on('PLAYER_DAMAGED', (e) =>
       this.hud.number(
@@ -273,7 +276,12 @@ export class Game {
   private resume(): void {
     this.presentation.resting = false;
     if (this.state.state === 'ENDING') {
-      this.session.player.teleport(190, 1.2);
+      this.world.update(
+        route.finale.returnX,
+        this.session.abilities.remanence,
+        this.session.relocate(route.finale.returnX),
+      );
+      this.session.player.teleport(route.finale.returnX, 1.2);
       this.endShown = true;
     }
     this.state.change('PLAYING');
@@ -397,6 +405,18 @@ export class Game {
     if (persist) void this.save.saveSettings(value).catch((error) => reportError(error));
   }
   private installDebug(): void {
+    const bossSnapshot = (id: string) => {
+      const encounter = this.session.enemies.encounter(id)!;
+      const director = encounter.director;
+      return {
+        id,
+        health: encounter.actor.health,
+        state: director.state,
+        phase: director.phase,
+        pattern: director.pattern.id,
+        targets: [...director.targets],
+      };
+    };
     const api: DebugAPI = {
       snapshot: () => ({
         state: this.state.state,
@@ -426,13 +446,8 @@ export class Game {
           health: e.actor.health,
           state: e.fsm.state,
         })),
-        boss: {
-          health: this.session.enemies.boss.health,
-          state: this.session.enemies.director.state,
-          phase: this.session.enemies.director.phase,
-          pattern: this.session.enemies.director.pattern.id,
-          targets: [...this.session.enemies.director.targets],
-        },
+        boss: bossSnapshot('faceless-guardian'),
+        bosses: this.session.enemies.bosses.map((b) => bossSnapshot(b.data.id)),
         gates: [...this.session.closedGates()],
         settings: structuredClone(this.settings),
         memories: [...this.session.narrative.memories],
@@ -461,11 +476,10 @@ export class Game {
         if (!Number.isInteger(amount) || amount < 0) throw new Error('Invalid debug shard amount');
         this.session.inventory.shards += amount;
       },
-      setBossHealth: (value: number) => {
-        this.session.enemies.boss.health = Math.max(
-          0,
-          Math.min(this.session.enemies.boss.maxHealth, value),
-        );
+      setBossHealth: (value: number, id = 'faceless-guardian') => {
+        const boss = this.session.enemies.encounter(id)?.actor;
+        if (!boss || !Number.isFinite(value)) throw new Error(`Invalid debug boss ${id}`);
+        boss.health = Math.max(0, Math.min(boss.maxHealth, value));
       },
       setEnemyHealth: (id: string, value: number) => {
         const enemy = this.session.enemies.entities.get(id)?.actor;

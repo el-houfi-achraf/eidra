@@ -8,6 +8,7 @@ import {
 import { EnemyFSM } from '../../src/ai/EnemyFSM';
 import { BossDirector } from '../../src/bosses/BossDirector';
 import { enemyData } from '../../game-data/enemies/roster';
+import { guardianData } from '../../game-data/bosses/guardian';
 const hit = { x: 1, y: 1, width: 2, height: 2, damage: 12, stagger: 0.2, force: 2, direction: 1 };
 describe('Combat', () => {
   it('caps damage, protects invulnerability and rejects invalid damage', () => {
@@ -68,17 +69,23 @@ describe('Deterministic opponents', () => {
     f.update(0.1, { ...b, health: 0 });
     expect(f.state).toBe('DEAD');
   });
-  it('boss patterns cycle and phase two preserves telegraphy', () => {
-    const b = new BossDirector();
+  it('boss patterns cycle and a later phase preserves telegraphy', () => {
+    const b = new BossDirector(guardianData, [165, 195]);
     b.activate();
-    b.update(2.3, 320, 2, -1);
-    b.update(0.1, 320, 2, -1);
+    b.update(2.3, 400, 2, -1);
+    b.update(0.1, 400, 2, -1);
     expect(b.state).toBe('windup');
-    b.update(1.2, 320, 2, -1);
+    b.update(1.2, 400, 2, -1);
     expect(b.trigger).toBe(true);
-    b.update(0.3, 100, 2, -1);
+    b.update(0.3, 250, 2, -1);
     expect(b.phase).toBe(2);
-    b.update(2, 100, 2, -1);
+    expect(b.state).toBe('transition');
+    b.update(2, 250, 2, -1);
     expect(b.pattern.id).toBe('slam');
+    b.update(0.1, 250, 2, -1);
+    expect(b.state).toBe('windup');
+    // Phase two telegraphs faster, but still telegraphs.
+    expect(b.windup).toBeLessThan(b.pattern.windup);
+    expect(b.windup).toBeGreaterThan(0.6);
   });
 });

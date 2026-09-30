@@ -142,25 +142,101 @@ test('streaming unloads old sectors and death returns to the checkpoint', async 
   expect(s.player.health).toBe(100);
   expect(s.player.x).toBeCloseTo(73, 0);
 });
-test('boss introduction, phase two, defeat and prelude conclusion', async ({ page }) => {
+test('boss introduction, three phases, defeat and the opening of Act II', async ({ page }) => {
   await start(page);
   await page.evaluate(() => window.eidra!.teleport(167));
   await expect(page.locator('body')).toHaveAttribute('data-state', 'CUTSCENE');
   await skipDialogue(page);
   await expect.poll(async () => (await snapshot(page)).boss.state).not.toBe('dormant');
-  await page.evaluate(() => window.eidra!.setBossHealth(150));
+  await page.evaluate(() => window.eidra!.setBossHealth(200));
   await expect.poll(async () => (await snapshot(page)).boss.phase).toBe(2);
-  // The phase change is an armored roar before the second rotation begins.
+  // Each phase change is an armored roar before the wider rotation begins.
   await expect.poll(async () => (await snapshot(page)).boss.state).not.toBe('transition');
-  expect((await snapshot(page)).boss.health).toBe(150);
+  expect((await snapshot(page)).boss.health).toBe(200);
+  await page.evaluate(() => window.eidra!.setBossHealth(100));
+  await expect.poll(async () => (await snapshot(page)).boss.phase).toBe(3);
+  await expect.poll(async () => (await snapshot(page)).boss.state).not.toBe('transition');
   await page.screenshot({ path: 'test-results/boss.png' });
   await page.evaluate(() => window.eidra!.setBossHealth(0));
   await expect.poll(async () => (await snapshot(page)).flags).toContain('boss-defeated');
-  await page.evaluate(() => window.eidra!.teleport(196));
+  // Mira's farewell, then the route opens onto Act II instead of ending the game.
+  await page.evaluate(() => window.eidra!.teleport(198));
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'CUTSCENE');
+  await skipDialogue(page);
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'PLAYING');
+  await page.evaluate(() => window.eidra!.teleport(203));
+  await expect.poll(async () => (await snapshot(page)).flags).toContain('act-2');
+  await expect(page.locator('#title-card')).toContainText('ACTE II');
+  expect((await snapshot(page)).state).toBe('PLAYING');
+});
+test('Act II: the Seconde impulsion climbs higher and the ember vents burn', async ({ page }) => {
+  await start(page);
+  // Peak height of a held jump from the rift's near bank, with or without a second press.
+  const peak = async (twice: boolean): Promise<number> => {
+    await page.evaluate(() => window.eidra!.teleport(284));
+    await expect.poll(async () => (await snapshot(page)).player.grounded).toBe(true);
+    const floor = (await snapshot(page)).player.y;
+    let top = floor,
+      rising = false,
+      second = false;
+    await page.keyboard.down('Space');
+    for (let i = 0; i < 600; i++) {
+      const s = await snapshot(page);
+      top = Math.max(top, s.player.y);
+      if (s.player.vy > 1) rising = true;
+      // At the apex, press again (and hold, or the second arc is cut short).
+      if (twice && rising && !second && s.player.vy <= 0.5) {
+        second = true;
+        await page.keyboard.up('Space');
+        await page.keyboard.down('Space');
+      }
+      if (rising && s.player.grounded) break;
+    }
+    await page.keyboard.up('Space');
+    return top - floor;
+  };
+  const single = await peak(false);
+  // The ability lies before the sealed exit of the ember fields.
+  await page.evaluate(() => window.eidra!.teleport(277));
+  await expect.poll(async () => (await snapshot(page)).abilities).toContain('double-jump');
+  const double = await peak(true);
+  expect(single).toBeLessThan(2.8);
+  // The rift's high ledges rise 2.6 m and more above the previous one.
+  expect(double).toBeGreaterThan(3.2);
+  expect((await snapshot(page)).flags).toContain('tutorial:double');
+  // Standing in a fire column costs health.
+  const before = (await snapshot(page)).player.health;
+  await page.evaluate(() => window.eidra!.teleport(246));
+  await expect
+    .poll(async () => (await snapshot(page)).player.health, { timeout: 15_000 })
+    .toBeLessThan(before);
+});
+test('Ilyra: three phases, her fall, the epilogue and the end of the act', async ({ page }) => {
+  await start(page);
+  await page.evaluate(() => window.eidra!.teleport(373));
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'CUTSCENE');
+  await skipDialogue(page);
+  const ilyra = async () => (await snapshot(page)).bosses.find((b) => b.id === 'ilyra')!;
+  await expect.poll(async () => (await ilyra()).state).not.toBe('dormant');
+  await expect(page.locator('#title-card')).toContainText('ILYRA');
+  expect((await snapshot(page)).gates).toContain('denial-right');
+  await page.evaluate(() => window.eidra!.setBossHealth(300, 'ilyra'));
+  await expect.poll(async () => (await ilyra()).phase).toBe(2);
+  await page.evaluate(() => window.eidra!.setBossHealth(120, 'ilyra'));
+  await expect.poll(async () => (await ilyra()).phase).toBe(3);
+  await page.screenshot({ path: 'test-results/ilyra.png' });
+  await page.evaluate(() => window.eidra!.setBossHealth(0, 'ilyra'));
+  await expect.poll(async () => (await snapshot(page)).flags).toContain('defeated:ilyra');
+  await expect.poll(async () => (await snapshot(page)).gates).not.toContain('denial-right');
+  await page.evaluate(() => window.eidra!.teleport(409));
   await expect(page.locator('body')).toHaveAttribute('data-state', 'CUTSCENE');
   await skipDialogue(page);
   await expect(page.locator('body')).toHaveAttribute('data-state', 'ENDING');
-  await expect(page.getByText('FIN DU PRÉLUDE')).toBeVisible();
+  await expect(page.getByText('FIN DE L’ACTE II')).toBeVisible();
+  // Exploring on returns Eidra to the garden, before the end of the act.
+  await page.getByRole('button', { name: 'Revenir explorer →' }).click();
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'PLAYING');
+  expect((await snapshot(page)).player.x).toBeLessThan(408.5);
 });
 /** Holds a key for `ms` and returns the furthest x reached meanwhile. */
 async function furthest(page: Page, key: string, ms: number): Promise<number> {
