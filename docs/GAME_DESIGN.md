@@ -45,13 +45,19 @@ Chaque coup ennemi suit anticipation → frappe → récupération : recul et ar
 
 ## Boss
 
-Chaque boss est décrit par des données (D027) : trois phases séparées par une transition blindée (rugissement, onde de choc), une rotation de patterns qui s'élargit à chaque phase, des télégraphes qui raccourcissent et des enchaînements (le pattern suivant part sans récupération, avec une anticipation plus courte). Chaque pattern reste annoncé dans la barre de vie et par une silhouette propre ; les repères de phase sont tracés sur la barre. Un boss est blindé pendant son introduction et ses transitions ; l'étourdir interrompt un enchaînement.
+Chaque boss est décrit par des données (D027) : deux ou trois phases séparées par une transition blindée (rugissement, onde de choc), une rotation de patterns qui s'élargit à chaque phase, des télégraphes qui raccourcissent et des enchaînements (le pattern suivant part sans récupération, avec une anticipation plus courte). Chaque pattern reste annoncé dans la barre de vie et par une silhouette propre ; les repères de phase sont tracés sur la barre. Un boss est blindé pendant son introduction et ses transitions ; l'étourdir interrompt un enchaînement.
 
-**Gardien Sans Visage** (460 PV). Phase 1 : balayage, onde au sol, charge. Sous 60 % : télégraphes ×0,82, **pluie d'éclats** (cinq impacts marqués autour d'Eidra, espacés de 2,6 m) et balayage enchaîné d'une charge. Sous 28 % : télégraphes ×0,68, **disparition** (une marque montre où il réapparaît, derrière Eidra ou du côté libre si un mur l'en empêche) suivie d'un balayage puis d'une charge, **ondes successives** (trois paires d'ondes à sauter en rythme, toutes les 0,45 s) et onde suivie de la pluie.
+Chaque boss a sa capacité signature et sa démarche (D032) : on les reconnaît à leur façon de bouger avant même leur premier coup.
 
-**Ilyra** (560 PV), rapide et fuyante. Phase 1 : pétales (six marques), reflet (charge), voile (trois éclats en éventail visés sur Eidra). Sous 66 % : le reflet revient en sens inverse, ronces (onde), disparition suivie d'une taille. Sous 33 % : floraison (quatre paires d'ondes).
+**Porteur du dernier ordre** (260 PV, deux phases), marche lourde par à-coups. Phase 1 : taille (enchaînée d'un revers en phase 2), assaut, **Étendard** — il plante sa bannière à côté de lui ; elle envoie des ondes des deux côtés toutes les 1,3 s pendant 5 s pendant qu'il continue à se battre. Sous 50 % : télégraphes ×0,8, **Décret** (onde) enchaîné de l'étendard.
 
-**Élites** (D028). Le Porteur du dernier ordre enchaîne deux coups avec élan, trois quand il enrage sous 50 % ; la Sentinelle de cendre en enchaîne trois (quatre en rage). La rage raccourcit anticipations et récupérations et accélère la poursuite.
+**Gardien Sans Visage** (460 PV), en lévitation, entouré d'éclats. Phase 1 : balayage, onde au sol, charge. Sous 60 % : télégraphes ×0,82, **pluie d'éclats** (cinq impacts marqués autour d'Eidra, espacés de 2,6 m) et balayage enchaîné d'une charge. Sous 28 % : télégraphes ×0,68, **disparition** (une marque montre où il réapparaît, derrière Eidra ou du côté libre si un mur l'en empêche) suivie d'un balayage puis d'une charge, **ondes successives** (trois paires d'ondes à sauter en rythme, toutes les 0,45 s) et onde suivie de la pluie. Dès la phase 2, **Commandement** : « NE BOUGEZ PLUS » — un œil s'ouvre au-dessus d'Eidra ; chaque mouvement pendant les contrôles fait tomber un éclat sur elle et l'œil rougit.
+
+**Sentinelle de cendre** (380 PV, deux phases), par bonds, braises en orbite. Entaille enchaînée d'un revers, estoc, **Bond** — elle marque la position d'Eidra, s'élance en arc et atterrit avec un impact et deux ondes (quitter la marque, puis sauter) — et **Éruption** : une ligne de six geysers court vers Eidra. Sous 50 % : télégraphes ×0,78, le revers enchaîne l'estoc et le bond enchaîne l'éruption.
+
+**Ilyra** (560 PV), rapide et fuyante, elle glisse au-dessus du sol parmi ses pétales. Phase 1 : pétales (six marques), reflet (charge), voile (trois éclats en éventail visés sur Eidra). Sous 66 % : le reflet revient en sens inverse, ronces (onde), disparition suivie d'une taille, **Reflets** — deux copies d'elle prennent place dans l'arène et tirent des éclats ; chacune se brise en un coup, frapper la vraie les dissipe toutes ; seul un bref scintillement trahit les copies. Sous 33 % : floraison (quatre paires d'ondes).
+
+Les ennemis gardent `combo`, `lunge` et `enrage` (D028) : le Porteur de cendres enchaîne deux coups avec élan.
 
 ## Dangers
 
