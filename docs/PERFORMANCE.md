@@ -98,6 +98,10 @@ Aucune scène de l'Acte II n'est plus lente que la chambre d'éveil de référen
 
 Protocole standard : 64 draw calls / 54 794 triangles en MEDIUM, 26 / 27 921 en LOW, identiques ; CPU 4,3 / 2,6 ms et rendu logiciel 153,3 / 64,5 ms, dans le bruit des mesures précédentes. Allers-retours x = 123 / 7 : 273 / 262 meshes (+8 : les boîtes de collision invisibles des sept portes de l'Acte II et trois marques au sol de plus pour les pluies à six marques ; la marionnette du Gardien n'est plus créée qu'à l'approche de son arène), 7 / 6 ressources physiques, 2 / 1 chunks, stables. Allers-retours dans l'Acte II (x = 262 / 214 six fois, puis 300 / 385 trois fois) : 328 / 269 puis 327 / 254 meshes, 16 / 6 puis 14 / 5 ressources physiques, stables, sans erreur. Bundle principal : 1,91 Mo minifié / 473 ko gzip.
 
+### Septième itération : toutes les manettes
+
+Aucun changement de rendu. Protocole standard : 64 / 26 draw calls et 54 794 / 27 921 triangles, identiques ; CPU 4,0 / 2,5 ms et rendu logiciel 150,2 / 65,2 ms en MEDIUM / LOW, dans le bruit des mesures précédentes ; allers-retours de streaming inchangés (273 / 262 meshes, 7 / 6 ressources physiques, 2 / 1 chunks). Lecture d'une manette par image (normalisation, quatorze liaisons, directions), mesurée sous Node : environ 3 µs, négligeable devant le budget CPU. Bundle principal : 1,93 Mo minifié / 478 ko gzip (+14 ko / +5 ko).
+
 Mesures brutes : [performance.json](evidence/performance.json) (dernière itération).
 
 ## Optimisation et stabilité

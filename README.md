@@ -24,24 +24,26 @@ Ouvrir l'adresse indiquée par Vite, généralement http://127.0.0.1:4173. Ne pa
 
 ## Commandes
 
-| Action                            | Clavier / souris                       | Manette standard      |
-| --------------------------------- | -------------------------------------- | --------------------- |
-| Déplacement                       | A / D ou flèches                       | Stick gauche / croix  |
-| Marcher                           | Ctrl maintenu                          | Stick partiel         |
-| Saut                              | Espace, W ou flèche haut               | A                     |
-| Attaque légère / aérienne         | J / clic gauche                        | X                     |
-| Plongée (rebond « pogo »)         | S ou flèche bas + attaque, en l’air    | Stick / croix bas + X |
-| Charger une attaque               | K / clic droit maintenu, puis relâcher | LT                    |
-| Esquive, après acquisition        | Maj                                    | B                     |
-| Parade, puis riposte ×2           | L, puis attaque dans la seconde        | LB, puis X            |
-| Recueillement (soin)              | F maintenu, immobile                   | RT maintenu           |
-| Rémanence, après acquisition      | Q                                      | Y                     |
-| Memory Step, après acquisition    | R                                      | RB                    |
-| Dialogue / ancrage / autel / pass | E                                      | RT                    |
-| Carte et souvenirs                | Tab                                    | View                  |
-| Pause                             | Échap                                  | Start                 |
+| Action                            | Clavier / souris                       | Manette (Xbox / PlayStation / Nintendo) |
+| --------------------------------- | -------------------------------------- | --------------------------------------- |
+| Déplacement                       | A / D ou flèches                       | Stick gauche ou croix                   |
+| Marcher                           | Ctrl maintenu                          | Stick à mi-course                       |
+| Saut                              | Espace, W ou flèche haut               | A / ✕ / B                               |
+| Attaque légère / aérienne         | J / clic gauche                        | X / □ / Y                               |
+| Plongée (rebond « pogo »)         | S ou flèche bas + attaque, en l’air    | Bas + attaque, en l’air                 |
+| Charger une attaque               | K / clic droit maintenu, puis relâcher | LT / L2 / ZL maintenu                   |
+| Esquive, après acquisition        | Maj                                    | RT / R2 / ZR                            |
+| Parade, puis riposte ×2           | L, puis attaque dans la seconde        | LB / L1 / L, puis attaque               |
+| Recueillement (soin)              | F maintenu, immobile                   | B / ○ / A maintenu                      |
+| Rémanence, après acquisition      | Q                                      | Y / △ / X                               |
+| Memory Step, après acquisition    | R                                      | RB / R1 / R                             |
+| Dialogue / ancrage / autel / pass | E                                      | Haut (stick ou croix)                   |
+| Carte et souvenirs                | Tab                                    | View / Create / −                       |
+| Pause                             | Échap                                  | Menu / Options / +                      |
 
-Touches remappables dans Réglages. Les invites à l’écran suivent le dernier périphérique utilisé (clavier ou manette). Assistance facultative : dégâts reçus réduits. La manette permet également de parcourir les boutons des menus avec le stick vertical / la croix et A. Le réglage des sliders reste accessible au clavier / à la souris.
+Touches remappables dans Réglages. Assistance facultative : dégâts reçus réduits.
+
+**Manettes.** Toute manette reconnue par le navigateur fonctionne : Xbox, PlayStation (DualShock, DualSense), Nintendo (Pro Controller), clones XInput et manettes génériques USB / Bluetooth, y compris celles que le navigateur ne sait pas associer à la disposition standard (croix directionnelle rapportée comme un axe unique, gâchettes en axes). La disposition par défaut suit celle des action-plateformes dessinés à la main : saut en bas, frappe à gauche, recueillement à droite, esquive sur la gâchette droite, parler et se reposer en poussant vers le haut. Les invites affichent les symboles de la manette en main (A / B, ✕ / ○, B / A…) et suivent le dernier périphérique utilisé. Tous les menus se parcourent à la manette : stick ou croix pour se déplacer, A / ✕ pour valider, B / ○ pour revenir, gâchettes hautes pour changer d'onglet, gauche / droite pour régler curseurs et listes. L'onglet **Manette** des réglages permet de réassigner chaque action en appuyant sur le bouton voulu, de régler la zone morte du stick, la force des vibrations (coups, parades, chocs, victoire) et le style des symboles. Brancher une manette l'annonce ; la débrancher en jeu met le jeu en pause. Plusieurs manettes peuvent être branchées : celle sur laquelle on appuie joue.
 
 ## Contenu jouable
 

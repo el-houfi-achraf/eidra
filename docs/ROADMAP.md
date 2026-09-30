@@ -19,7 +19,7 @@
 | 12 — Sept boss principaux            | Deux jouables                      | Le Gardien et Ilyra ; cinq restants                   |
 | 13 — Audio / VFX / shaders           | Intégration prototype              | Musique, rigs, VFX et textures de production restants |
 | 14 — Performance                     | Instrumentée et mesurée            | 60 FPS sur GPU moyen non certifiés                    |
-| 15 — Accessibilité / input           | Intégrée au slice                  | Tests de manettes physiques et UX supplémentaires     |
+| 15 — Accessibilité / input           | Toutes manettes, remappage         | Qualification sur manettes physiques                  |
 | 16 — QA complet                      | Chromium logiciel + tests domaine  | Firefox / Safari / WebGPU matériel restants           |
 | 17 — Release                         | Build et configuration prêts       | Publication requiert l'accès Cloudflare               |
 
