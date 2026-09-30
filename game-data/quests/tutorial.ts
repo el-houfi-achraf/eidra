@@ -10,6 +10,7 @@ export const HintActionSchema = z.enum([
   'echo',
   'down',
   'double',
+  'cast',
 ]);
 export type HintAction = z.infer<typeof HintActionSchema>;
 const HintSchema = z.object({
@@ -25,6 +26,8 @@ const HintSchema = z.object({
   until: z.string().optional(),
   /** Only while Eidra is hurt and can afford a Recueillement. */
   wounded: z.boolean().default(false),
+  /** Only once Eidra holds enough resonance to throw a card. */
+  cards: z.boolean().default(false),
 });
 export type TutorialHint = z.infer<typeof HintSchema>;
 /**
@@ -96,5 +99,14 @@ export const tutorialHints = [
     from: 276,
     to: 300,
     requires: ['double-jump'],
+  },
+  // Taught once Eidra has earned two cards' worth of resonance, anywhere after the gallery.
+  {
+    id: 'cast',
+    action: 'cast',
+    text: 'Toucher : lancer une carte · maintenir : se recueillir',
+    from: 40,
+    to: 411,
+    cards: true,
   },
 ].map((hint) => HintSchema.parse(hint));

@@ -18,7 +18,7 @@ import {
 import { stageFlag } from '../quests/StageProgress';
 import { defaultSettings } from '../config/settings';
 import { offeringData } from '../../game-data/items/offerings';
-import { focusData } from '../../game-data/abilities/abilities';
+import { cardData, focusData } from '../../game-data/abilities/abilities';
 export interface MenuActions {
   start: (slot: number) => void;
   load: (save: SaveData) => void;
@@ -95,6 +95,7 @@ const hintKeys = (action: string, label: Label): string[] =>
     dash: [label(InputAction.Dash)],
     parry: [label(InputAction.Parry)],
     heal: [label(InputAction.Heal)],
+    cast: [label(InputAction.Heal)],
     remanence: [label(InputAction.Remanence)],
     echo: [label(InputAction.Echo)],
     down: [label(InputAction.Down), label(InputAction.Attack)],
@@ -104,7 +105,7 @@ const controls: [InputAction, string][] = [
   [InputAction.Attack, 'Frapper'],
   [InputAction.Parry, 'Parer'],
   [InputAction.Dash, 'Élan'],
-  [InputAction.Heal, 'Se recueillir'],
+  [InputAction.Heal, 'Carte (toucher) · soin (maintenir)'],
   [InputAction.Remanence, 'Rémanence'],
   [InputAction.Echo, 'Memory Step'],
   [InputAction.Interact, 'Interagir'],
@@ -273,7 +274,7 @@ export class MenuUI {
     const abilities = this.root.querySelector('#abilities');
     if (!abilities) return;
     const entries: [InputAction, string, string, boolean, boolean][] = [
-      [InputAction.Heal, 'heal', 'Recueillement', true, session.focus.segments > 0],
+      [InputAction.Heal, 'heal', 'Cartes · soin', true, session.focus.resonance >= cardData.cost],
       [
         InputAction.Dash,
         'dash',

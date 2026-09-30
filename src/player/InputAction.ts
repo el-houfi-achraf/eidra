@@ -44,7 +44,7 @@ export const actionLabels: Record<InputAction, string> = {
   parry: 'Parade',
   remanence: 'Rémanence',
   echo: 'Memory Step',
-  heal: 'Recueillement (maintenir)',
+  heal: 'Carte (toucher) · Recueillement (maintenir)',
   interact: 'Interagir',
   map: 'Carte',
   pause: 'Pause',

@@ -30,12 +30,17 @@ import {
   pits,
   route,
 } from '../../game-data/zones/laboratory';
-import { focusData } from '../../game-data/abilities/abilities';
+import { cardData, focusData } from '../../game-data/abilities/abilities';
+import { CardSystem } from '../combat/Cards';
 import type { AbilityId } from '../../game-data/abilities/abilities';
 import type { DialogueId } from '../../game-data/dialogue/story';
 import type { BossEncounter } from '../enemies/EnemyManager';
 import { scorches } from '../combat/Hazards';
-export type BurstKind = 'gold' | 'damage' | 'memory' | 'dust' | 'heal';
+export type BurstKind = 'gold' | 'damage' | 'memory' | 'dust' | 'heal' | 'crimson';
+/** Walls that stop thrown cards: every solid slab of the route (memories excluded). */
+const walls = chunks.flatMap((chunk) => chunk.platforms.filter((p) => !p.memory));
+const inWall = (x: number, y: number): boolean =>
+  walls.some((w) => Math.abs(x - w.x) < w.w / 2 && Math.abs(y - w.y) < w.h / 2);
 export type TitleKind = 'area' | 'boss' | 'victory';
 export interface SessionEffects {
   notice: (text: string) => void;
@@ -57,6 +62,10 @@ export class GameSession {
   readonly combat = new CombatSystem();
   readonly abilities = new AbilitySystem();
   readonly focus = new FocusSystem();
+  readonly cards = new CardSystem();
+  /** Seconds the Recueillement input has been held: a short press throws a card. */
+  private healHold = 0;
+  private wasHealHeld = false;
   readonly tutorial = new TutorialDirector();
   readonly arenas = new ArenaDirector();
   readonly stages = new StageProgress();
@@ -76,6 +85,10 @@ export class GameSession {
   interaction = '';
   echoOpen = false;
   private chargeTime = 0;
+  /** 0..1 progress of a charged blow being held, for the staff raised overhead. */
+  get chargeProgress(): number {
+    return Math.min(1, this.chargeTime / 0.45);
+  }
   private wasCharging = false;
   private echoHitTime = 0;
   private zone = '';
@@ -169,6 +182,9 @@ export class GameSession {
     this.combat.reset();
     this.chargeTime = 0;
     this.wasCharging = false;
+    this.cards.reset();
+    this.healHold = 0;
+    this.wasHealHeld = false;
     this.narrative.active = null;
     this.actor.maxHealth = this.inventory.maxHealth;
     this.focus.reset();
@@ -212,7 +228,7 @@ export class GameSession {
     if (dash && p.motion.dashTime > 0) {
       this.learn('dash');
       this.fx.sound('dash');
-      this.fx.burst(this.actor.x, this.actor.y, 'memory');
+      this.fx.burst(this.actor.x, this.actor.y, 'crimson');
     }
     if (jump && p.motion.vy > 0) {
       this.learn('jump');
@@ -283,6 +299,15 @@ export class GameSession {
       this.fx.notice('Le contrepoids se souvient. Le passage reste ouvert.');
       this.fx.save();
     }
+    // One input, two gestures: a tap throws a card, a hold channels Recueillement.
+    const healPressed = input.consume(InputAction.Heal),
+      healHeld = input.held(InputAction.Heal);
+    if (healPressed && !this.wasHealHeld) this.healHold = 0;
+    if (healHeld || healPressed) this.healHold += dt;
+    if ((this.wasHealHeld || healPressed) && !healHeld && this.healHold <= cardData.tap)
+      this.throwCard();
+    if (!healHeld) this.healHold = 0;
+    this.wasHealHeld = healHeld;
     // Recueillement: grounded and idle.
     const healed = this.focus.update(
       dt,
@@ -339,15 +364,29 @@ export class GameSession {
         const boss = this.enemies.encounter(enemy.id);
         if (boss && !boss.active) continue;
         if (!this.combat.hitboxes.test(hit, enemy)) continue;
-        if (!boss?.director.armored) this.hurtEnemy(enemy, hit, true);
+        if (!boss?.director.armored) this.hurtEnemy(enemy, hit, 'melee');
         // Pogo: a downward strike that connects springs Eidra back into the air.
         if (this.combat.attackKind === 'down' && !bounced) {
           bounced = true;
           p.motion.bounce();
+          // The staff strikes home: a splash of red beneath her.
+          this.fx.burst(this.actor.x, this.actor.y - 1.1, 'crimson');
           this.learn('down');
           this.fx.sound('jump');
         }
       }
+    }
+    // Thrown cards fly on, stop against walls and closed gates, and spend themselves on a body.
+    const shut = gates.filter((gate) => closed.has(gate.id)).map((gate) => gate.x);
+    this.cards.update(dt, (x, y) => inWall(x, y) || shut.some((gx) => Math.abs(x - gx) < 0.3));
+    for (const enemy of this.enemies.actors) {
+      if (enemy.health <= 0) continue;
+      const boss = this.enemies.encounter(enemy.id);
+      if (boss && !boss.active) continue;
+      const shot = this.cards.strike(enemy);
+      if (!shot) continue;
+      if (boss?.director.armored) this.fx.burst(shot.x, shot.y, 'gold');
+      else this.hurtEnemy(enemy, this.cards.hitbox(shot), 'card');
     }
     if (echo?.attacking && this.echoHitTime === 0) {
       this.echoHitTime = 0.3;
@@ -358,7 +397,7 @@ export class GameSession {
           new HurtboxSystem().overlaps(hit, enemy) &&
           (!boss || (boss.active && !boss.director.armored))
         )
-          this.hurtEnemy(enemy, hit, false);
+          this.hurtEnemy(enemy, hit, 'echo');
       }
     }
     for (const entity of this.enemies.entities.values())
@@ -424,6 +463,7 @@ export class GameSession {
       wounded:
         this.actor.health < this.actor.maxHealth * 0.6 &&
         this.focus.resonance >= this.focus.data.cost,
+      cards: this.focus.resonance >= cardData.cost,
     });
     if (this.actor.y < -5) {
       this.takeHit(
@@ -492,7 +532,28 @@ export class GameSession {
     this.learn('attack');
     this.fx.sound(kind === 'charged' || this.combat.empowered ? 'heavy' : 'attack');
   }
-  private hurtEnemy(enemy: Combatant, hit: Hitbox, byPlayer: boolean): void {
+  /** A card from the orbit, or a fan of three during a riposte. */
+  private throwCard(): void {
+    const m = this.player.motion;
+    if (this.actor.stagger > 0 || m.dashTime > 0 || !this.cards.ready) return;
+    const x = this.actor.x + m.facing * 0.45,
+      y = this.actor.y + 0.15;
+    if (this.focus.resonance < cardData.cost) {
+      // Not enough resonance: the gesture fizzles.
+      this.fx.burst(x, y, 'dust');
+      return;
+    }
+    this.focus.interrupt();
+    this.focus.resonance -= cardData.cost;
+    const fan = this.combat.parry.riposte > 0;
+    if (fan) this.combat.parry.riposte = 0;
+    this.cards.throw(x, y, m.facing, fan);
+    this.learn('cast');
+    this.fx.burst(x, y, 'crimson');
+    this.fx.sound(fan ? 'heavy' : 'attack');
+  }
+  private hurtEnemy(enemy: Combatant, hit: Hitbox, source: 'melee' | 'card' | 'echo'): void {
+    const byPlayer = source === 'melee';
     const dealt = this.combat.damage.apply(
       enemy,
       enemy.id === 'faceless-guardian' ? { ...hit, stagger: 0 } : hit,
@@ -510,6 +571,8 @@ export class GameSession {
         this.focus.gain(focusData.gainPerHit);
         this.combat.hitStop.trigger(finisher ? 0.085 : 0.05);
       }
+      // Cards spend resonance: they never earn it back, and barely stop time.
+      if (source === 'card') this.combat.hitStop.trigger(0.03);
       this.fx.burst(enemy.x, enemy.y, 'damage');
       this.fx.sound('hit', enemy.x, enemy.y);
       this.fx.shake(finisher ? 0.4 : 0.22);

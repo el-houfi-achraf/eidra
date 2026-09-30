@@ -168,15 +168,69 @@ export interface HeroPoseInput {
   attackTime: number;
   attackKind: AttackKind;
   dashing: boolean;
+  /** Swing of the three-hit staff combo (1, 2 or 3). */
+  combo?: number;
+  /** 0..1 progress of a charged blow being held. */
+  charge?: number;
 }
+/** Staff angles: 0 upright, positive behind, negative towards the facing side. */
+const mix = (a: number, b: number, t: number): number => a + (b - a) * t;
+/**
+ * Eidra's key poses with her staff: a low sweep, a rising arc and a lunging thrust
+ * for the combo; the staff raised overhead while a charge gathers, then brought down
+ * as the cards burst; pointed straight down for the pogo; trailed back in a dash.
+ */
 export function heroPose(h: HeroPoseInput): Pose {
-  if (h.dashing) return { lean: 0.32, squash: 0.12 };
-  if (h.attackTime <= 0) return {};
+  if (h.dashing) return { lean: 0.32, squash: 0.12, swing: 1.2 };
+  if (h.attackTime <= 0) {
+    const charge = h.charge ?? 0;
+    if (charge <= 0) return {};
+    const k = easeOut(charge);
+    return {
+      swing: 0.3 + 2.4 * k,
+      lean: -0.14 * k,
+      squash: 0.06 * k,
+      tremble: charge >= 1 ? 0.02 : 0,
+    };
+  }
   const duration = h.attackKind === 'charged' ? 0.58 : 0.32;
-  const arc = Math.sin(clamp01(1 - h.attackTime / duration) * Math.PI);
-  if (h.attackKind === 'down') return { lean: 0.55 * arc, squash: -0.08 * arc };
-  if (h.attackKind === 'charged')
-    return { lean: 0.3 * arc, offset: 0.25 * arc, squash: 0.08 * arc };
-  if (h.attackKind === 'aerial') return { lean: 0.22 * arc };
-  return { lean: 0.18 * arc, offset: 0.14 * arc };
+  const t = clamp01(1 - h.attackTime / duration);
+  const arc = Math.sin(t * Math.PI);
+  // The blow lands early in the swing, then the staff settles.
+  const strike = easeOut(clamp01(t * 1.6));
+  switch (h.attackKind) {
+    case 'down':
+      return { lean: 0.55 * arc, squash: -0.08 * arc, swing: Math.PI, reach: -0.12 };
+    case 'charged':
+      return {
+        lean: 0.3 * arc,
+        offset: 0.25 * arc,
+        squash: 0.08 * arc,
+        swing: mix(2.7, -1.7, strike),
+      };
+    case 'aerial':
+      return { lean: 0.22 * arc, swing: mix(1.3, -2.7, strike) };
+    case 'dash':
+      return { lean: 0.35 * arc, offset: 0.3 * arc, swing: -1.57, reach: 0.55 * arc };
+    default:
+      if (h.combo === 2)
+        // Rising arc: from low in front up past the shoulder.
+        return {
+          lean: 0.12 * arc,
+          offset: 0.1 * arc,
+          lift: 0.05 * arc,
+          swing: mix(-2.5, -0.1, strike),
+        };
+      if (h.combo === 3)
+        // Thrust: drawn back, then driven forward with a lunge.
+        return {
+          lean: 0.3 * arc,
+          offset: 0.35 * arc,
+          squash: 0.05 * arc,
+          swing: -1.52,
+          reach: mix(-0.18, 0.5, strike),
+        };
+      // Sweep: from behind the shoulder, low across the front.
+      return { lean: 0.18 * arc, offset: 0.14 * arc, swing: mix(0.9, -1.9, strike) };
+  }
 }

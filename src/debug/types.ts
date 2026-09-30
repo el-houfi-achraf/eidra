@@ -23,6 +23,8 @@ export interface DebugSnapshot {
     invulnerable: number;
   };
   resonance: number;
+  /** Thrown cards in flight. */
+  cards: { x: number; y: number }[];
   shards: number;
   healthUpgrades: number;
   abilities: AbilityId[];
@@ -64,6 +66,8 @@ export interface DebugAPI {
   unlock: (id: AbilityId) => void;
   damage: (amount: number) => void;
   addShards: (amount: number) => void;
+  /** Sets the resonance (0..99): the cards orbiting Eidra. */
+  setResonance: (value: number) => void;
   /** Defaults to the Faceless Guardian. */
   setBossHealth: (value: number, id?: string) => void;
   setEnemyHealth: (id: string, value: number) => void;

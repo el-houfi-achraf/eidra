@@ -47,3 +47,35 @@ export const focusData = FocusSchema.parse({
   gainOnParry: 22,
 });
 export type FocusData = z.infer<typeof FocusSchema>;
+const CardSchema = z.object({
+  /** Resonance spent per throw; each orbiting card shows `perCard` resonance. */
+  cost: z.number().positive(),
+  perCard: z.number().positive(),
+  damage: z.number().positive(),
+  /** Metres per second and metres travelled before a card fades. */
+  speed: z.number().positive(),
+  range: z.number().positive(),
+  /** Cards and spread (radians) of the fan thrown during a riposte. */
+  fan: z.number().int().min(2),
+  spread: z.number().positive(),
+  cooldown: z.number().nonnegative(),
+  /** A press shorter than this throws; a longer one keeps channelling Recueillement. */
+  tap: z.number().positive(),
+});
+/**
+ * Eidra's cards: her resonance, made visible as cards orbiting her. A short press of
+ * the Recueillement input throws one; the same press held channels a heal, so every
+ * card is a choice between striking from afar and mending.
+ */
+export const cardData = CardSchema.parse({
+  cost: 22,
+  perCard: 11,
+  damage: 16,
+  speed: 18,
+  range: 13,
+  fan: 3,
+  spread: 0.2,
+  cooldown: 0.35,
+  tap: 0.2,
+});
+export type CardData = z.infer<typeof CardSchema>;

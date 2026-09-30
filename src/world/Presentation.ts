@@ -29,6 +29,8 @@ import { CharacterView } from '../animation/CharacterView';
 import type { CharacterKind } from '../animation/CharacterView';
 import { EffectPool } from '../vfx/EffectPool';
 import { SlashArc } from '../vfx/SlashArc';
+import { CardHalo, ORBIT_SLOTS } from '../vfx/CardHalo';
+import { cardData } from '../../game-data/abilities/abilities';
 import { Afterimages } from '../vfx/Afterimages';
 import { Motes } from '../vfx/Motes';
 import { LightRays } from '../vfx/LightRays';
@@ -66,6 +68,11 @@ export class Presentation {
   private bossCue: Mesh;
   private rainMarkers: { floor: Mesh; beam: Mesh }[] = [];
   private slash: SlashArc;
+  /** Eidra's cards: orbit, shield, thrown and bursting. */
+  private cards: CardHalo;
+  private shield = 0;
+  private cardTrail = 0;
+  private dashClock = 0;
   private afterimages: Afterimages;
   private motes: Motes;
   private rays: LightRays;
@@ -145,6 +152,7 @@ export class Presentation {
     this.mira = new CharacterView(scene, p, 'mira');
     this.effects = new EffectPool(scene, p);
     this.slash = new SlashArc(scene, p);
+    this.cards = new CardHalo(scene, p, this.effects);
     this.afterimages = new Afterimages(scene, p);
     this.motes = new Motes(scene, p);
     this.rays = new LightRays(scene);
@@ -350,8 +358,14 @@ export class Presentation {
       }
     }
     const dashing = !menu && m.dashTime > 0;
+    // The dash tears a crimson streak: sparks shed behind her.
+    this.dashClock -= dt;
+    if (dashing && this.dashClock <= 0) {
+      this.dashClock = 0.04;
+      this.effects.burst(p.x - m.facing * 0.35, p.y + (Math.random() - 0.3) * 0.6, 'crimson', 2);
+    }
     if (dashing && !this.wasDashing) {
-      this.effects.ring(p.x, p.y, 'memory', 2.2, 0.25);
+      this.effects.ring(p.x, p.y, 'crimson', 2.2, 0.25);
       if (m.grounded) this.effects.burst(p.x - m.facing * 0.4, p.y - 0.8, 'dust', 4);
     }
     this.wasDashing = dashing;
@@ -378,8 +392,16 @@ export class Presentation {
     grade.vignetteColor.set(0.55 * danger, 0.02 * danger, 0.01 * danger, 0);
     grade.vignetteWeight = 2.4 + danger * 2.5;
     // A new swing starts a fresh crescent.
-    if (session.combat.attackTime > this.lastAttackTime + 0.01)
-      this.slash.play(session.combat.attackKind, session.combat.empowered, session.combat.finisher);
+    if (session.combat.attackTime > this.lastAttackTime + 0.01) {
+      this.slash.play(
+        session.combat.attackKind,
+        session.combat.empowered,
+        session.combat.finisher,
+        session.combat.comboIndex,
+      );
+      // The charged blow: cards burst from her hand.
+      if (session.combat.attackKind === 'charged') this.cards.burst(hx, hy, m.facing);
+    }
     this.lastAttackTime = session.combat.attackTime;
     this.slash.update(dt, hx, hy, m.facing);
     this.afterimages.update(dt, !menu && m.dashTime > 0, hx, hy, m.facing);
@@ -412,12 +434,35 @@ export class Presentation {
               attackTime: session.combat.attackTime,
               attackKind: session.combat.attackKind,
               dashing,
+              combo: session.combat.comboIndex,
+              charge: session.chargeProgress,
             })),
         kneel: this.kneel,
         dying: this.shatter >= 0 ? Math.min(1, this.shatter / 0.45) : this.reform,
       },
     );
     this.hero.root.setEnabled(this.shatter < 0.45);
+    // The orbit counts her resonance; parrying pulls it into a shield.
+    const parry = session.combat.parry;
+    this.shield = damp(this.shield, parry.window > 0 || parry.cooldown > 0.45 ? 1 : 0, 18, dt);
+    this.cardTrail = damp(this.cardTrail, dashing ? 1 : 0, 10, dt);
+    this.cards.update(
+      dt,
+      this.time,
+      hx,
+      hy,
+      m.facing,
+      {
+        count: Math.min(ORBIT_SLOTS, Math.floor(session.focus.resonance / cardData.perCard)),
+        shield: menu ? 0 : this.shield,
+        gather: channel,
+        empowered: !menu && parry.riposte > 0,
+        trail: this.cardTrail,
+        hidden: menu || this.shatter >= 0,
+      },
+      menu ? [] : session.cards.shots,
+      settings.reducedMotion,
+    );
     this.rays.follow(hx, hy);
     this.rays.update(dt, settings.reducedMotion);
     const echo = session.abilities.echo;
@@ -694,6 +739,7 @@ export class Presentation {
   dispose(): void {
     this.effects.dispose();
     this.slash.dispose();
+    this.cards.dispose();
     this.afterimages.dispose();
     this.motes.dispose();
     this.rays.dispose();

@@ -89,3 +89,10 @@ Lire README, ROADMAP et AGENT_RULES, lancer `npm ci`, puis `npm run check` et le
 - **Vibrations** sur les coups, parades, blessures, chocs, victoires et à la mort.
 - **Branchement annoncé ; débranchement en jeu = pause.**
 - Sauvegardes et réglages existants compatibles (nouveaux réglages avec valeurs par défaut). Les manettes physiques restent à qualifier : les tests utilisent des manettes scriptées.
+
+### Huitième itération : la nouvelle Eidra
+
+- **Apparence** d'après la planche de référence : capuche sombre à couronne d'épines dorées, masque blanc aux yeux pourpres, longs cheveux noirs, robe ivoire éclaboussée de rouge, cape pourpre en lambeaux qui flotte, bâton doré orné.
+- **Cartes** : la résonance tourne autour d'Eidra en cartes rouges ; appui bref sur la touche de soin = lancer une carte (éventail de trois pendant une riposte), appui maintenu = Recueillement ; bouclier de cartes pendant la parade ; rafale de cartes à l'attaque chargée, plus longue.
+- **Mouvements** : combo de bâton en trois coups (balayage, arc montant, estoc), bâton levé à la charge, pointé vers le bas au pogo avec gerbe rouge, traîné en arrière à la course et au dash, dash à traînée pourpre, jambes repliées à l'impulsion, écartées à l'apex, tendues à la chute.
+- Astuce contextuelle du lancer, commandes et aide-mémoire mis à jour ; sauvegarde inchangée.

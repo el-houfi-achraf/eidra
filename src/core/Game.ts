@@ -469,6 +469,7 @@ export class Game {
           invulnerable: this.session.actor.invulnerable,
         },
         resonance: this.session.focus.resonance,
+        cards: this.session.cards.shots.map((c) => ({ x: c.x, y: c.y })),
         shards: this.session.inventory.shards,
         healthUpgrades: this.session.inventory.healthUpgrades,
         abilities: [...this.session.abilities.unlocked],
@@ -517,6 +518,13 @@ export class Game {
       damage: (amount: number) => {
         this.session.actor.invulnerable = 0;
         this.session.actor.health = Math.max(0, this.session.actor.health - Math.max(0, amount));
+      },
+      setResonance: (value: number) => {
+        if (!Number.isFinite(value)) throw new Error('Invalid debug resonance');
+        this.session.focus.resonance = Math.max(
+          0,
+          Math.min(this.session.focus.data.capacity, value),
+        );
       },
       addShards: (amount: number) => {
         if (!Number.isInteger(amount) || amount < 0) throw new Error('Invalid debug shard amount');

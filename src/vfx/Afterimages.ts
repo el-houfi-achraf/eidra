@@ -6,7 +6,7 @@ interface Ghost {
   mesh: Mesh;
   life: number;
 }
-/** Fading hooded silhouettes left behind by the dash, pooled and reused. */
+/** Fading crimson silhouettes left behind by Eidra's dash, pooled and reused. */
 export class Afterimages {
   private ghosts: Ghost[] = [];
   private cursor = 0;
@@ -14,7 +14,7 @@ export class Afterimages {
   constructor(scene: Scene, p: Palette) {
     for (let i = 0; i < 7; i++) {
       const g = new PuppetGeometry();
-      const tint = [0.75, 1, 0.9] as const;
+      const tint = [1, 0.22, 0.28] as const;
       g.lathe(
         [
           [0.2, 0.36],

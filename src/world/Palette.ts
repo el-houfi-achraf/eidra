@@ -32,6 +32,12 @@ export class Palette {
   readonly paintedMemory: StandardMaterial;
   /** Additive fire column of the ember vents. */
   readonly flame: StandardMaterial;
+  /** Eidra's crimson: eyes, heart, slashes and sparks. */
+  readonly crimson: StandardMaterial;
+  /** Face of Eidra's cards: crimson, gold frame, a pale diamond. */
+  readonly card: StandardMaterial;
+  /** Additive red streak behind a thrown card or a dash. */
+  readonly cardTrail: StandardMaterial;
   constructor(scene: Scene) {
     const make = (id: string, color: string, emission = 0, alpha = 1): StandardMaterial => {
       const m = new StandardMaterial(id, scene);
@@ -46,6 +52,7 @@ export class Palette {
     this.dark = make('deep-stone', '#102325');
     this.ivory = make('ceramic', '#dae0cb', 0.12);
     this.crystal = make('lumerite', '#8effdb', 1.2);
+    this.crimson = make('eidra-crimson', '#ee3441', 1.15);
     this.gold = make('remembered-gold', '#d7ad69', 0.6);
     this.danger = make('warning-amber', '#ff914d', 1);
     this.memory = make('memory-surface', '#86d6bf', 0.55, 0.38);
@@ -120,6 +127,38 @@ export class Palette {
     this.halo.alphaMode = Constants.ALPHA_ADD;
     this.halo.alpha = 0.99;
     this.halo.disableDepthWrite = true;
+    // A card: crimson field, gold frame, a pale diamond pip; unlit so it reads at any depth.
+    this.card = new StandardMaterial('eidra-card', scene);
+    this.card.diffuseTexture = proceduralTexture(scene, 32, 48, (u, v) => {
+      const edge = Math.min(u, 1 - u, v * (32 / 48), (1 - v) * (32 / 48));
+      if (edge < 0.08) return [0.88, 0.7, 0.36, 1];
+      if (edge < 0.12) return [0.3, 0.04, 0.07, 1];
+      const pip = Math.abs(u - 0.5) * 1.4 + Math.abs(v - 0.5);
+      if (pip < 0.17) return [0.98, 0.9, 0.82, 1];
+      if (pip < 0.22) return [0.88, 0.7, 0.36, 1];
+      const grain = 0.85 + 0.15 * Math.sin(u * 40) * Math.sin(v * 52);
+      return [0.62 * grain, 0.07 * grain, 0.11 * grain, 1];
+    });
+    this.card.diffuseColor = Color3.White();
+    this.card.ambientColor = Color3.White();
+    this.card.emissiveColor = new Color3(0.28, 0.02, 0.04);
+    this.card.specularColor = Color3.Black();
+    this.card.disableLighting = true;
+    this.card.backFaceCulling = false;
+    this.card.fogEnabled = false;
+    this.cardTrail = new StandardMaterial('card-trail', scene);
+    this.cardTrail.diffuseTexture = proceduralTexture(scene, 64, 16, (u, v) => {
+      const a = u ** 1.6 * (1 - Math.abs(v - 0.5) * 2) ** 1.4;
+      return [a, a * 0.12, a * 0.16, 1];
+    });
+    this.cardTrail.diffuseColor = Color3.White();
+    this.cardTrail.ambientColor = Color3.White();
+    this.cardTrail.specularColor = Color3.Black();
+    this.cardTrail.disableLighting = true;
+    this.cardTrail.backFaceCulling = false;
+    this.cardTrail.fogEnabled = false;
+    this.cardTrail.alphaMode = Constants.ALPHA_ADD;
+    this.cardTrail.disableDepthWrite = true;
     // Fire: white-hot at the vent, orange then red as it rises, ragged at the edges.
     const lick = tileableNoise(29, 4, 3);
     this.flame = new StandardMaterial('ember-vent', scene);
