@@ -124,6 +124,10 @@ Temps d'image et CPU dans le bruit. Les draw calls supplémentaires viennent des
 
 Protocole standard : 64 / 26 draw calls et 60 474 / 32 151 triangles, identiques ; CPU 4,0 / 2,4 ms et rendu logiciel 148,4 / 46,9 ms en MEDIUM / LOW. Allers-retours de streaming : 320 / 316 meshes (+2 / +9 : l'œil et les colonnes de geysers, moins la marionnette d'élite du Porteur qui n'est plus chargée avec son secteur), 7 / 6 ressources physiques, 2 / 1 chunks, stables. Bundle principal : 1,96 Mo minifié / 488 ko gzip (+5 ko).
 
+### Dixième itération : bande-son et bruitages
+
+Protocole standard : 64 / 26 draw calls et 60 474 / 32 151 triangles, identiques (l'audio ne dessine rien) ; CPU 4,4 / 3,1 ms et rendu logiciel 138,5 / 52,6 ms en MEDIUM / LOW ; allers-retours de streaming : 320 / 316 meshes, 7 / 6 ressources physiques, 2 / 1 chunks, inchangés. Bundle principal : 1,97 Mo minifié / 492 ko gzip (+4 ko). Mémoire : seules les boucles audibles sont décodées en flux (lecteur média), les bruitages occupent environ 4 Mo de tampons décodés ; une région quittée depuis 20 s libère sa musique et son ambiance. Téléchargement : environ 0,9 Mo de bruitages au démarrage, puis environ 0,6 Mo par thème la première fois qu'il est entendu (un seul format est téléchargé, OGG ou MP3).
+
 Mesures brutes : [performance.json](evidence/performance.json) (dernière itération).
 
 ## Optimisation et stabilité
