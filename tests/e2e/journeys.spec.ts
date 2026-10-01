@@ -707,7 +707,8 @@ test('one prompt at a time, off Eidra, and a clear way under the ledges', async 
   // On the anchor, what Eidra can do here replaces the lesson.
   await page.evaluate(() => window.eidra!.teleport(7));
   await expect(interaction).toHaveClass(/visible/);
-  await expect(interaction).toContainText('S’ancrer');
+  // A new journey is already anchored there: the anchor offers its altar.
+  await expect(interaction).toContainText('Autel de l’ancrage');
   await expect(hint).not.toHaveClass(/visible/);
   // The prompt line sits under her feet, never over her.
   const prompt = await interaction.boundingBox();

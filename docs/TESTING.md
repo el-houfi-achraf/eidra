@@ -113,7 +113,7 @@ Avant les tests automatiques, une partie complète a été jouée par un script 
 
 198 tests unitaires / intégration dans 24 fichiers. Nouveau `walkway.test.ts` : aucune dalle ne pend entre la taille et la tête d'Eidra au-dessus d'un sol ; toute corniche au-dessus du passage reste à un saut ; les ancrages sont sur sol plein, à plus de 2 m d'une sortie scellée, avec des identifiants uniques. `tutorial.test.ts` : une leçon ignorée se retire après sa durée d'affichage et le reste ; celles qui suivent Eidra partout (cartes, Recueillement) se retirent plus tôt.
 
-25 parcours E2E. Ajout : **« one prompt at a time, off Eidra, and a clear way under the ledges »** — le voyage commence hors de portée du premier ancrage, la leçon d'abord ; sur l'ancrage, l'action remplace la leçon, sur une ligne sous les pieds d'Eidra (plus bas que 80 % de l'écran) ; Eidra passe sous la corniche de Seris par vraies touches jusqu'à l'arène du Porteur ; blessée pendant le combat, aucune leçon ne s'affiche ; l'ancrage du contrepoids s'active.
+25 parcours E2E. Ajout : **« one prompt at a time, off Eidra, and a clear way under the ledges »** — le voyage commence hors de portée du premier ancrage, la leçon d'abord ; sur l'ancrage (déjà le sien), l'autel remplace la leçon, sur une ligne sous les pieds d'Eidra (plus bas que 80 % de l'écran) ; Eidra passe sous la corniche de Seris par vraies touches jusqu'à l'arène du Porteur ; blessée pendant le combat, aucune leçon ne s'affiche ; l'ancrage du contrepoids s'active. Parcours répété 3 / 3 ; les 24 autres passent sans changement.
 
 ## Qualité restant à qualifier
 
