@@ -9,17 +9,19 @@ const LoopSchema = z.object({
   /** Gain relative to the music (or effects, for ambiences) volume. */
   volume: z.number().min(0).max(1.5).default(1),
 });
+/** A theme, with the name the soundtrack page of the title screen shows. */
+const TrackSchema = LoopSchema.extend({ title: z.string() });
 export const musicTracks = {
-  title: LoopSchema.parse({ volume: 0.9 }),
-  lumerite: LoopSchema.parse({ volume: 1 }),
-  mira: LoopSchema.parse({ volume: 0.95 }),
-  machinery: LoopSchema.parse({ volume: 0.9 }),
-  ashes: LoopSchema.parse({ volume: 0.95 }),
-  garden: LoopSchema.parse({ volume: 1 }),
-  keeper: LoopSchema.parse({ volume: 0.85 }),
-  guardian: LoopSchema.parse({ volume: 0.85 }),
-  warden: LoopSchema.parse({ volume: 0.85 }),
-  ilyra: LoopSchema.parse({ volume: 0.85 }),
+  title: TrackSchema.parse({ volume: 0.9, title: 'Ce qui attend' }),
+  lumerite: TrackSchema.parse({ volume: 1, title: 'Les voûtes de Lumérite' }),
+  mira: TrackSchema.parse({ volume: 0.95, title: 'La porte laissée ouverte' }),
+  machinery: TrackSchema.parse({ volume: 0.9, title: 'Les machines obéissent' }),
+  ashes: TrackSchema.parse({ volume: 0.95, title: 'Failles de cendre' }),
+  garden: TrackSchema.parse({ volume: 1, title: 'Le jardin du déni' }),
+  keeper: TrackSchema.parse({ volume: 0.85, title: 'Le dernier ordre' }),
+  guardian: TrackSchema.parse({ volume: 0.85, title: 'Sans visage' }),
+  warden: TrackSchema.parse({ volume: 0.85, title: 'La sentinelle de cendre' }),
+  ilyra: TrackSchema.parse({ volume: 0.85, title: 'Ilyra' }),
 };
 export type TrackId = keyof typeof musicTracks;
 export const ambienceBeds = {

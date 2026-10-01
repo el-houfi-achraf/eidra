@@ -36,6 +36,8 @@ import { Motes } from '../vfx/Motes';
 import { LightRays } from '../vfx/LightRays';
 import { bossPose, enemyPose, gaitPose, heroPose, withGait } from '../animation/Poses';
 import { BossSignatures } from '../vfx/BossSignatures';
+import { TITLE_FRAME, TITLE_HERO, TitleStage } from './TitleStage';
+import type { Frame } from '../camera/CameraRig';
 import { LEAP_TIME } from '../bosses/BossDirector';
 import { damp } from '../core/math';
 import { VENT_HEIGHT, ventProgress, ventState } from '../combat/Hazards';
@@ -70,6 +72,9 @@ export class Presentation {
   private bossCue: Mesh;
   private rainMarkers: { floor: Mesh; beam: Mesh }[] = [];
   private signatures: BossSignatures;
+  /** Key art behind the menus; built when they show, released when play starts. */
+  private titleStage: TitleStage | null = null;
+  private view: 'title' | 'preview' | 'play' = 'play';
   private slash: SlashArc;
   /** Eidra's cards: orbit, shield, thrown and bursting. */
   private cards: CardHalo;
@@ -323,20 +328,40 @@ export class Presentation {
     this.effects.ring(x, y, 'memory', 4, 0.8);
     for (let i = 0; i < 6; i++) this.motes.gather(x, y, this.palette.crystal);
   }
-  render(dt: number, session: GameSession, settings: Settings, menu: boolean): void {
+  render(
+    dt: number,
+    session: GameSession,
+    settings: Settings,
+    menu: boolean,
+    /** A chapter flown over from the title screen, instead of the title vista. */
+    preview: Frame | null = null,
+  ): void {
     this.time += dt;
     const p = session.player.position,
       m = session.player.motion;
-    const hx = menu ? 10 : p.x,
-      hy = menu ? 1.1 : p.y;
+    if (menu && !this.titleStage) this.titleStage = new TitleStage(this.scene, this.palette);
+    if (!menu && this.titleStage) {
+      this.titleStage.dispose();
+      this.titleStage = null;
+    }
+    const frame = menu ? (preview ?? TITLE_FRAME) : null;
+    const view = preview && menu ? 'preview' : menu ? 'title' : 'play';
+    // Entering the title or a preview cuts straight to its framing (play cuts on reform).
+    if (view !== this.view) {
+      this.view = view;
+      if (frame) this.camera.hold(frame);
+    }
+    this.titleStage?.update(this.time, settings.reducedMotion);
+    const hx = menu ? TITLE_HERO.x : p.x,
+      hy = menu ? TITLE_HERO.y : p.y;
     this.camera.update(
       dt,
-      menu ? 10 : p.x,
-      menu ? 1 : p.y,
+      p.x,
+      p.y,
       m.facing,
       menu ? null : session.arenas.active,
       settings,
-      menu,
+      frame,
     );
     if (menu) this.shatter = -1;
     for (const [id, t] of this.flashes) this.flashes.set(id, t - dt);
@@ -511,7 +536,8 @@ export class Presentation {
     this.emitter.set(this.camera.camera.position.x, 4, 2);
     // Each sector has its own colour identity: fog, sky, mist and dust follow the camera.
     const cx = this.camera.camera.position.x;
-    const tint = tintAt(cx);
+    // The title shows the dawn of its vista instead of a sector.
+    const tint = view === 'title' && this.titleStage ? this.titleStage.tint : tintAt(cx);
     this.scene.fogColor.copyFromFloats(...tint.fog);
     clear.set(tint.fog[0], tint.fog[1], tint.fog[2], 1);
     this.backdrop.update(cx, this.camera.camera.position.y, tint);
@@ -777,6 +803,7 @@ export class Presentation {
     });
   }
   dispose(): void {
+    this.titleStage?.dispose();
     this.signatures.dispose();
     this.effects.dispose();
     this.slash.dispose();

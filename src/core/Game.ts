@@ -24,6 +24,8 @@ import { familyNames } from '../../game-data/input/controllers';
 import { rumbleCues } from '../../game-data/input/rumble';
 import { soundCues } from '../../game-data/audio/sounds';
 import type { AudioScene } from '../audio/MusicDirector';
+/** The camera's flight over a chapter from the title screen: metres, m/s. */
+const FLYOVER = { lead: 6, length: 64, speed: 2.6, y: 4.4, halfHeight: 7.6 } as const;
 export class Game {
   private engine!: AbstractEngine;
   private presentation!: Presentation;
@@ -48,6 +50,8 @@ export class Game {
   private deathTimer = 0;
   private saving: Promise<void> = Promise.resolve();
   private lifecycle = new AbortController();
+  /** A chapter flown over behind the title screen. */
+  private flyover: { x: number; to: number; done: () => void } | null = null;
   constructor(private canvas: HTMLCanvasElement) {
     this.input = new InputManager(canvas);
     this.ui = new MenuUI({
@@ -64,6 +68,20 @@ export class Game {
       cancelPadCapture: () => this.input.cancelCapture(),
       pad: () => ({ info: this.input.pad, glyph: (token) => this.input.padLabel(token) }),
       rumbleTest: () => this.input.rumble(rumbleCues['boss-slam']!),
+      listen: (theme) => {
+        void this.audio.start().catch((error: unknown) => reportError(error));
+        this.audio.director.listen(theme);
+      },
+      preview: (chapter, done) => {
+        this.flyover = {
+          x: chapter.from + FLYOVER.lead,
+          to: Math.min(chapter.to - FLYOVER.lead, chapter.from + FLYOVER.length),
+          done,
+        };
+        void this.audio.start().catch((error: unknown) => reportError(error));
+        this.audio.director.listen(chapter.theme);
+      },
+      endPreview: () => this.endFlyover(),
     });
     // The score starts with the first gesture (browsers keep audio asleep until then),
     // so the title theme plays in the menus.
@@ -275,7 +293,23 @@ export class Game {
         this.ui.navigate(this.input.menu);
       this.ui.setDevice(this.input.device, this.input.family);
       const menu = this.state.state === 'MAIN_MENU' || this.state.state === 'BOOT';
-      this.presentation.render(dt, this.session, this.settings, menu);
+      if (!menu && this.flyover) this.endFlyover();
+      const flight = this.flyover;
+      if (flight) {
+        flight.x += dt * FLYOVER.speed;
+        this.world.update(flight.x, false, new Set());
+        if (flight.x >= flight.to) {
+          this.endFlyover();
+          flight.done();
+        }
+      }
+      this.presentation.render(
+        dt,
+        this.session,
+        this.settings,
+        menu,
+        flight ? { x: flight.x, y: FLYOVER.y, halfHeight: FLYOVER.halfHeight } : null,
+      );
       this.hud.update(
         this.session,
         ['PLAYING', 'PAUSED'].includes(this.state.state),
@@ -361,6 +395,13 @@ export class Game {
     this.ui.playing();
     this.input.reset();
     this.input.focus();
+  }
+  /** Back from a chapter preview: the title theme, the world streamed where play starts. */
+  private endFlyover(): void {
+    if (!this.flyover) return;
+    this.flyover = null;
+    this.audio.director.listen(null);
+    this.world.update(10, false, new Set());
   }
   private async showMenu(): Promise<void> {
     window.clearTimeout(this.deathTimer);

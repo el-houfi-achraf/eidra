@@ -8,6 +8,6 @@ Dépendances : Babylon.js core / GUI / loaders (Apache-2.0), Havok Web package (
 
 Les fichiers glslang et twgsl copiés dans `public/decoders` proviennent de la distribution Babylon.js 9.27.0. Conserver les mentions incorporées dans ces fichiers et le fichier de licence Babylon distribué à côté. Le décodeur meshoptimizer et sa licence MIT sont également inclus. Ne pas supprimer les mentions tierces lors du packaging.
 
-La police système Georgia / Arial n'est ni copiée ni redistribuée. Les graphismes SVG du titre et de l'icône sont originaux.
+La police système Georgia / Arial n'est ni copiée ni redistribuée. L'écran titre embarque trois familles sous SIL Open Font License 1.1, dans `src/ui/fonts/` avec leur licence : **Cinzel** (© 2020 The Cinzel Project Authors), **Cormorant Garamond** (© 2015 The Cormorant Project Authors) et **Inter** (© 2016 The Inter Project Authors), en sous-ensembles latins woff2 issus des paquets Fontsource. Elles sont redistribuées sans modification et non vendues seules ; garder les fichiers `LICENSE-*.txt` à côté. Les graphismes SVG du titre, des icônes, des vignettes et de l'icône du jeu sont originaux.
 
 L'attribution des droits et la licence de publication du code de jeu restent à décider par le propriétaire. Aucun transfert de droits sur les dépendances tierces n'est impliqué.

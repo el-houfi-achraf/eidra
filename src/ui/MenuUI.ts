@@ -19,6 +19,17 @@ import { stageFlag } from '../quests/StageProgress';
 import { defaultSettings } from '../config/settings';
 import { offeringData } from '../../game-data/items/offerings';
 import { cardData, focusData } from '../../game-data/abilities/abilities';
+import { chapterAt, credits, news, titleMood, titleScreen } from '../../game-data/ui/title';
+import type { Chapter } from '../../game-data/ui/title';
+import { moods } from '../../game-data/zones/moods';
+import { dialogues, fundamentalMemories } from '../../game-data/dialogue/story';
+import { musicTracks } from '../../game-data/audio/music';
+import type { TrackId } from '../../game-data/audio/music';
+import { bossRoster } from '../../game-data/bosses/roster';
+import { titleProgress, trackOrigin } from './TitleProgress';
+import type { TitleProgress } from './TitleProgress';
+import { icons, thumbnail } from './TitleArt';
+import type { IconId } from './TitleArt';
 export interface MenuActions {
   start: (slot: number) => void;
   load: (save: SaveData) => void;
@@ -35,6 +46,11 @@ export interface MenuActions {
   /** The controller in hand and the glyph of a binding for it. */
   pad: () => { info: PadInfo | null; glyph: (token: PadToken | undefined) => string };
   rumbleTest: () => void;
+  /** Plays a theme of the score in the menus; null brings back the title theme. */
+  listen: (theme: TrackId | null) => void;
+  /** Flies the camera over a chapter behind the title; `done` when the flight ends. */
+  preview: (chapter: Chapter, done: () => void) => void;
+  endPreview: () => void;
 }
 /** Controller actions the player may remap; moving, aiming down and pause stay fixed. */
 const padActions = [
@@ -73,6 +89,34 @@ const tips = [
   'La Rémanence révèle ce qui a disparu, mais elle consume votre mémoire.',
 ];
 const tip = (): string => tips[Math.floor(Math.random() * tips.length)]!;
+type Section = 'home' | 'play' | 'settings' | 'extras';
+const sections: [Section, string][] = [
+  ['home', 'Accueil'],
+  ['play', 'Jouer'],
+  ['settings', 'Paramètres'],
+  ['extras', 'Extras'],
+];
+/** The preview card turns to its next slide after this long (ms). */
+const SLIDE_EVERY = 7000;
+const pad2 = (n: number): string => String(n).padStart(2, '0');
+/** The latest news the bell has shown, kept in this browser. */
+const NEWS_KEY = 'eidra.news.seen';
+const seenNews = (): string | null => {
+  try {
+    return localStorage.getItem(NEWS_KEY);
+  } catch (error) {
+    // Storage blocked (private window): the bell simply keeps its dot.
+    console.warn('[EIDRA] News state unavailable', error);
+    return null;
+  }
+};
+const markNewsSeen = (): void => {
+  try {
+    localStorage.setItem(NEWS_KEY, news[0]?.id ?? '');
+  } catch (error) {
+    console.warn('[EIDRA] News state not kept', error);
+  }
+};
 const duration = (seconds: number): string => {
   const minutes = Math.floor(seconds / 60);
   return minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
@@ -125,8 +169,23 @@ export class MenuUI {
   private reducedMotion = false;
   /** Latest input device, for the few prompts that differ between keyboard and pad. */
   private device: 'keyboard' | 'gamepad' = 'keyboard';
+  private family: PadFamily | null = null;
+  /** The title screen's saves, settings and what they tell of the journey. */
+  private front: {
+    saves: (SaveData | null)[];
+    settings: Settings;
+    progress: TitleProgress;
+  } | null = null;
+  private slide = 0;
+  private slideTimer = 0;
+  /** Theme chosen on the soundtrack page, if any. */
+  private listening: TrackId | null = null;
+  private keyboard = new AbortController();
   constructor(private actions: MenuActions) {
     this.root = document.getElementById('interface')!;
+    window.addEventListener('keydown', (event) => this.titleKey(event), {
+      signal: this.keyboard.signal,
+    });
   }
   private bind(id: string, handler: () => void): void {
     this.root.querySelector(`#${id}`)?.addEventListener('click', handler);
@@ -149,9 +208,13 @@ export class MenuUI {
   }
   /** Follows the device in hand: glyph style of the prompts and visible focus for pads. */
   setDevice(device: 'keyboard' | 'gamepad', family: PadFamily): void {
+    const changed = device !== this.device || family !== this.family;
     this.device = device;
+    this.family = family;
     if (document.body.dataset.device !== device) document.body.dataset.device = device;
     if (document.body.dataset.pad !== family) document.body.dataset.pad = family;
+    const keys = changed ? this.root.querySelector('.title-keys') : null;
+    if (keys) keys.innerHTML = this.keyHints();
   }
   /** Cinematic card for a new area, a boss introduction or a victory. */
   title(kind: TitleKind, title: string, subtitle: string): void {
@@ -193,47 +256,370 @@ export class MenuUI {
       el!.textContent = '';
     }, 2200);
   }
+  /** Focuses what the page offers first: its marked default, else its first button. */
   private focus(): void {
-    this.root.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+    (
+      this.root.querySelector<HTMLElement>('[data-autofocus]:not(:disabled)') ??
+      this.root.querySelector<HTMLElement>('.title-page button:not(:disabled)') ??
+      this.root.querySelector<HTMLElement>('button:not(:disabled)')
+    )?.focus();
   }
   main(saves: (SaveData | null)[], settings: Settings): void {
-    const recent = saves
-      .filter((s): s is SaveData => s !== null)
-      .sort((a, b) => b.savedAt - a.savedAt)[0];
-    this.root.innerHTML = `<div class="menu-scrim"></div><header class="masthead"><span class="wordmark">${mark} NHALIS</span><span class="edition">LES ARCHIVES DU SILENCE <i></i></span></header><section class="main-menu"><p class="eyebrow"><span></span> UN MONDE QUI REFUSE D’OUBLIER</p><h1>EIDRA</h1><p class="subtitle">SHARDS OF SILENCE</p><div class="title-rule"></div><p class="tagline">Certains souvenirs attendent<br>qu’on les laisse partir.</p><nav aria-label="Menu principal"><button id="continue" class="menu-link primary" ${recent ? '' : 'disabled'}><span>Continuer</span><b aria-hidden="true">↗</b></button><button id="new" class="menu-link"><span>Nouvelle partie</span><b aria-hidden="true">→</b></button><button id="load" class="menu-link"><span>Charger une partie</span><b aria-hidden="true">+</b></button><button id="settings" class="menu-link"><span>Réglages</span><b aria-hidden="true">+</b></button></nav>${recent ? `<p class="last-save"><span>DERNIER ANCRAGE</span>${escape(anchorName(recent.checkpoint))} · ${duration(recent.playtime)} · ${ago(recent.savedAt)}</p>` : ''}</section><aside class="chapter-card"><span class="tiny">CHAPITRE 00</span><h2>Le laboratoire<br>de l’éveil</h2><p>Quelque chose se souvient de vous.</p><span class="chapter-line"></span></aside><footer class="menu-footer"><span>07 <i>/</i> SEPT FRAGMENTS. UNE CONSCIENCE.</span><span>CLAVIER + SOURIS <i>·</i> MANETTE</span><span class="version">EIDRA · PRÉLUDE</span></footer>`;
+    this.front = { saves, settings, progress: titleProgress(saves) };
+    this.slide = 0;
+    this.home();
+  }
+  /**
+   * The title screen keeps a frame of its own: a bar of sections at the top
+   * (home, play, settings, extras), the progress and the keys in hand at the
+   * bottom; only the page between them changes.
+   */
+  private shell(section: Section, content: string): void {
+    const { settings, progress } = this.front!;
+    window.clearTimeout(this.slideTimer);
+    this.root.innerHTML = `<div class="title-shell" data-page="${section}"><div class="title-shade" aria-hidden="true"></div><header class="title-bar"><span class="title-brand">${icons.emblem}<span>EIDRA</span></span><nav class="title-nav" aria-label="Sections">${sections
+      .map(
+        ([id, name]) =>
+          `<button data-section="${id}" ${id === section ? 'aria-current="page"' : ''}>${name}</button>`,
+      )
+      .join(
+        '',
+      )}</nav><div class="title-tools"><button id="quick-settings" class="icon-button" aria-label="Ouvrir les réglages" title="Réglages">${icons.gear}</button><button id="news" class="icon-button" aria-label="Nouveautés" title="Nouveautés" aria-expanded="false" aria-controls="title-pop">${icons.bell}${seenNews() === news[0]?.id ? '' : '<i class="unread"></i>'}</button><span class="tools-rule" aria-hidden="true"></span><button id="profile" class="profile-chip" aria-label="Profil : ${escape(settings.profileName)}" aria-expanded="false" aria-controls="title-pop"><span class="avatar">${icons.mask}</span><span class="profile-text"><strong>${escape(settings.profileName)}</strong><small><i></i>Profil local</small></span></button></div></header><main class="title-page">${content}</main><footer class="title-footer"><span class="fragments" title="Fragments de la partie la plus récente">${icons.emblem}<b>${pad2(progress.fragments)}</b><em>/</em><span>${pad2(progress.total)}</span><small>Fragments trouvés</small></span><span class="title-keys">${this.keyHints()}</span></footer></div>`;
+    this.root
+      .querySelectorAll<HTMLButtonElement>('.title-nav [data-section]')
+      .forEach((button) =>
+        button.addEventListener('click', () => this.go(button.dataset.section as Section)),
+      );
+    this.bind('quick-settings', () => this.go('settings'));
+    this.bind('news', () => this.popover('news'));
+    this.bind('profile', () => this.popover('profile'));
+  }
+  private go(section: Section): void {
+    const t = this.front;
+    if (!t) return;
+    if (section === 'home') this.home();
+    else if (section === 'play') this.slots(!t.progress.latest);
+    else if (section === 'settings') this.settings(t.settings, () => this.home());
+    else this.extras();
+  }
+  private home(): void {
+    const { progress } = this.front!;
+    const latest = progress.latest;
+    const chapter = progress.chapter;
+    const action = (id: string, icon: IconId, label: string, primary: boolean, extra = '') =>
+      `<button id="${id}" class="title-action${primary ? ' primary' : ''}" ${primary ? 'data-autofocus' : ''} ${extra}><i class="glyph">${icons[icon]}</i><span>${label}</span>${primary ? `<i class="go">${icons.arrow}</i>` : ''}</button>`;
+    const resume = latest
+      ? `<button id="continue" class="title-action primary" data-autofocus aria-label="Continuer" aria-describedby="continue-detail"><i class="glyph">${icons.diamond}</i><span>Continuer<small id="continue-detail">${escape(anchorName(latest.checkpoint))} · ${duration(latest.playtime)} · ${ago(latest.savedAt)}</small></span><i class="go">${icons.arrow}</i></button>`
+      : '';
+    this.shell(
+      'home',
+      `<section class="title-hero"><h1 class="title-word" aria-label="EIDRA"><span aria-hidden="true">EIDR</span><span class="title-a" aria-hidden="true">A<i class="title-spark">${icons.sparkle}</i></span></h1><p class="title-sub"><i></i><span>${escape(titleScreen.subtitle)}</span><i></i></p><p class="title-tagline">${escape(titleScreen.tagline)}</p><nav class="title-menu" aria-label="Menu principal">${resume}${action('new', 'diamond', 'Nouvelle partie', !latest)}${action('load', 'folder', 'Charger une partie', false, latest ? '' : 'disabled')}${action('settings', 'gear', 'Réglages', false)}</nav></section><aside class="chapter-card" aria-label="Chapitre en cours"><span class="chapter-rule" aria-hidden="true"><i></i></span><p class="tiny">CHAPITRE ${chapter.number}</p><h2>${escape(chapter.title)}</h2><p>${escape(chapter.tagline)}</p></aside>${this.carousel()}`,
+    );
     this.bind('continue', () => {
-      if (recent) this.actions.load(recent);
+      if (latest) this.actions.load(latest);
     });
-    this.bind('new', () => this.slots(saves, true, () => this.main(saves, settings)));
-    this.bind('load', () => this.slots(saves, false, () => this.main(saves, settings)));
-    this.bind('settings', () => this.settings(settings, () => this.main(saves, settings)));
+    this.bind('new', () => this.slots(true));
+    this.bind('load', () => this.slots(false));
+    this.bind('settings', () => this.go('settings'));
+    this.wireCarousel();
     this.focus();
   }
-  private slots(saves: (SaveData | null)[], create: boolean, back: () => void): void {
-    this.root.innerHTML = `<div class="modal-scrim"></div><section class="panel compact"><p class="eyebrow">LES ANCRAGES</p><h2>${create ? 'Une nouvelle mémoire' : 'Retrouver une mémoire'}</h2><p class="muted">Trois emplacements, conservés dans ce navigateur.</p><div class="slots">${saves
-      .map((save, i) =>
-        save
-          ? `<button class="slot filled" id="slot-${i}"><span class="slot-number">0${i + 1}</span><span class="slot-body"><strong>${escape(anchorName(save.checkpoint))}</strong><small>Laboratoire de l’éveil · ${ago(save.savedAt)}</small><span class="slot-stats"><i title="Temps de jeu">◷ ${duration(save.playtime)}</i><i title="Vitalité">♥ ${100 + save.healthUpgrades * 20}</i><i title="Éclats">◆ ${save.shards}</i><i title="Souvenirs">❖ ${save.memories.length}/7</i><i title="Pouvoirs">✦ ${save.abilities.length}</i></span></span><b aria-hidden="true">→</b></button>`
-          : `<button class="slot" id="slot-${i}" ${create ? '' : 'disabled'}><span class="slot-number">0${i + 1}</span><span class="slot-body"><strong>Emplacement libre</strong><small>${create ? 'Commencer le voyage' : 'Aucune mémoire ici'}</small></span><b aria-hidden="true">${create ? '+' : ''}</b></button>`,
+  /** What the bottom-right card offers in turn: each chapter reached, the score, the news. */
+  private slides(): {
+    eyebrow: string;
+    title: string;
+    label: string;
+    art: string;
+    run: () => void;
+  }[] {
+    const { progress } = this.front!;
+    const chapterSlides = progress.reached.map((chapter) => ({
+      eyebrow: `Chapitre ${chapter.number}`,
+      title: chapter.title,
+      label: `Voir l’aperçu du chapitre ${chapter.number}`,
+      art: thumbnail(moods[chapter.sector] ?? titleMood, chapter.id, 'chapter'),
+      run: () => this.preview(chapter),
+    }));
+    const count = progress.themes.length;
+    return [
+      ...chapterSlides,
+      {
+        eyebrow: 'Bande originale',
+        title: `${count} thème${count > 1 ? 's' : ''} retrouvé${count > 1 ? 's' : ''}`,
+        label: 'Écouter la bande originale',
+        art: thumbnail(moods['ember-fields'] ?? titleMood, 'score', 'score'),
+        run: () => this.extras('score'),
+      },
+      {
+        eyebrow: 'Nouveautés',
+        title: news[0]?.title ?? 'Rien de nouveau',
+        label: 'Lire les nouveautés',
+        art: thumbnail(moods['denial-garden'] ?? titleMood, 'news', 'news'),
+        run: () => this.popover('news'),
+      },
+    ];
+  }
+  private carousel(): string {
+    const slides = this.slides();
+    this.slide %= slides.length;
+    return `<aside class="preview-card" aria-roledescription="carrousel" aria-label="Aperçus"><div class="preview-slides">${slides
+      .map(
+        (s, i) =>
+          `<article class="preview-slide" data-index="${i}" aria-roledescription="diapositive" aria-label="${i + 1} sur ${slides.length}" ${i === this.slide ? '' : 'hidden'}><div class="preview-thumb">${s.art}<button class="preview-play" data-run="${i}" aria-label="${escape(s.label)}">${icons.play}</button></div><div class="preview-text"><p class="tiny">${escape(s.eyebrow)}</p><h3>${escape(s.title)}</h3></div></article>`,
       )
-      .join('')}</div><button id="back" class="text-button">← Retour</button></section>`;
+      .join(
+        '',
+      )}</div><div class="preview-dots">${slides.map((_, i) => `<button class="dot" data-slide="${i}" aria-label="Aperçu ${i + 1}" ${i === this.slide ? 'aria-current="true"' : ''}></button>`).join('')}</div></aside>`;
+  }
+  private wireCarousel(): void {
+    const slides = this.slides();
+    const card = this.root.querySelector<HTMLElement>('.preview-card');
+    if (!card) return;
+    const show = (index: number): void => {
+      this.slide = (index + slides.length) % slides.length;
+      card.querySelectorAll<HTMLElement>('.preview-slide').forEach((el) => {
+        el.hidden = Number(el.dataset.index) !== this.slide;
+      });
+      card.querySelectorAll<HTMLElement>('[data-slide]').forEach((dot) => {
+        if (Number(dot.dataset.slide) === this.slide) dot.setAttribute('aria-current', 'true');
+        else dot.removeAttribute('aria-current');
+      });
+    };
+    card
+      .querySelectorAll<HTMLButtonElement>('[data-run]')
+      .forEach((button) =>
+        button.addEventListener('click', () => slides[Number(button.dataset.run)]?.run()),
+      );
+    card
+      .querySelectorAll<HTMLButtonElement>('[data-slide]')
+      .forEach((dot) => dot.addEventListener('click', () => show(Number(dot.dataset.slide))));
+    // Turns by itself, unless motion is reduced or the player is looking at it.
+    const turn = (): void => {
+      if (!card.isConnected) return;
+      if (!card.matches(':hover, :focus-within')) show(this.slide + 1);
+      this.slideTimer = window.setTimeout(turn, SLIDE_EVERY);
+    };
+    if (!this.reducedMotion) this.slideTimer = window.setTimeout(turn, SLIDE_EVERY);
+  }
+  /** Flies over a chapter, its theme playing, the interface drawn aside. */
+  private preview(chapter: Chapter): void {
+    const shell = this.root.querySelector<HTMLElement>('.title-shell');
+    if (!shell) return;
+    window.clearTimeout(this.slideTimer);
+    this.closePopover();
+    shell.classList.add('previewing');
+    shell.insertAdjacentHTML(
+      'beforeend',
+      `<div class="cinematic-bars" aria-hidden="true"></div><div class="preview-caption" role="status"><p class="tiny">APERÇU · CHAPITRE ${chapter.number}</p><h2>${escape(chapter.title)}</h2><p>${escape(chapter.tagline)}</p><button id="back" class="text-button">${icons.back}<span>Revenir au titre</span></button></div>`,
+    );
+    this.bind('back', () => {
+      this.actions.endPreview();
+      this.home();
+    });
+    this.root.querySelector<HTMLElement>('.preview-caption #back')?.focus();
+    this.listening = null;
+    this.actions.preview(chapter, () => {
+      if (this.root.querySelector('.title-shell.previewing')) this.home();
+    });
+  }
+  private slots(create: boolean): void {
+    const { saves, progress } = this.front!;
+    const autofocus = saves.findIndex((save) => (create ? true : save !== null));
+    this.shell(
+      'play',
+      `<section class="panel title-panel play-panel"><div class="panel-heading"><div><p class="eyebrow">LES ANCRAGES</p><h2>${create ? 'Une nouvelle mémoire' : 'Retrouver une mémoire'}</h2></div><button id="back" class="text-button">${icons.back}<span>Retour</span></button></div><div class="tabs" role="tablist" aria-label="Jouer"><button role="tab" id="tab-load" aria-selected="${!create}" class="tab ${create ? '' : 'active'}" ${progress.latest ? '' : 'disabled'}>Charger</button><button role="tab" id="tab-create" aria-selected="${create}" class="tab ${create ? 'active' : ''}">Nouvelle partie</button></div><p class="muted">Trois emplacements, conservés dans ce navigateur.</p><div class="slots">${saves
+        .map((save, i) =>
+          save
+            ? `<button class="slot filled" id="slot-${i}" ${i === autofocus ? 'data-autofocus' : ''}><span class="slot-number">0${i + 1}</span><span class="slot-body"><strong>${escape(anchorName(save.checkpoint))}</strong><small>${escape(chapterAt(save.position.x).title)} · ${ago(save.savedAt)}</small><span class="slot-stats"><i title="Temps de jeu">◷ ${duration(save.playtime)}</i><i title="Vitalité">♥ ${100 + save.healthUpgrades * 20}</i><i title="Éclats">◆ ${save.shards}</i><i title="Souvenirs">❖ ${save.memories.length}/7</i><i title="Pouvoirs">✦ ${save.abilities.length}</i></span></span><b aria-hidden="true">${create ? '↺' : '→'}</b></button>`
+            : `<button class="slot" id="slot-${i}" ${create ? '' : 'disabled'} ${i === autofocus ? 'data-autofocus' : ''}><span class="slot-number">0${i + 1}</span><span class="slot-body"><strong>Emplacement libre</strong><small>${create ? 'Commencer le voyage' : 'Aucune mémoire ici'}</small></span><b aria-hidden="true">${create ? '+' : ''}</b></button>`,
+        )
+        .join('')}</div></section>`,
+    );
+    this.bind('tab-load', () => this.slots(false));
+    this.bind('tab-create', () => this.slots(true));
     saves.forEach((save, i) =>
       this.bind(`slot-${i}`, () => {
-        if (create && save) this.confirmOverwrite(i + 1, () => this.slots(saves, create, back));
+        if (create && save) this.confirmOverwrite(i + 1, () => this.slots(create));
         else if (create) this.actions.start(i + 1);
         else if (save) this.actions.load(save);
       }),
     );
-    this.bind('back', back);
+    this.bind('back', () => this.home());
     this.focus();
   }
   private confirmOverwrite(slot: number, back: () => void): void {
-    this.root.innerHTML = `<div class="modal-scrim"></div><section class="panel compact"><p class="eyebrow">EMPLACEMENT 0${slot}</p><h2>Remplacer cette mémoire ?</h2><p>La progression précédente de cet emplacement sera remplacée.</p><button class="solid-button" id="replace">Remplacer et commencer</button><button class="text-button" id="back">Conserver ma partie</button></section>`;
+    this.shell(
+      'play',
+      `<section class="panel title-panel compact"><p class="eyebrow">EMPLACEMENT 0${slot}</p><h2>Remplacer cette mémoire ?</h2><p>La progression précédente de cet emplacement sera remplacée.</p><button class="solid-button" id="replace">Remplacer et commencer</button><button class="text-button" id="back" data-autofocus>Conserver ma partie</button></section>`,
+    );
     this.bind('replace', () => this.actions.start(slot));
     this.bind('back', back);
     this.focus();
   }
+  /** Memories once recovered, the themes heard so far and the credits. */
+  private extras(tab: 'memories' | 'score' | 'credits' = 'memories'): void {
+    const { progress } = this.front!;
+    const tabs: [typeof tab, string][] = [
+      ['memories', 'Souvenirs'],
+      ['score', 'Bande originale'],
+      ['credits', 'Crédits'],
+    ];
+    const lines = dialogues as Partial<Record<string, { speaker: string; lines: string[] }>>;
+    const memories = fundamentalMemories
+      .map((id, i) => {
+        const found = progress.memories.has(id) ? lines[id] : undefined;
+        return found
+          ? `<li class="found"><b>${pad2(i + 1)}</b><div><strong>${escape(found.speaker)}</strong><q>${escape(found.lines[0]!.replace(/^«\s*|\s*»$/g, ''))}</q></div></li>`
+          : `<li><b>${pad2(i + 1)}</b><div><strong>Fragment inconnu</strong><span>Quelque part, quelqu’un attend encore.</span></div></li>`;
+      })
+      .join('');
+    const tracks = (Object.keys(musicTracks) as TrackId[])
+      .map((id) => {
+        const known = progress.themes.includes(id);
+        const playing = this.listening === id;
+        return known
+          ? `<li><button class="track" data-theme="${id}" aria-pressed="${playing}"><i class="glyph">${playing ? icons.pause : icons.play}</i><span><strong>${escape(musicTracks[id].title)}</strong><small>${escape(trackOrigin(id))}</small></span></button></li>`
+          : `<li><button class="track" disabled><i class="glyph">${icons.lock}</i><span><strong>Thème inconnu</strong><small>Il attend plus loin sur la route.</small></span></button></li>`;
+      })
+      .join('');
+    const panels: Record<typeof tab, string> = {
+      memories: `<p class="muted">${progress.memories.size} / ${fundamentalMemories.length} fragments retrouvés dans vos parties.</p><ol class="memory-gallery">${memories}</ol>`,
+      score: `<p class="muted">Les thèmes déjà entendus dans vos parties. Le titre reprend le sien quand vous arrêtez l’écoute.</p><ul class="track-list">${tracks}</ul>`,
+      credits: `<dl class="credits">${credits.map(([role, who]) => `<dt>${escape(role)}</dt><dd>${escape(who)}</dd>`).join('')}</dl>`,
+    };
+    this.shell(
+      'extras',
+      `<section class="panel title-panel extras-panel"><div class="panel-heading"><div><p class="eyebrow">CE QUE NHALIS GARDE</p><h2>Extras</h2></div><button id="back" class="text-button">${icons.back}<span>Retour</span></button></div><div class="tabs" role="tablist" aria-label="Extras">${tabs.map(([id, name]) => `<button role="tab" id="tab-${id}" aria-selected="${id === tab}" aria-controls="panel-${id}" class="tab ${id === tab ? 'active' : ''}">${name}</button>`).join('')}</div>${tabs.map(([id]) => `<div class="tab-panel" role="tabpanel" id="panel-${id}" aria-labelledby="tab-${id}" ${id === tab ? '' : 'hidden'}>${panels[id]}</div>`).join('')}</section>`,
+    );
+    for (const [id] of tabs) this.bind(`tab-${id}`, () => this.extras(id));
+    this.root.querySelectorAll<HTMLButtonElement>('[data-theme]').forEach((button) =>
+      button.addEventListener('click', () => {
+        const id = button.dataset.theme as TrackId;
+        this.listening = this.listening === id ? null : id;
+        this.actions.listen(this.listening);
+        this.extras('score');
+        this.root.querySelector<HTMLElement>(`[data-theme="${id}"]`)?.focus();
+      }),
+    );
+    this.bind('back', () => this.home());
+    this.root.querySelector<HTMLElement>(`#tab-${tab}`)?.focus();
+  }
+  /** The bell's news, or the profile: a small panel under the top bar. */
+  private popover(kind: 'news' | 'profile'): void {
+    const open = this.root.querySelector<HTMLElement>('#title-pop');
+    const was = open?.dataset.kind;
+    this.closePopover();
+    if (was === kind) return;
+    const shell = this.root.querySelector<HTMLElement>('.title-shell');
+    const t = this.front;
+    if (!shell || !t) return;
+    const trigger = this.root.querySelector<HTMLElement>(`#${kind}`);
+    trigger?.setAttribute('aria-expanded', 'true');
+    if (kind === 'news') {
+      shell.insertAdjacentHTML(
+        'beforeend',
+        `<section id="title-pop" class="title-pop news-pop" data-kind="news" aria-label="Nouveautés"><p class="eyebrow">NOUVEAUTÉS</p><ul>${news.map((item) => `<li><strong>${escape(item.title)}</strong><span>${escape(item.text)}</span></li>`).join('')}</ul><button id="close-pop" class="text-button">Fermer</button></section>`,
+      );
+      markNewsSeen();
+      this.root.querySelector('#news .unread')?.remove();
+    } else {
+      const filled = t.saves.filter((s): s is SaveData => s !== null);
+      const playtime = filled.reduce((sum, s) => sum + s.playtime, 0);
+      const bosses = new Set(filled.flatMap((s) => s.bosses)).size;
+      shell.insertAdjacentHTML(
+        'beforeend',
+        `<section id="title-pop" class="title-pop profile-pop" data-kind="profile" aria-label="Profil"><p class="eyebrow">PROFIL LOCAL</p><label class="setting"><span>Nom du voyageur<small>Affiché sur cet écran, gardé sur cet appareil</small></span><input id="profile-name" type="text" maxlength="20" autocomplete="nickname" spellcheck="false" value="${escape(t.settings.profileName)}"></label><div class="profile-stats"><span><b>${duration(playtime)}</b><small>DE VOYAGE</small></span><span><b>${t.progress.memories.size}/${fundamentalMemories.length}</b><small>FRAGMENTS</small></span><span><b>${bosses}/${bossRoster.length}</b><small>GARDIENS APAISÉS</small></span><span><b>${filled.length}/3</b><small>ANCRAGES</small></span></div><button id="close-pop" class="text-button">Fermer</button></section>`,
+      );
+      const input = this.root.querySelector<HTMLInputElement>('#profile-name');
+      input?.addEventListener('change', () => {
+        const name = input.value.trim().slice(0, 20) || defaultSettings().profileName;
+        t.settings.profileName = name;
+        input.value = name;
+        this.actions.settings(t.settings);
+        const chip = this.root.querySelector<HTMLElement>('#profile');
+        chip?.setAttribute('aria-label', `Profil : ${name}`);
+        const label = chip?.querySelector('strong');
+        if (label) label.textContent = name;
+      });
+      input?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') input.blur();
+      });
+    }
+    this.bind('close-pop', () => this.closePopover(true));
+    this.root.querySelector<HTMLElement>('#title-pop input, #title-pop button')?.focus();
+  }
+  /** Closes the open panel, if any; true when one was open. */
+  private closePopover(refocus = false): boolean {
+    const pop = this.root.querySelector<HTMLElement>('#title-pop');
+    if (!pop) return false;
+    const kind = pop.dataset.kind ?? '';
+    pop.remove();
+    const trigger = this.root.querySelector<HTMLElement>(`#${kind}`);
+    trigger?.setAttribute('aria-expanded', 'false');
+    if (refocus) trigger?.focus();
+    return true;
+  }
+  /** The two keys the footer teaches, on the device in hand. */
+  private keyHints(): string {
+    const pad = this.device === 'gamepad' ? this.actions.pad() : null;
+    const settings = this.front?.settings;
+    const select = pad
+      ? pad.glyph('b0')
+      : keyLabel(settings?.bindings[InputAction.Interact] ?? defaultBindings[InputAction.Interact]);
+    const back = pad ? pad.glyph('b1') : keyLabel('Escape');
+    return `<kbd>${escape(select)}</kbd><span>Sélectionner</span><kbd>${escape(back)}</kbd><span>Retour</span>`;
+  }
+  /**
+   * Keyboard play of the title screen, as the footer promises: arrows move the
+   * focus, the interaction key selects, Escape goes back. Tab and Enter still work.
+   */
+  private titleKey(event: KeyboardEvent): void {
+    if (!this.root.querySelector('.title-shell') || this.keyCapture || this.padCapturing) return;
+    const target = event.target;
+    const active =
+      target instanceof HTMLElement && target !== document.body && this.root.contains(target)
+        ? target
+        : null;
+    if (event.code === 'Escape') {
+      event.preventDefault();
+      this.back();
+      return;
+    }
+    if (active instanceof HTMLInputElement && active.type === 'text') return;
+    const direction = (
+      {
+        ArrowUp: [0, -1],
+        ArrowDown: [0, 1],
+        ArrowLeft: [-1, 0],
+        ArrowRight: [1, 0],
+      } as Record<string, [number, number]>
+    )[event.code];
+    if (direction) {
+      const [x, y] = direction;
+      // Sliders and lists keep left and right for their value.
+      if (x && active instanceof HTMLInputElement && active.type === 'range') return;
+      event.preventDefault();
+      if (x && active instanceof HTMLSelectElement) this.cycle(active, x);
+      else if (active) this.move(active, x, y);
+      else this.focus();
+      return;
+    }
+    const settings = this.front?.settings;
+    const select =
+      settings?.bindings[InputAction.Interact] ?? defaultBindings[InputAction.Interact];
+    if (event.code === select && active?.matches('button, input[type="checkbox"]')) {
+      event.preventDefault();
+      active.click();
+    }
+  }
+  /** Back, on the title screen: close a panel, else leave the page. */
+  private back(): void {
+    if (this.closePopover(true)) return;
+    this.root.querySelector<HTMLButtonElement>('#back, #resume')?.click();
+  }
   playing(): void {
+    window.clearTimeout(this.slideTimer);
+    this.listening = null;
     this.root.innerHTML =
       '<div class="ingame"><div class="zone-label"><span id="act-name" class="tiny"></span><p id="zone-name"></p></div><div id="objective" class="objective"></div><div id="interaction" class="interaction"></div><div id="hint" class="hint" role="status" aria-live="polite"></div><div id="abilities" class="ability-dock"></div><div id="journal-hint" class="journal-hint"></div></div>';
   }
@@ -396,7 +782,10 @@ export class MenuUI {
         .join('')}</div><p class="muted small">La manette se règle dans l’onglet Manette.</p>`,
       gamepad: padPanel(),
     };
-    this.root.innerHTML = `<div class="modal-scrim"></div><section class="panel settings-panel"><div class="panel-heading"><div><p class="eyebrow">À VOTRE RYTHME</p><h2>Réglages</h2></div><button id="back" class="text-button">Terminé ↗</button></div><div class="tabs" role="tablist" aria-label="Catégories de réglages">${tabs.map(([id, name]) => `<button role="tab" id="tab-${id}" aria-selected="${id === tab}" aria-controls="panel-${id}" class="tab ${id === tab ? 'active' : ''}">${name}</button>`).join('')}</div>${tabs.map(([id]) => `<div class="tab-panel" role="tabpanel" id="panel-${id}" aria-labelledby="tab-${id}" ${id === tab ? '' : 'hidden'}>${panels[id]}</div>`).join('')}<div class="settings-footer"><button id="reset-settings" class="text-button">Rétablir les valeurs par défaut</button></div></section>`;
+    const panel = `<section class="panel settings-panel"><div class="panel-heading"><div><p class="eyebrow">À VOTRE RYTHME</p><h2>Réglages</h2></div><button id="back" class="text-button">Terminé ↗</button></div><div class="tabs" role="tablist" aria-label="Catégories de réglages">${tabs.map(([id, name]) => `<button role="tab" id="tab-${id}" aria-selected="${id === tab}" aria-controls="panel-${id}" class="tab ${id === tab ? 'active' : ''}">${name}</button>`).join('')}</div>${tabs.map(([id]) => `<div class="tab-panel" role="tabpanel" id="panel-${id}" aria-labelledby="tab-${id}" ${id === tab ? '' : 'hidden'}>${panels[id]}</div>`).join('')}<div class="settings-footer"><button id="reset-settings" class="text-button">Rétablir les valeurs par défaut</button></div></section>`;
+    // On the title screen the settings are one of its pages; in a journey, a panel over it.
+    if (this.front && this.root.querySelector('.title-shell')) this.shell('settings', panel);
+    else this.root.innerHTML = `<div class="modal-scrim"></div>${panel}`;
     const show = (id: string): void => {
       for (const [other] of tabs) {
         const selected = other === id;
@@ -565,15 +954,24 @@ export class MenuUI {
         ? focused
         : null;
     if (menu.back) {
-      this.root.querySelector<HTMLButtonElement>('#back, #resume')?.click();
+      this.back();
       return;
     }
     if (menu.previous || menu.next) {
-      const tabs = [...this.root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
-      const index = tabs.findIndex((t) => t.getAttribute('aria-selected') === 'true');
-      const next = tabs[(index + (menu.next ? 1 : -1) + tabs.length) % tabs.length];
+      // The bumpers turn the page's tabs; on the title's home, its sections.
+      const tabs = [
+        ...this.root.querySelectorAll<HTMLButtonElement>('[role="tab"]:not(:disabled)'),
+      ];
+      const sectionsBar = [
+        ...this.root.querySelectorAll<HTMLButtonElement>('.title-nav [data-section]'),
+      ];
+      const list = tabs.length ? tabs : sectionsBar;
+      const index = list.findIndex(
+        (t) => t.getAttribute('aria-selected') === 'true' || t.hasAttribute('aria-current'),
+      );
+      const next = list[(index + (menu.next ? 1 : -1) + list.length) % list.length];
       next?.click();
-      next?.focus();
+      if (tabs.length) this.root.querySelector<HTMLElement>(`#${next?.id}`)?.focus();
       return;
     }
     if (!active) {
@@ -755,6 +1153,7 @@ export class MenuUI {
     this.focus();
   }
   loading(): void {
+    window.clearTimeout(this.slideTimer);
     this.root.innerHTML = `<div class="modal-scrim"></div><section class="loading-screen"><div class="loading-sigil">${mark}</div><p class="eyebrow">NHALIS SE SOUVIENT</p><p class="tip"><span>CONSEIL</span>${escape(tip())}</p></section>`;
   }
   /** Stacked, self-dismissing notifications at the top of the screen. */
@@ -780,6 +1179,8 @@ export class MenuUI {
   dispose(): void {
     this.cancelCapture();
     this.stopTyping();
+    this.keyboard.abort();
+    window.clearTimeout(this.slideTimer);
     for (const timer of this.toastTimers) window.clearTimeout(timer);
     document.getElementById('toasts')?.remove();
     window.clearTimeout(this.captionTimer);

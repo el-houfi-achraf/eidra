@@ -25,6 +25,8 @@ export const SettingsSchema = z.object({
   vibration: z.number().min(0).max(1).default(0.7),
   /** Button glyphs: follow the controller in hand, or a fixed family. */
   glyphs: z.union([z.literal('auto'), FamilySchema]).default('auto'),
+  /** Name on the profile chip of the title screen; kept on this device only. */
+  profileName: z.string().trim().min(1).max(20).catch('Voyageur').default('Voyageur'),
 });
 export type Settings = z.infer<typeof SettingsSchema>;
 export const defaultSettings = (): Settings => SettingsSchema.parse({});

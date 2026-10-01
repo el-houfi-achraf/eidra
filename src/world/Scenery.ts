@@ -5,7 +5,7 @@ import type { Mood } from '../../game-data/zones/moods';
 import { PaintedGeometry, random } from './PaintedGeometry';
 import type { Paint, Point, RGBA } from './PaintedGeometry';
 import { mixRgb, tintAt } from './Mood';
-import type { RGB } from './Mood';
+import type { RGB, Tint } from './Mood';
 /**
  * Painted set of a sector, as flat silhouettes stacked in depth like cut-out
  * layers: the nearer, the darker; the further, the more they melt into the haze.
@@ -55,9 +55,9 @@ const rgba = (c: RGB, a = 1): RGBA => [c[0], c[1], c[2], a];
  * Colour of a layer at a given depth (0 = nearest, 1 = distant): darkest near,
  * lifting towards the horizon far away, with mist pooling near the floor.
  */
-export function layerPaint(depth: number, lift = 0): Paint {
+export function layerPaint(depth: number, lift = 0, tintOf: (x: number) => Tint = tintAt): Paint {
   return (x, y) => {
-    const t = tintAt(x);
+    const t = tintOf(x);
     const base =
       depth < 0.5 ? mixRgb(t.near, t.mid, depth / 0.5) : mixRgb(t.mid, t.far, (depth - 0.5) / 0.5);
     const hazy = mixRgb(base, t.horizon, depth * depth * 0.45);
@@ -82,9 +82,9 @@ const steps = (x0: number, x1: number, step: number): number[] => {
   const count = Math.max(1, Math.round((x1 - x0) / step));
   return Array.from({ length: count + 1 }, (_, i) => x0 + ((x1 - x0) * i) / count);
 };
-type Rng = () => number;
+export type Rng = () => number;
 const jitter = (rng: Rng, amount: number): number => (rng() - 0.5) * 2 * amount;
-function column(
+export function column(
   g: PaintedGeometry,
   rng: Rng,
   x: number,
@@ -120,7 +120,7 @@ function column(
     );
   }
 }
-function arch(
+export function arch(
   g: PaintedGeometry,
   rng: Rng,
   cx: number,
@@ -157,7 +157,7 @@ function arch(
   }
   if (spine.length > 1) flush();
 }
-function hang(
+export function hang(
   g: PaintedGeometry,
   rng: Rng,
   x: number,
@@ -178,7 +178,7 @@ function hang(
   }
   g.ribbon(spine, widths, z, paint);
 }
-function vine(
+export function vine(
   g: PaintedGeometry,
   rng: Rng,
   x: number,
@@ -451,7 +451,7 @@ function brazier(
   glow.sprite(x, top + 0.3, size * 4, size * 3, z - 0.1, glowAt(x, 0.6));
 }
 /** A dead tree: a leaning trunk that splits into bare, thinning branches. */
-function tree(
+export function tree(
   g: PaintedGeometry,
   rng: Rng,
   x: number,

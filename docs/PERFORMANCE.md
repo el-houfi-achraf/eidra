@@ -130,6 +130,12 @@ Comparaison A / B (build `main` contre ce build, une partie neuve par scène, ME
 
 Protocole standard : 64 / 26 draw calls et 60 474 / 32 151 triangles, identiques (l'audio ne dessine rien) ; CPU 4,4 / 3,1 ms et rendu logiciel 138,5 / 52,6 ms en MEDIUM / LOW ; allers-retours de streaming : 320 / 316 meshes, 7 / 6 ressources physiques, 2 / 1 chunks, inchangés. Bundle principal : 1,97 Mo minifié / 492 ko gzip (+4 ko). Mémoire : la musique et les ambiances sont lues en flux (lecteur média), jamais décodées en entier, et une région quittée depuis 20 s les libère ; les bruitages et les motifs sont des tampons décodés d'environ 32 Mo à 48 kHz (166 s de son, queues de réverbération comprises). Téléchargement : environ 1,2 Mo de bruitages et de motifs au démarrage, puis environ 0,6 Mo par thème et 0,4 Mo par ambiance la première fois qu'ils sont entendus (un seul format est téléchargé, OGG ou MP3).
 
+### Onzième itération : écran titre
+
+Comparaison A / B (build `main` contre ce build, même protocole que les itérations précédentes, deux passages). **Écran titre** : 151,2 / 3,3 ms → 158,9 / 3,5 ms (frame / CPU), 66 → 60 draw calls, 309 → 338 meshes : l'illustration (`TitleStage`, une trentaine de maillages dont sept éclats instanciés d'une seule source) remplace la vue du secteur d'éveil, et le décor des couches peintes est fusionné par matériau comme celui des secteurs. **Aperçu de chapitre** : 158,3 / 4,1 ms, 56 draw calls, le secteur survolé chargé comme en jeu. **En jeu** (une partie neuve par scène) : chambre d'éveil 163,2 / 5,1 → 162,6 / 4,9 ms ; arène du Porteur 164,6 / 6,6 → 165,4 / 6,2 ms ; Champs de braise 165,7 / 7,3 → 168,6 / 7,7 ms ; Jardin du déni 153,0 / 5,9 → 151,3 / 5,7 ms, dans le bruit : l'illustration est libérée au début du voyage (316 meshes en jeu après le titre, comme avant).
+
+Protocole standard : 64 / 26 draw calls et 60 474 / 32 151 triangles, identiques ; CPU 4,8 / 3,2 ms et rendu logiciel 161,0 / 72,3 ms en MEDIUM / LOW (machine plus lente que lors de la mesure précédente : les écarts de ce passage se lisent dans l'A / B ci-dessus, fait dans la même session) ; allers-retours de streaming : 320 / 316 meshes, 7 / 6 ressources physiques, 2 / 1 chunks, inchangés. Polices : environ 200 ko de woff2 empaquetés à part, chargés à l'affichage du titre ; bundle principal : 2,00 Mo minifié / 502 ko gzip (+29 ko minifié / +10 ko gzip : coque du titre, illustration, icônes et données).
+
 Mesures brutes : [performance.json](evidence/performance.json) (dernière itération).
 
 ## Optimisation et stabilité

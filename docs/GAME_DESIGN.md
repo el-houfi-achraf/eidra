@@ -27,7 +27,7 @@ Ressenti des coups (référence : action-plateformes modernes) : hit-stop court 
 
 ## Apprentissage et interface
 
-Un tutoriel contextuel remplace le long texte de départ : une invite (glyphe de touche ou de bouton + verbe) apparaît dans la zone où le geste devient utile — se déplacer, sauter, frapper, l'élan après son acquisition, parer près du Porteur de cendres, la Rémanence au pont, la plongée près du Veilleur du pont, l'Écho au sceau — et disparaît dès que le joueur l'a accompli, où qu'il soit. Le Recueillement n'est suggéré que blessé et avec un segment disponible. Les menus privilégient l'information utile : dernier ancrage sur l'écran titre, cartes de sauvegarde (lieu, durée, vitalité, éclats, souvenirs, pouvoirs), objectif et rappel des commandes en pause, carte en itinéraire avec marqueurs, conseils à la mort et au chargement.
+Un tutoriel contextuel remplace le long texte de départ : une invite (glyphe de touche ou de bouton + verbe) apparaît dans la zone où le geste devient utile — se déplacer, sauter, frapper, l'élan après son acquisition, parer près du Porteur de cendres, la Rémanence au pont, la plongée près du Veilleur du pont, l'Écho au sceau — et disparaît dès que le joueur l'a accompli, où qu'il soit. Le Recueillement n'est suggéré que blessé et avec un segment disponible. Les menus privilégient l'information utile : sur l'écran titre (D034), dernier ancrage, temps de jeu et chapitre de la partie à reprendre, fragments retrouvés, aperçu des chapitres atteints, souvenirs et thèmes déjà rencontrés, nouveautés ; cartes de sauvegarde (lieu, durée, vitalité, éclats, souvenirs, pouvoirs), objectif et rappel des commandes en pause, carte en itinéraire avec marqueurs, conseils à la mort et au chargement.
 
 ## Manettes
 
