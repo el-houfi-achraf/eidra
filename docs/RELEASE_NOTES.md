@@ -113,3 +113,12 @@ Lire README, ROADMAP et AGENT_RULES, lancer `npm ci`, puis `npm run check` et le
 - **Ambiances** : gouttes et bourdonnement des voûtes, vent et braises des failles, brise et carillons du jardin.
 - **59 bruitages en couches, avec variantes** et hauteur légèrement aléatoire : trois coups de bâton, coups qui touchent (claquement, corps, tintement), armure, mort d'ennemi, blessure, parade, dash, saut, double saut, atterrissage léger ou lourd, pas sur la pierre, la cendre ou la mousse, Recueillement qui monte puis se résout, cartes, pogo, éclats, Rémanence, Écho, mort et reconstitution ; ennemis qui repèrent, anticipent, frappent et tirent ; rugissements, télégraphes et coups des boss, étendard, Commandement, geysers, bond, reflets brisés ; colonnes de feu, portes de pierre, ancrage, dialogues et menus.
 - Sous-titres de bruitages pour les sons qui comptent ; vibrations des manettes alignées sur les nouveaux sons. Formats OGG et MP3 ; la musique est diffusée en streaming et libérée loin de sa région. Réglages et sauvegardes inchangés.
+
+### Onzième itération : l'écran titre
+
+- **Un nouvel écran titre**, d'après la maquette (D034) : barre de sections (Accueil, Jouer, Paramètres, Extras) avec réglages, nouveautés et profil ; grand titre à l'étoile sur le A, « SHARDS OF SILENCE », devise ; menu à icônes avec « Continuer » encadré d'or ; chapitre en cours ; carte d'aperçus ; fragments retrouvés et touches en pied de page.
+- **Une illustration vivante** derrière : Eidra sur son rocher sous un anneau d'or et d'éclats de Lumérite qui tournent, un rayon de lumière, des ruines envahies de feuillage, l'aube par une porte, l'eau qui reflète l'anneau.
+- **Le voyage résumé** : « Continuer » indique l'ancrage, le temps de jeu et depuis quand ; le chapitre de la partie en cours s'affiche à droite ; les fragments de cette partie en bas à gauche.
+- **Aperçu des chapitres** : la caméra survole un chapitre déjà atteint, sur son thème. **Bande originale** : réécouter les thèmes déjà entendus. **Souvenirs** : les fragments retrouvés, avec leur première phrase. **Crédits** et **Nouveautés**.
+- **Profil local** : choisissez le nom affiché ; il est gardé avec les réglages.
+- **Clavier** : flèches, E et Échap sur l'écran titre, comme l'annonce le pied de page ; la manette change de section avec les gâchettes hautes. Polices Cinzel, Cormorant Garamond et Inter (licence libre OFL). Sauvegardes compatibles.

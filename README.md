@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Ouvrir **http://127.0.0.1:5173**. Le thème du titre démarre au premier clic ou à la première touche (règle des navigateurs). Cliquez sur **Nouvelle partie**, puis un emplacement libre. Les sauvegardes restent dans ce navigateur. Utilisez un ancrage avec E avant de quitter.
+Ouvrir **http://127.0.0.1:5173**. Le thème du titre démarre au premier clic ou à la première touche (règle des navigateurs). L'écran titre réunit l'accueil, les emplacements (**Jouer**), les **Paramètres** et les **Extras** (souvenirs retrouvés, bande originale à réécouter, crédits) ; la carte en bas à droite fait survoler un chapitre déjà atteint. Au clavier : flèches, E pour sélectionner, Échap pour revenir. Cliquez sur **Nouvelle partie**, puis un emplacement libre. Les sauvegardes restent dans ce navigateur. Utilisez un ancrage avec E avant de quitter.
 
 Pour jouer au build de production :
 
