@@ -744,15 +744,32 @@ test('an unmapped controller plays through its hat and is remapped with the pad 
   for (let i = 0; i < 4; i++) await padTap(page, 5);
   await expect(page.locator('#pad-status')).toContainText('Generic USB Joystick');
   await expect(page.locator('#pad-status')).toContainText('Générique');
-  // Down to the first row of bindings, then left to « Sauter ».
+  // Down to the bindings, then across to « Sauter », with the hat alone. The route is
+  // read from where the focus lands after each push: on a slow runner a long frame may
+  // repeat a push, and the next one corrects it.
   const hat = async (value: number): Promise<void> => {
     await padAxis(page, 9, value);
     await frames(page);
     await padAxis(page, 9, 1.2857);
     await frames(page);
   };
-  for (let i = 0; i < 8 && (await focused(page)).endsWith('|'); i++) await hat(0.1429);
-  if (!(await focused(page)).endsWith('|jump')) await hat(0.7143);
+  for (let i = 0; i < 16 && !(await focused(page)).endsWith('|jump'); i++) {
+    const delta = await page.evaluate(() => {
+      const target = document.querySelector<HTMLElement>('[data-pad-action="jump"]');
+      const active = document.activeElement as HTMLElement | null;
+      if (!target || !active) return null;
+      const a = active.getBoundingClientRect(),
+        b = target.getBoundingClientRect();
+      return {
+        dx: b.x + b.width / 2 - (a.x + a.width / 2),
+        dy: b.y + b.height / 2 - (a.y + a.height / 2),
+      };
+    });
+    if (!delta) break;
+    // Rows first (sliders above would take a sideways push as a new value), then across.
+    if (Math.abs(delta.dy) > 6) await hat(delta.dy > 0 ? 0.1429 : -1);
+    else await hat(delta.dx > 0 ? -0.4286 : 0.7143);
+  }
   expect(await focused(page)).toContain('|jump');
   await padTap(page, 0);
   await expect(page.locator('[data-pad-action="jump"] kbd')).toHaveText('Appuyez…');
