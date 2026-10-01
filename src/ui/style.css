@@ -1461,7 +1461,7 @@ body[data-device='gamepad'] kbd {
   background:
     linear-gradient(90deg, #041215d9 0%, #041215a8 24%, #0412154d 44%, transparent 60%),
     linear-gradient(180deg, #041215d0 0%, transparent 15%),
-    linear-gradient(0deg, #041215ee 0%, #04121580 12%, transparent 26%),
+    linear-gradient(0deg, #041215e0 0%, #0412155c 11%, transparent 22%),
     radial-gradient(ellipse at 100% 0%, #04121580, transparent 40%);
   transition: opacity 0.8s ease;
 }

@@ -502,13 +502,13 @@ export class TitleStage {
   }
   private buildWater(scene: Scene): void {
     const t = this.tint;
-    const near = mixRgb(t.near, [0, 0, 0], 0.3),
-      far = mixRgb(t.fog, t.horizon, 0.12);
+    const near = mixRgb(t.near, t.mid, 0.35),
+      far = mixRgb(t.fog, t.horizon, 0.22);
     const crystal = hexToRgb(titleColors.crystal);
     // Where the ring and the doorway stand along the pool (u), and how wide they reflect.
     const streaks = [
-      { u: 0.5 + (RING.x - TITLE_X) / WATER_SIZE.width, width: 0.012, color: crystal, k: 0.5 },
-      { u: 0.5 + 10.1 / WATER_SIZE.width, width: 0.03, color: t.light, k: 0.32 },
+      { u: 0.5 + (RING.x - TITLE_X) / WATER_SIZE.width, width: 0.018, color: crystal, k: 0.85 },
+      { u: 0.5 + 10.1 / WATER_SIZE.width, width: 0.035, color: t.light, k: 0.55 },
     ];
     const texture = proceduralTexture(scene, 128, 128, (u, v) => {
       // Darker under the camera, catching the dawn towards the horizon, with faint ripples.
@@ -524,10 +524,11 @@ export class TitleStage {
       return [c[0], c[1], c[2], 1];
     });
     const material = new StandardMaterial('title-water', scene);
-    // Unlit diffuse rather than emissive: the water must not feed the bloom.
-    material.diffuseTexture = texture;
-    material.diffuseColor = Color3.White();
+    // Unlit: the emissive texture is added to the emissive colour, which stays black.
+    material.diffuseColor = Color3.Black();
     material.specularColor = Color3.Black();
+    material.emissiveTexture = texture;
+    material.emissiveColor = Color3.Black();
     material.disableLighting = true;
     this.materials.push(material);
     // A pool around the outcrop: the ruins stand in it further back.
