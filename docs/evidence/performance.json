@@ -8,122 +8,122 @@
     {
       "preset": "MEDIUM",
       "cpuMs": {
-        "median": 4.800000000279397,
-        "p95": 9.700000000186265
+        "median": 4.7999999998137355,
+        "p95": 8.299999999813735
       },
       "gpuMs": {
-        "median": 137.608648,
-        "p95": 163.261852
+        "median": 136.461863,
+        "p95": 156.731643
       },
       "frameMs": {
-        "median": 161,
-        "p95": 307.10000000009313
+        "median": 156.20000000018626,
+        "p95": 284.5
       },
       "drawCalls": {
-        "median": 64,
-        "p95": 64
+        "median": 60,
+        "p95": 60
       },
       "triangles": {
-        "median": 60474,
-        "p95": 60474
+        "median": 60630,
+        "p95": 60630
       }
     },
     {
       "preset": "LOW",
       "cpuMs": {
         "median": 3.2000000001862645,
-        "p95": 6.199999999720603
+        "p95": 5.2999999998137355
       },
       "gpuMs": {
-        "median": 52.608093,
-        "p95": 68.027796
+        "median": 51.956482,
+        "p95": 63.338907
       },
       "frameMs": {
-        "median": 72.3000000002794,
-        "p95": 121.6999999997206
+        "median": 69.39999999990687,
+        "p95": 120.59999999962747
       },
       "drawCalls": {
-        "median": 26,
-        "p95": 26
+        "median": 24,
+        "p95": 24
       },
       "triangles": {
-        "median": 32151,
-        "p95": 32151
+        "median": 32124,
+        "p95": 32124
       }
     }
   ],
   "streaming": [
     {
       "x": 123,
-      "meshes": 320,
-      "bodies": 7,
-      "chunks": 2
+      "meshes": 353,
+      "bodies": 33,
+      "chunks": 3
     },
     {
       "x": 7,
-      "meshes": 316,
-      "bodies": 6,
-      "chunks": 1
+      "meshes": 340,
+      "bodies": 19,
+      "chunks": 2
     },
     {
       "x": 123,
-      "meshes": 320,
-      "bodies": 7,
-      "chunks": 2
+      "meshes": 353,
+      "bodies": 33,
+      "chunks": 3
     },
     {
       "x": 7,
-      "meshes": 316,
-      "bodies": 6,
-      "chunks": 1
+      "meshes": 340,
+      "bodies": 19,
+      "chunks": 2
     },
     {
       "x": 123,
-      "meshes": 320,
-      "bodies": 7,
-      "chunks": 2
+      "meshes": 353,
+      "bodies": 33,
+      "chunks": 3
     },
     {
       "x": 7,
-      "meshes": 316,
-      "bodies": 6,
-      "chunks": 1
+      "meshes": 340,
+      "bodies": 19,
+      "chunks": 2
     },
     {
       "x": 123,
-      "meshes": 320,
-      "bodies": 7,
-      "chunks": 2
+      "meshes": 353,
+      "bodies": 33,
+      "chunks": 3
     },
     {
       "x": 7,
-      "meshes": 316,
-      "bodies": 6,
-      "chunks": 1
+      "meshes": 340,
+      "bodies": 19,
+      "chunks": 2
     },
     {
       "x": 123,
-      "meshes": 320,
-      "bodies": 7,
-      "chunks": 2
+      "meshes": 353,
+      "bodies": 33,
+      "chunks": 3
     },
     {
       "x": 7,
-      "meshes": 316,
-      "bodies": 6,
-      "chunks": 1
+      "meshes": 340,
+      "bodies": 19,
+      "chunks": 2
     },
     {
       "x": 123,
-      "meshes": 320,
-      "bodies": 7,
-      "chunks": 2
+      "meshes": 353,
+      "bodies": 33,
+      "chunks": 3
     },
     {
       "x": 7,
-      "meshes": 316,
-      "bodies": 6,
-      "chunks": 1
+      "meshes": 340,
+      "bodies": 19,
+      "chunks": 2
     }
   ],
   "errors": []

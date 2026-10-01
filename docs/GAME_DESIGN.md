@@ -4,9 +4,9 @@ Metroidvania solo 2.5D. Piliers : exploration, combat lisible, mémoire physique
 
 ## Deux actes jouables
 
-**Acte I — Le laboratoire oublié.** Réveil, apprentissage du mouvement, premières rencontres, Mira, acquisition de Rémanence, retour vers un passage oublié, Écho mémoriel, Porteur du dernier ordre et Gardien Sans Visage. L'adieu de Mira ouvre la porte de Nhalis.
+**Acte I — Le laboratoire oublié.** Réveil, apprentissage du mouvement, premières rencontres, Mira, la descente dans le puits, l'Élan de Lumérite, la Rémanence au fond des profondeurs, la remontée vers les combles, l'Écho mémoriel, Porteur du dernier ordre et Gardien Sans Visage. L'adieu de Mira ouvre la porte de Nhalis. L'acte est un réseau de 25 salles sur deux dimensions (D036, LEVEL_DESIGN) : la route et 20 chambres au-dessus et au-dessous, avec des boucles, trois salles secrètes derrière des murs fêlés et un raccourci qui s'ouvre de l'autre côté. Les pouvoirs sont espacés (Élan vers 10 min, Rémanence vers 20 min, Écho vers 35 min) et chacun ouvre des salles déjà aperçues : les dalles de la Rémanence se voient en fantôme dès la première salle. Objectif de durée d'un premier passage : 45 à 55 minutes, à confirmer par playtests humains.
 
-**Acte II — Les Failles de cendre.** Rampants qui bondissent, Porte-braise qui tirent des salves, colonnes de feu à traverser en rythme, Seconde impulsion (double saut), la Faille à franchir de corniche en corniche sous les Souvenirs errants, la Sentinelle de cendre, puis Ilyra au Jardin du déni et l'épilogue. Objectif de durée : 35–50 minutes pour les deux actes, à confirmer par playtests humains. Les deux actes ne sont pas le jeu complet.
+**Acte II — Les Failles de cendre.** Rampants qui bondissent, Porte-braise qui tirent des salves, colonnes de feu à traverser en rythme, Seconde impulsion (double saut), la Faille à franchir de corniche en corniche sous les Souvenirs errants, la Sentinelle de cendre, puis Ilyra au Jardin du déni et l'épilogue. L'Acte II garde sa route ; objectif de durée : 20 à 30 minutes, à confirmer par playtests humains. Les deux actes ne sont pas le jeu complet.
 
 ## Boucle
 
@@ -32,6 +32,14 @@ L'interface n'a qu'un canal (D035) : une invite à la fois, sur une ligne basse 
 ## Manettes
 
 Le jeu se joue entièrement à la manette, quel qu'en soit le modèle, comme les action-plateformes de référence. Disposition par défaut : saut en bas (A / ✕), frappe à gauche (X / □), recueillement à droite maintenu (B / ○), Rémanence en haut (Y / △), esquive sur la gâchette droite, attaque chargée sur la gauche, parade et Écho mémoriel sur les gâchettes hautes, carte sur Select, pause sur Start, parler / s'ancrer / ouvrir un passage en poussant vers le haut, plongée avec bas + frappe. Le stick à mi-course fait marcher. Chaque action (hors déplacement, visée et pause) se réassigne à la manette seule ; la zone morte, la force des vibrations et le style des symboles se règlent. Les menus se parcourent à la manette (navigation spatiale, curseurs et listes à gauche / droite, onglets aux gâchettes hautes, retour sur B / ○). Vibrations : coup porté (léger), parade, blessure, choc lourd, victoire, mort. Débrancher la manette met le jeu en pause.
+
+## Ennemis de l'Acte I
+
+Dix types, décrits par des données (`game-data/enemies/roster.ts`) et chacun lisible à sa silhouette : le **Veilleur fêlé** (hallebarde), le **Souvenir errant** (flotte et tire de loin), le **Porteur de cendres** (enchaîne deux coups), puis dans les salles : la **Phalène de cire** (plane hors de portée, plonge une fois sur Eidra puis remonte : se frappe en l'air ou à la plongée), la **Coque murée** (pare de face, se retourne lentement : on la prend de dos ou par-dessus), la **Mite de poussière** (rapide, fragile, en nombre), la **Lanterne-guetteuse** (immobile, tire des paires d'étincelles lentes à esquiver ou à parer) et le **Gisant** (une pierre inoffensive qui se lève quand on approche). Le Rampant de cendre et le Porte-braise viennent de l'Acte II. Le bestiaire du journal nomme chaque ennemi dès qu'un des siens est tombé, avec une ligne de récit.
+
+## Carte et journal
+
+Le journal (Tab, ou le bouton de carte) montre la carte de l'acte en cours, salle par salle et à l'échelle : salles visitées, salles entrevues par une porte, secrets absents tant qu'ils ne sont pas trouvés, portes, ancrages et position d'Eidra. Deux autres onglets : le bestiaire et les souvenirs retrouvés, en entier.
 
 ## Arènes et contact
 
