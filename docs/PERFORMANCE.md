@@ -126,7 +126,7 @@ Protocole standard : 64 / 26 draw calls et 60 474 / 32 151 triangles, identiques
 
 ### Dixième itération : bande-son et bruitages
 
-Protocole standard : 64 / 26 draw calls et 60 474 / 32 151 triangles, identiques (l'audio ne dessine rien) ; CPU 4,4 / 3,1 ms et rendu logiciel 138,5 / 52,6 ms en MEDIUM / LOW ; allers-retours de streaming : 320 / 316 meshes, 7 / 6 ressources physiques, 2 / 1 chunks, inchangés. Bundle principal : 1,97 Mo minifié / 492 ko gzip (+4 ko). Mémoire : seules les boucles audibles sont décodées en flux (lecteur média), les bruitages occupent environ 4 Mo de tampons décodés ; une région quittée depuis 20 s libère sa musique et son ambiance. Téléchargement : environ 0,9 Mo de bruitages au démarrage, puis environ 0,6 Mo par thème la première fois qu'il est entendu (un seul format est téléchargé, OGG ou MP3).
+Protocole standard : 64 / 26 draw calls et 60 474 / 32 151 triangles, identiques (l'audio ne dessine rien) ; CPU 4,4 / 3,1 ms et rendu logiciel 138,5 / 52,6 ms en MEDIUM / LOW ; allers-retours de streaming : 320 / 316 meshes, 7 / 6 ressources physiques, 2 / 1 chunks, inchangés. Bundle principal : 1,97 Mo minifié / 492 ko gzip (+4 ko). Mémoire : la musique et les ambiances sont lues en flux (lecteur média), jamais décodées en entier, et une région quittée depuis 20 s les libère ; les bruitages et les motifs sont des tampons décodés d'environ 32 Mo à 48 kHz (166 s de son, queues de réverbération comprises). Téléchargement : environ 1,2 Mo de bruitages et de motifs au démarrage, puis environ 0,6 Mo par thème et 0,4 Mo par ambiance la première fois qu'ils sont entendus (un seul format est téléchargé, OGG ou MP3).
 
 Mesures brutes : [performance.json](evidence/performance.json) (dernière itération).
 
