@@ -34,45 +34,93 @@ const floor = (bottom: number): number => bottom + SHELL;
 /** A door in a side wall, from a sill up to head room and a little more. */
 const side = (s: 'left' | 'right', sill: number) => ({ side: s, from: sill, to: sill + 3.2 });
 /**
- * A zigzag stair from a floor up to a last step at `to`: a low first step, then
- * equal rises of at most `RISE`, alternating between two columns so no step
- * hangs over another at head height. The last step stands on column `last`.
+ * The four lanes a stair climbs through in turn: by the left wall, right of the
+ * middle, by the right wall, left of the middle. The two middle lanes are offset
+ * so that no step ever hangs over the edge another one is leapt from: every leap
+ * rises freely, and a lane only comes back four steps higher.
+ */
+const LANES = ['left', 'mid-right', 'right', 'mid-left'] as const;
+type Lane = (typeof LANES)[number];
+/** Width of a step. */
+const STEP = 2.2;
+function lane(span: readonly [number, number], which: Lane): [number, number] {
+  const [p, q] = span;
+  const c = (p + q) / 2;
+  switch (which) {
+    case 'left':
+      return [p, p + STEP];
+    case 'right':
+      return [q - STEP, q];
+    case 'mid-right':
+      return [c - 0.55, c + 1.65];
+    case 'mid-left':
+      return [c - 1.65, c + 0.55];
+  }
+}
+/**
+ * A stair up a shaft from a floor at `base` to a last step at `to`, on lane
+ * `last`: a first step `first` above the floor (low enough to step up to, or
+ * high enough to walk under), then equal rises of at most `RISE`. `span` is the
+ * inside of the shaft, 8.8 to 10 m wide. `solid` picks the steps that stay solid
+ * in a remembered stair (rests, and the last step where a lever stands).
  */
 function stairs(
-  columns: { a: [number, number]; b: [number, number] },
+  span: readonly [number, number],
   base: number,
   to: number,
-  last: 'a' | 'b',
-  memory = false,
+  last: Lane,
+  options: { memory?: boolean; first?: number; solid?: (k: number, n: number) => boolean } = {},
 ): Slab[] {
-  const first = base + 1;
-  const n = Math.max(1, Math.ceil((to - first) / RISE));
-  const rise = (to - first) / n;
-  const other = last === 'a' ? 'b' : 'a';
+  const start = base + (options.first ?? 1);
+  const n = Math.max(1, Math.ceil((to - start) / RISE));
+  const rise = (to - start) / n;
+  const end = LANES.indexOf(last);
   return Array.from({ length: n + 1 }, (_, k) => {
-    const [left, right] = columns[(n - k) % 2 === 0 ? last : other];
-    return ledge((left + right) / 2, first + k * rise, right - left, memory);
+    const [left, right] = lane(span, LANES[(((end - (n - k)) % 4) + 4) % 4]!);
+    const memory = Boolean(options.memory) && !options.solid?.(k, n);
+    return ledge((left + right) / 2, start + k * rise, right - left, memory);
   });
 }
+/** The step a stair rests on halfway up, and its last one. */
+const restAndTop = (k: number, n: number): boolean => k === Math.floor(n / 2) || k === n;
 /** Tops of a stair, for doors whose sill must meet one of its steps. */
 const tops = (slabs: Slab[]): number[] => slabs.map((s) => s.y + s.h / 2);
 
 // ── The depths ─────────────────────────────────────────────────────────────
 const DEEP = -30;
 const BED = -52;
-const wellLower = stairs({ a: [74.6, 77.4], b: [80.6, 83.4] }, floor(DEEP), -17.6, 'a', true);
-const wellUpper = stairs({ a: [74.6, 77.4], b: [80.6, 83.4] }, -16, -6.1, 'a', true);
-const archiveStair = stairs({ a: [47, 50.2], b: [52.4, 55.6] }, floor(DEEP), -19.4, 'a');
-const drownedStair = stairs({ a: [110.6, 113.4], b: [116, 119.4] }, floor(BED), -29.4, 'a');
-/** The drowned chapel opens off a step of the drowned stair, on the right wall. */
-const chapelSill = tops(drownedStair)[4]!;
-const roots = stairs({ a: [57.2, 59.8], b: [62.5, 65.5] }, floor(BED), -32.6, 'a', true);
+/**
+ * The well's stair is remembered all the way up under the gallery's floor, where
+ * the draft of the opening takes over, but for one solid step halfway, under the
+ * opening: whoever drops in lands there first.
+ */
+const wellStair = stairs([74.6, 83.4], floor(DEEP), -6.6, 'mid-right', {
+  memory: true,
+  solid: (k, n) => k === Math.floor(n / 2),
+});
+const archiveStair = stairs([44.6, 53.4], floor(DEEP), -19.4, 'left');
+const drownedStair = stairs([110.6, 119.4], floor(BED), -29.4, 'left');
+/** The drowned chapel opens off the first step by the right wall. */
+const chapelSill = tops(drownedStair)[3]!;
+/**
+ * The Rémanence holds ten seconds: halfway up the roots, one step is solid stone to
+ * rest on while it gathers again, and so is the last, where the lever stands.
+ */
+const roots = stairs([56.6, 65.4], floor(BED), -33.6, 'left', { memory: true, solid: restAndTop });
+
+/** In the Rémanence's sanctum, remembered steps up to a solid shelf and its reliquary. */
+const sanctumSteps = stairs([92, 100.8], floor(BED), floor(BED) + 7.4, 'right', {
+  memory: true,
+  solid: (k, n) => k === n,
+});
+const sanctumShelf = sanctumSteps.at(-1)!;
 
 // ── The lofts ──────────────────────────────────────────────────────────────
 const LOFT = 11;
-const loftStair = stairs({ a: [108.6, 112.2], b: [114, 117.2] }, floor(LOFT), 27.6, 'a');
-const cageStair = stairs({ a: [142.6, 145.4], b: [138.4, 141.4] }, floor(LOFT), 29.4, 'a');
-const belfryStair = stairs({ a: [128.6, 132.2], b: [133.6, 137.2] }, floor(33), 41.6, 'a');
+const loftStair = stairs([108.6, 117.4], floor(LOFT), 27.6, 'left');
+/** Up the cage to its last step, under the opening to the belfry. */
+const cageStair = stairs([136.6, 145.4], floor(LOFT), 28.3, 'mid-left');
+const belfryStair = stairs([128.6, 137.4], floor(33), 41.6, 'left');
 
 export const depthChambers = [
   // ── Under the gallery: the well, the archives, their secret study, the Élan ──
@@ -91,14 +139,7 @@ export const depthChambers = [
       side('left', floor(DEEP)),
       side('right', floor(DEEP)),
     ],
-    platforms: [
-      // A ledge breaks the fall halfway down; the rest of the climb is remembered.
-      ledge(79, -16, 2.4),
-      ...wellLower,
-      ...wellUpper,
-      // Under the gallery's hole: from here a leap carries Eidra back up.
-      ledge(79, -4.5, 1.8, true),
-    ],
+    platforms: wellStair,
     enemies: [],
   },
   {
@@ -118,9 +159,8 @@ export const depthChambers = [
       { side: 'bottom', from: 57, to: 60 },
     ],
     platforms: [
-      ...archiveStair.slice(0, -1),
-      // The last step runs to the left wall: a cracked wall there hides a study.
-      ledge(47.4, -19.4, 5.6),
+      // The last step meets the left wall: a cracked wall there hides a study.
+      ...archiveStair,
       ledge(66, -27.1, 3),
       ledge(70.4, -25.3, 3),
       ledge(66, -23.5, 3),
@@ -128,7 +168,7 @@ export const depthChambers = [
     enemies: [
       { id: 'husk-1', kind: 'husk', x: 62.5, y: floor(DEEP) + 1, patrol: [60.5, 64] },
       { id: 'moth-1', kind: 'moth', x: 63, y: floor(DEEP) + 5 },
-      { id: 'moth-2', kind: 'moth', x: 51.3, y: -23.2 },
+      { id: 'moth-2', kind: 'moth', x: 58.5, y: -24 },
     ],
   },
   {
@@ -143,7 +183,7 @@ export const depthChambers = [
     top: -6,
     seed: 107,
     doors: [side('right', -19.4)],
-    platforms: [ledge(38.5, -17.1, 3), ledge(34, -15.3, 3), ledge(38.5, -13.5, 2.4)],
+    platforms: [ledge(38.5, -18.15, 3), ledge(33.8, -16.45, 3)],
     enemies: [{ id: 'gisant-1', kind: 'gisant', x: 35.5, y: -18.4 }],
   },
   {
@@ -177,7 +217,8 @@ export const depthChambers = [
     top: -18,
     seed: 113,
     doors: [side('right', floor(DEEP)), { side: 'bottom', from: 13, to: 20.6 }],
-    platforms: [ledge(10.6, floor(DEEP) + 2.3, 2.4)],
+    // The reliquary waits on a step beyond the chasm.
+    platforms: [ledge(10.6, floor(DEEP) + 1.25, 2.4)],
     enemies: [{ id: 'lantern-1', kind: 'lantern', x: 16.8, y: -23.5 }],
   },
   // ── Under the bridge: the chasm, the drowned stair, the Rémanence, the roots ──
@@ -249,13 +290,8 @@ export const depthChambers = [
     top: -36,
     seed: 139,
     doors: [side('right', floor(BED)), side('left', floor(BED))],
-    platforms: [
-      // Once remembered, steps lead up to an offering left on a high shelf.
-      ledge(94.4, floor(BED) + 2.3, 2.4, true),
-      ledge(98.8, floor(BED) + 4.0, 2.4, true),
-      ledge(94.4, floor(BED) + 5.7, 2.4, true),
-      ledge(99.4, floor(BED) + 7.4, 3.2),
-    ],
+    // Once remembered, steps lead up to an offering left on a high shelf.
+    platforms: sanctumSteps,
     enemies: [
       { id: 'husk-2', kind: 'husk', x: 103, y: floor(BED) + 1, patrol: [101, 107] },
       { id: 'mite-4', kind: 'mite', x: 105.5, y: floor(BED) + 1 },
@@ -293,11 +329,11 @@ export const depthChambers = [
     top: 25,
     seed: 151,
     doors: [
-      { side: 'bottom', from: 32.5, to: 35.5 },
+      { side: 'bottom', from: 36.5, to: 39 },
       side('right', floor(LOFT)),
       side('left', floor(LOFT)),
     ],
-    platforms: [ledge(37.6, floor(LOFT) + 2.3, 3), ledge(26.4, floor(LOFT) + 2.3, 3)],
+    platforms: [ledge(26.4, floor(LOFT) + 2.3, 3), ledge(31.6, floor(LOFT) + 4.1, 3)],
     enemies: [{ id: 'gisant-4', kind: 'gisant', x: 29.5, y: floor(LOFT) + 1 }],
   },
   {
@@ -380,7 +416,7 @@ export const depthChambers = [
     platforms: [
       ledge(89.5, floor(LOFT), 2.4, true),
       ledge(99.2, floor(LOFT), 2.4, true),
-      ledge(104.4, floor(LOFT) + 2.3, 2.4),
+      ledge(104.4, floor(LOFT) + 1.25, 2.4),
     ],
     enemies: [
       { id: 'moth-8', kind: 'moth', x: 94, y: floor(LOFT) + 4.5 },
@@ -434,8 +470,7 @@ export const depthChambers = [
       side('left', floor(LOFT)),
       { side: 'top', from: 139, to: 142 },
     ],
-    // Up the cage to the belfry; the last step is narrow, under the opening.
-    platforms: [...cageStair, ledge(140.5, 31, 2.2)],
+    platforms: cageStair,
     enemies: [
       { id: 'lantern-6', kind: 'lantern', x: 131.5, y: 24 },
       { id: 'moth-10', kind: 'moth', x: 133, y: floor(LOFT) + 5 },
@@ -502,7 +537,7 @@ export const depthLandmarks = [
   {
     id: 'cache-trial',
     x: 10.6,
-    y: floor(DEEP) + 3.5,
+    y: floor(DEEP) + 2.5,
     kind: 'cache',
     label: 'Reliquaire d’éclats',
     shards: 12,
@@ -517,7 +552,7 @@ export const depthLandmarks = [
   },
   {
     id: 'cache-sanctum',
-    x: 99.4,
+    x: sanctumShelf.x,
     y: floor(BED) + 8.6,
     kind: 'cache',
     label: 'Reliquaire d’éclats',
@@ -543,7 +578,7 @@ export const depthSeals = [
     y: DEEP,
     w: 3,
     h: 1.2,
-    lever: { x: 58, y: -32.6 },
+    lever: { x: 58, y: -33.6 },
   },
   // Walls of the two secret lofts.
   { id: 'oculus-wall', kind: 'cracked', x: 22, y: floor(LOFT) + 1.6, w: 1.2, h: 3.2 },

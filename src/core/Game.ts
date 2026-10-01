@@ -625,8 +625,18 @@ export class Game {
         this.session.abilities.unlock(id);
       },
       damage: (amount: number) => {
+        if (!Number.isFinite(amount)) throw new Error('Invalid debug damage');
         this.session.actor.invulnerable = 0;
-        this.session.actor.health = Math.max(0, this.session.actor.health - Math.max(0, amount));
+        // A negative amount heals, up to full health.
+        const actor = this.session.actor;
+        actor.health = Math.max(0, Math.min(actor.maxHealth, actor.health - amount));
+      },
+      defeatEnemies: () => {
+        for (const entity of this.session.enemies.entities.values()) entity.actor.health = 0;
+      },
+      setEnergy: (value: number) => {
+        if (!Number.isFinite(value)) throw new Error('Invalid debug energy');
+        this.session.abilities.energy = Math.max(0, Math.min(100, value));
       },
       setResonance: (value: number) => {
         if (!Number.isFinite(value)) throw new Error('Invalid debug resonance');

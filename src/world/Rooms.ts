@@ -111,6 +111,42 @@ export function openings(room: ChunkData): { side: 'top' | 'bottom'; from: numbe
       to: p.door.to,
     }));
 }
+/** Metres under a doorway overhead where its draft catches a rising leap. */
+export const DRAFT = 2;
+/** A doorway overhead: the boundary to cross and the room beyond it. */
+export interface Overhead {
+  boundary: number;
+  from: number;
+  to: number;
+  upper: ChunkData;
+}
+/** Doorways in the ceiling of a room: a chamber's top doors, a route room's vault openings. */
+export function overheads(room: ChunkData): Overhead[] {
+  if (room.kind === 'chamber')
+    return room.doors
+      .filter((d) => d.side === 'top')
+      .flatMap((d) => {
+        const upper = roomAt((d.from + d.to) / 2, room.top + 0.25);
+        return upper ? [{ boundary: room.top, from: d.from, to: d.to, upper }] : [];
+      });
+  return passages
+    .filter((p) => p.to === room.id && p.door.side === 'bottom')
+    .map((p) => {
+      const upper = byId.get(p.from)!;
+      return { boundary: upper.bottom, from: p.door.from, to: p.door.to, upper };
+    });
+}
+/**
+ * The doorway overhead whose draft holds a body at (x, y): under the opening, far
+ * enough from its edges for the head to pass, at most `DRAFT` below it.
+ */
+export function draftAt(room: ChunkData, x: number, y: number): Overhead | null {
+  return (
+    overheads(room).find(
+      (o) => x >= o.from + 0.35 && x <= o.to - 0.35 && y >= o.boundary - DRAFT && y < o.boundary,
+    ) ?? null
+  );
+}
 /** Cuts the ranges of `doors` out of the span [a, b]. */
 function cut(a: number, b: number, doors: readonly Door[]): [number, number][] {
   const spans: [number, number][] = [];

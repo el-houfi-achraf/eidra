@@ -7,7 +7,7 @@ import {
   seals,
 } from '../../../game-data/zones/laboratory';
 import type { ChunkData, Door } from '../../../game-data/zones/laboratory';
-import { passages, roomById, shell, SHELL } from '../../../src/world/Rooms';
+import { DRAFT, passages, roomById, shell, SHELL } from '../../../src/world/Rooms';
 /**
  * A coarse model of where Eidra can go: the tops of slabs and floors as surfaces,
  * joined by the jumps, falls and dashes her movement allows (MovementModel:
@@ -140,14 +140,14 @@ for (const p of passages) {
     if (landing[0]) links.push({ from: a, to: landing[0], seal });
     if (memoryFree && memoryFree !== landing[0]) links.push({ from: a, to: memoryFree, seal });
   }
-  // Rising through: a leap whose apex crosses the boundary, then the updraft.
+  // Rising through: a leap from under the opening into its draft, which carries on.
   for (const a of surfaces.filter(
     (s) =>
       s.room === spaceOf(lower) &&
       s.y < boundary &&
-      s.y + APEX >= boundary + THROUGH &&
-      s.x1 > door.from - 0.6 &&
-      s.x0 < door.to + 0.6,
+      s.y + APEX >= boundary - DRAFT + THROUGH &&
+      s.x1 > door.from + 0.35 &&
+      s.x0 < door.to - 0.35,
   ))
     for (const b of edges) links.push({ from: a, to: b, seal });
 }

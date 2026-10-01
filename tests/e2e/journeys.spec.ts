@@ -734,7 +734,7 @@ test('one prompt at a time, off Eidra, and a clear way under the ledges', async 
   await page.waitForTimeout(500);
   await expect(hint).not.toHaveClass(/visible/);
   // A defeat there now returns her to the counterweight's anchor, before the arena.
-  await page.evaluate(() => window.eidra!.teleport(136.5));
+  await page.evaluate(() => window.eidra!.teleport(127));
   await page.waitForTimeout(250);
   await page.keyboard.press('KeyE');
   await expect.poll(async () => (await snapshot(page)).checkpoint).toBe('counterweight');

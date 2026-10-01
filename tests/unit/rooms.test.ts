@@ -28,6 +28,7 @@ import {
 } from '../../src/world/Rooms';
 import { bodyBand } from '../../src/enemies/Terrain';
 import { SceneManager } from '../../src/world/SceneManager';
+import { MovementModel } from '../../src/player/MovementModel';
 import { reach, start, surfaceNear } from './support/reach';
 import type { Power, Surface } from './support/reach';
 
@@ -213,6 +214,57 @@ describe('rooms of the world (D036)', () => {
     manager.dispose();
     expect(live).toBe(0);
   });
+  it('lets every step of a stair be leapt from without striking a step above', () => {
+    // Taking off from the edge facing the next step, the head must rise freely
+    // (1.83 m standing, 2.49 m of jump) until the feet clear that step.
+    const bonks: string[] = [];
+    for (const room of chunks) {
+      const slabs = [...room.platforms, ...shell(room)];
+      const top = (p: { y: number; h: number }) => p.y + p.h / 2;
+      const bottom = (p: { y: number; h: number }) => p.y - p.h / 2;
+      for (const a of slabs)
+        for (const b of slabs) {
+          const rise = top(b) - top(a);
+          const gap = Math.max(0, Math.abs(b.x - a.x) - (a.w + b.w) / 2);
+          if (a === b || rise <= 0.3 || rise > 1.75 || gap <= 0.05 || gap > 3 || a.w < 1.2)
+            continue;
+          const dir = Math.sign(b.x - a.x);
+          const edge = a.x + (dir * a.w) / 2;
+          const [x0, x1] = [Math.min(edge, edge - dir * 0.68), Math.max(edge, edge - dir * 0.68)];
+          for (const c of slabs) {
+            if (c === a || c === b) continue;
+            if (c.x + c.w / 2 <= x0 || c.x - c.w / 2 >= x1) continue;
+            const above = bottom(c) - (top(a) + 1.83);
+            if (above > 0 && above < rise + 0.4)
+              bonks.push(
+                `${room.id}: from ${a.x}@${top(a).toFixed(2)} to ${b.x}@${top(b).toFixed(2)}`,
+              );
+          }
+        }
+    }
+    expect(bonks).toEqual([]);
+  });
+  it('never asks for a remembered climb longer than the Rémanence lasts', () => {
+    // It holds ten seconds; at well under a second a step, eight in a row is the most.
+    for (const room of chunks) {
+      const top = (p: { y: number; h: number }) => p.y + p.h / 2;
+      const steps = room.platforms
+        .filter((p) => p.memory)
+        .map(top)
+        .sort((a, b) => a - b);
+      const rests = room.platforms.filter((p) => !p.memory && p.w < 12).map(top);
+      let run = 0,
+        longest = 0,
+        last = Number.NEGATIVE_INFINITY;
+      for (const step of steps) {
+        if (rests.some((r) => r > last + 0.01 && r <= step + 0.01)) run = 0;
+        run++;
+        longest = Math.max(longest, run);
+        last = step;
+      }
+      expect(longest, room.id).toBeLessThanOrEqual(8);
+    }
+  });
   it('opens the vault of the counterweight over its ledges, the way up to the cage', () => {
     const counterweight = routeChunks.find((r) => r.id === 'counterweight')!;
     expect(openings(counterweight)).toEqual([{ side: 'top', from: 135, to: 138 }]);
@@ -271,5 +323,58 @@ describe('the way through Act I', () => {
     const all = powers('dash', 'remanence', 'memory-step');
     for (const place of reach(start, all))
       expect(reach(place, all).has(end), `${place.room} ${place.x0} ${place.y}`).toBe(true);
+  });
+});
+
+describe('the Élan’s chasms, with the real movement', () => {
+  /**
+   * Runs MovementModel step by step off a ledge at full speed (coyote jump at the
+   * edge) and returns how far the body travels before it falls back to the
+   * ledge's height: with the Élan at the top of the jump, or without it.
+   */
+  const leap = (dash: boolean): number => {
+    const m = new MovementModel();
+    const dt = 1 / 60;
+    let x = -3,
+      y = 0,
+      jumped = false,
+      rising = false,
+      dashed = false;
+    for (let t = 0; t < 4; t += dt) {
+      const supported = !jumped && x <= 0;
+      const jump = !jumped && x > -0.02;
+      if (jump) jumped = true;
+      // The Élan at the top of the arc: once the jump has risen and slows to a halt.
+      if (m.vy > 5) rising = true;
+      const dashNow = dash && rising && !dashed && m.vy < 1;
+      if (dashNow) dashed = true;
+      m.step(
+        dt,
+        { axis: 1, jump, jumpHeld: true, dash: dashNow, walk: false },
+        supported,
+        true,
+        false,
+      );
+      x += m.vx * dt;
+      // On the ledge the body stays on its floor; in the air it follows its speed.
+      y = supported && !jump ? 0 : y + m.vy * dt;
+      if (jumped && m.vy < 0 && y < 0) return x;
+    }
+    return x;
+  };
+  it('crosses every chasm the act asks the Élan for, and none of them without it', () => {
+    const withDash = leap(true),
+      without = leap(false);
+    // Eidra's capsule (0.33 m) may overhang either lip: a chasm narrower than the leap plus
+    // both overhangs is crossed.
+    const chasms = [
+      { room: 'dash-trial', gap: 20.6 - 13 },
+      { room: 'scriptorium', gap: 101 - 93 },
+      { room: 'hanging-archives', gap: 98 - 90.7 },
+    ];
+    for (const { room, gap } of chasms) {
+      expect(withDash + 0.66, room).toBeGreaterThan(gap + 0.5);
+      expect(without + 0.66, room).toBeLessThan(gap - 0.3);
+    }
   });
 });

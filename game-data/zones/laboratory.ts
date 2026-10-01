@@ -115,8 +115,8 @@ export const chunks = [
       { x: 26, y: 4.3, w: 3, h: 0.5, memory: true },
       { x: 31, y: 5.1, w: 5, h: 0.5, memory: true },
       // Past Kael's fragment, remembered steps climb to the crypt over the room.
-      { x: 37.2, y: 6.85, w: 2.5, h: 0.3, memory: true },
-      { x: 34, y: 8.85, w: 2.2, h: 0.3, memory: true },
+      { x: 35.6, y: 7.05, w: 2, h: 0.3, memory: true },
+      { x: 37.8, y: 8.85, w: 1.8, h: 0.3, memory: true },
     ],
     enemies: [{ id: 'watcher-1', kind: 'watcher', x: 34 }],
   },
@@ -166,12 +166,12 @@ export const chunks = [
       // Keeper (2.97 m tall) never has to walk under a slab lower than its head.
       { x: 144.5, y: 2.15, w: 3, h: 0.3 },
       // Ledges up to the opening in the vault (135 to 138): the way to the cage. The
-      // lowest clears Eidra's head, so the walk to the seal stays free.
-      { x: 133, y: 2.15, w: 2.4, h: 0.3 },
-      { x: 139, y: 3.85, w: 2.4, h: 0.3 },
-      { x: 133.4, y: 5.55, w: 2.6, h: 0.3 },
-      { x: 139, y: 7.25, w: 2.4, h: 0.3 },
-      { x: 136.5, y: 8.85, w: 2.2, h: 0.3 },
+      // lowest clears Eidra's head, so the walk to the seal stays free; no ledge hangs
+      // over the edge another is leapt from (lanes, as in `depths.ts`).
+      { x: 132.9, y: 2.15, w: 2.2, h: 0.3 },
+      { x: 136.85, y: 3.825, w: 2.2, h: 0.3 },
+      { x: 139.5, y: 5.5, w: 2.2, h: 0.3 },
+      { x: 135.75, y: 7.175, w: 2.2, h: 0.3 },
     ],
     // The Porteur du dernier ordre is a boss (game-data/bosses/keeper.ts).
     enemies: [],
@@ -208,7 +208,8 @@ export const checkpoints: Checkpoint[] = [
   { id: 'awakening', x: 7, name: 'Ancrage de l’éveil' },
   { id: 'mira', x: 73, name: 'Ancrage de Mira' },
   // Before the Keeper: a defeat no longer sends Eidra back across the memory bridge.
-  { id: 'counterweight', x: 136.5, name: 'Ancrage du contrepoids' },
+  // Short of the seal and of the climb to the cage, before the Keeper.
+  { id: 'counterweight', x: 127, name: 'Ancrage du contrepoids' },
   { id: 'threshold', x: 160, name: 'Ancrage du seuil' },
   ...depthCheckpoints,
   ...ashCheckpoints,

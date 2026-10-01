@@ -35,7 +35,7 @@ import {
   seals,
 } from '../../game-data/zones/laboratory';
 import type { ChunkData, Seal } from '../../game-data/zones/laboratory';
-import { chamberAt, roomAt, roomById, sectorOf, SHELL, worldSolids } from '../world/Rooms';
+import { chamberAt, draftAt, roomAt, roomById, sectorOf, SHELL, worldSolids } from '../world/Rooms';
 import { cardData, focusData } from '../../game-data/abilities/abilities';
 import { CardSystem } from '../combat/Cards';
 import type { AbilityId } from '../../game-data/abilities/abilities';
@@ -137,8 +137,6 @@ export class GameSession {
   private introduced = new Set<string>();
   /** Blows each cracked wall has taken (it gives way, and stays open, at its count). */
   private cracks = new Map<string, number>();
-  /** Room of the last step, to notice a doorway crossed. */
-  private lastRoom: ChunkData | null = null;
   /**
    * Last firm ground Eidra stood on: a fall into a chamber's pit returns her
    * there, as a rift of the route returns her to its bank.
@@ -256,23 +254,23 @@ export class GameSession {
     this.actor.x = point.x;
     this.actor.y = y;
     this.foothold = { x: point.x, y };
-    this.lastRoom = null;
   }
   /**
-   * Through a doorway overhead, a draft carries Eidra above the sill of the room
-   * she rises into, so a leap that reaches the opening always lands beside it.
+   * Under a doorway overhead, a draft catches a rising leap and carries Eidra above
+   * the sill of the room beyond, so a leap that reaches it always lands beside it.
    */
   private updraft(): void {
-    const from = this.lastRoom,
-      to = this.room;
-    this.lastRoom = to;
     const motion = this.player.motion;
-    if (!from || from === to || motion.vy <= 0 || this.actor.y < from.top) return;
-    const sill = to.kind === 'route' ? 0 : to.bottom + SHELL;
+    if (motion.vy <= 0) return;
+    const draft = draftAt(this.room, this.actor.x, this.actor.y);
+    // No draft blows through a closed grate.
+    if (!draft || this.sealed(this.actor.x, draft.boundary)) return;
+    const sill = draft.upper.kind === 'route' ? 0 : draft.upper.bottom + SHELL;
     const rise = sill + UPDRAFT_CLEARANCE - this.actor.y;
     if (rise <= 0) return;
     const speed = Math.sqrt(2 * GRAVITY * rise);
-    if (speed > motion.vy) motion.bounce(speed, speed / GRAVITY);
+    // Once carried, the rise already reaches the sill: no fresh push each step.
+    if (speed > motion.vy + 0.5) motion.bounce(speed, speed / GRAVITY);
   }
   /** The room Eidra is in. */
   get room(): ChunkData {

@@ -48,7 +48,7 @@ describe('the bestiary of the depths', () => {
     expect(-24.4 - lowest).toBeLessThanOrEqual(enemyData.moth.swoop + 0.01);
     expect(hits).toBeGreaterThanOrEqual(1);
     // Out of reach, it climbs back up.
-    player.x = 50;
+    player.x = 20;
     run(m, player, 4);
     expect(moth.actor.y).toBeCloseTo(-24.4, 1);
   });
