@@ -38,10 +38,11 @@ export type Hazard = z.infer<typeof HazardSchema>;
 export const ROUTE_BOTTOM = -5;
 export const ROUTE_TOP = 11;
 /**
- * Gates rise from the floor into the vault: no ledge of a route room lets Eidra
- * leap over one (the counterweight's climb passes nine metres up beside its seal).
+ * Gates rise from the floor to the vault, where the floor of a chamber above takes
+ * over: no ledge of a route room lets Eidra leap over one (the counterweight's
+ * climb passes seven metres up beside its seal, under the cage's floor).
  */
-export const GATE_HEIGHT = ROUTE_TOP + 1;
+export const GATE_HEIGHT = ROUTE_TOP;
 /**
  * An opening in a chamber's walls: a range of y on the left or right side, a range
  * of x on the top or bottom. It leads into whichever room lies across that side.

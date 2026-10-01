@@ -129,7 +129,7 @@ export function roomMap(act: Act, state: MapState): string {
         `<text class="label" x="${fixed((room.start + room.end) / 2)}" y="${fixed(-room.top - 1.5)}">${escape(room.name)}</text>`,
       );
   parts.push(
-    `<circle class="you" cx="${fixed(state.x)}" cy="${fixed(-state.y)}" r="1.6"><title>Eidra</title></circle>`,
+    `<circle class="you" cx="${fixed(state.x)}" cy="${fixed(-state.y)}" r="2.2"><title>Eidra</title></circle>`,
   );
   return `<svg class="room-map" viewBox="${fixed(x0)} ${fixed(-y1)} ${fixed(x1 - x0)} ${fixed(y1 - y0)}" role="img" aria-label="Carte de l’acte">${parts.join('')}</svg>`;
 }

@@ -673,7 +673,7 @@ export class MenuUI {
     const journalText = `${label(InputAction.Map)}|${label(InputAction.Pause)}`;
     if (journal && journal.dataset.text !== journalText) {
       journal.dataset.text = journalText;
-      journal.innerHTML = `<kbd>${escape(label(InputAction.Map))}</kbd><span>Carte & souvenirs</span><kbd>${escape(label(InputAction.Pause))}</kbd><span>Pause</span>`;
+      journal.innerHTML = `<kbd>${escape(label(InputAction.Map))}</kbd><span>Journal</span><kbd>${escape(label(InputAction.Pause))}</kbd><span>Pause</span>`;
     }
     const abilities = this.root.querySelector('#abilities');
     if (!abilities) return;

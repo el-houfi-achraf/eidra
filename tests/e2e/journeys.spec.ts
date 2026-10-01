@@ -44,12 +44,13 @@ test('new game: capsule movement, buffered jump, ability pickup and attack damag
   await hold(page, 'KeyD', 300);
   await expect.poll(async () => (await snapshot(page)).abilities).toContain('dash');
   // A dash away from them, through the doorway into the trial beyond.
+  // The direction is held until the simulation has turned her, whatever the frame rate.
   const from = (await snapshot(page)).player.x;
   await page.keyboard.down('KeyA');
-  await page.waitForTimeout(60);
+  await expect.poll(async () => (await snapshot(page)).player.x).toBeLessThan(from - 0.1);
   await hold(page, 'ShiftLeft', 70);
-  await page.keyboard.up('KeyA');
   await expect.poll(async () => (await snapshot(page)).player.x).toBeLessThan(from - 2);
+  await page.keyboard.up('KeyA');
   await page.evaluate(() => window.eidra!.teleport(31));
   await page.keyboard.down('KeyD');
   await expect
@@ -759,7 +760,11 @@ test('rooms: down the well, through a cracked wall, and the journal of the act',
   await page.evaluate(() => window.eidra!.teleport(45.6, -18.2));
   await expect.poll(async () => (await snapshot(page)).room).toBe('archives');
   await expect.poll(async () => (await snapshot(page)).player.grounded).toBe(true);
-  await hold(page, 'KeyA', 60);
+  // She turns to the wall: the key is held until the simulation has seen it.
+  const facing = (await snapshot(page)).player.x;
+  await page.keyboard.down('KeyA');
+  await expect.poll(async () => (await snapshot(page)).player.x).toBeLessThan(facing - 0.05);
+  await page.keyboard.up('KeyA');
   for (let i = 0; i < 8; i++) {
     if ((await snapshot(page)).flags.includes('open:study-wall')) break;
     await page.keyboard.press('KeyJ', { delay: 60 });

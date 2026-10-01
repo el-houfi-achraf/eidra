@@ -2482,7 +2482,7 @@ body[data-device='gamepad'] .title-action:focus {
   stroke-linecap: round;
 }
 .room-map .icon {
-  font-size: 3.2px;
+  font-size: 4.6px;
   text-anchor: middle;
   dominant-baseline: central;
   fill: #cfe7dc;
@@ -2505,7 +2505,7 @@ body[data-device='gamepad'] .title-action:focus {
   fill: #ee6b5f;
 }
 .room-map .label {
-  font-size: 2.3px;
+  font-size: 3px;
   letter-spacing: 0.12px;
   text-anchor: middle;
   fill: #9fb8ad;
