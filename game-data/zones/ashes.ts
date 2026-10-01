@@ -19,7 +19,7 @@ export const ashChunks = [
     seed: 113,
     platforms: [
       { x: 221, y: -1, w: 40, h: 2 },
-      { x: 214, y: 1.6, w: 3, h: 0.5 },
+      { x: 214, y: 2.15, w: 3, h: 0.3 },
       { x: 228, y: 2.2, w: 4, h: 0.5 },
     ],
     enemies: [
@@ -35,9 +35,9 @@ export const ashChunks = [
     seed: 131,
     platforms: [
       { x: 261, y: -1, w: 40, h: 2 },
-      { x: 250, y: 2, w: 4, h: 0.5 },
+      { x: 250, y: 2.15, w: 4, h: 0.3 },
       { x: 257.5, y: 3.6, w: 3, h: 0.5 },
-      { x: 268, y: 1.8, w: 4, h: 0.5 },
+      { x: 268, y: 2.15, w: 4, h: 0.3 },
     ],
     enemies: [
       { id: 'ember-1', kind: 'ember', x: 253 },

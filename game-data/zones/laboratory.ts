@@ -65,7 +65,8 @@ export const chunks = [
     seed: 31,
     platforms: [
       { x: 60, y: -1, w: 40, h: 2 },
-      { x: 50, y: 1.7, w: 5, h: 0.5 },
+      // Head-high slabs clear Eidra (1.83 m) and stay within one jump (top 2.3 m).
+      { x: 50, y: 2.15, w: 5, h: 0.3 },
       { x: 61, y: 3.5, w: 4, h: 0.5 },
     ],
     enemies: [
@@ -99,7 +100,7 @@ export const chunks = [
       { x: 140, y: -1, w: 40, h: 2 },
       // Ledge of Seris's fragment, in the antechamber before the Keeper's arena, so the
       // Keeper (2.97 m tall) never has to walk under a slab lower than its head.
-      { x: 144.5, y: 2, w: 3, h: 0.5 },
+      { x: 144.5, y: 2.15, w: 3, h: 0.3 },
     ],
     // The Porteur du dernier ordre is a boss (game-data/bosses/keeper.ts).
     enemies: [],
