@@ -97,6 +97,8 @@ export const ashChunks = [
 ];
 export const ashCheckpoints = [
   { id: 'nhalis', x: 205, name: 'Ancrage de Nhalis' },
+  // Before the vents: a fall to the fire columns no longer costs the walk from the gate.
+  { id: 'embers', x: 242.5, name: 'Ancrage des braises' },
   { id: 'rift', x: 283.5, name: 'Ancrage de la Faille' },
   // Before the Sentinelle: a defeat does not send Eidra back across the rift.
   { id: 'brazier', x: 322.5, name: 'Ancrage du Brasier' },

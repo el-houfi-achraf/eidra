@@ -120,6 +120,8 @@ export type ChunkData = z.infer<typeof ChunkSchema>;
 export const checkpoints = [
   { id: 'awakening', x: 7, name: 'Ancrage de l’éveil' },
   { id: 'mira', x: 73, name: 'Ancrage de Mira' },
+  // Before the Keeper: a defeat no longer sends Eidra back across the memory bridge.
+  { id: 'counterweight', x: 136.5, name: 'Ancrage du contrepoids' },
   { id: 'threshold', x: 160, name: 'Ancrage du seuil' },
   ...ashCheckpoints,
 ];
