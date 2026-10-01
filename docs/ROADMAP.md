@@ -17,7 +17,7 @@
 | 10 — Narration                       | Deux actes jouables + bible        | Révélations et campagne entière restantes                                   |
 | 11 — Neuf régions                    | Deux jouables                      | Art de production et sept régions restantes                                 |
 | 12 — Sept boss principaux            | Quatre jouables                    | Porteur, Gardien, Sentinelle et Ilyra ; trois restants                      |
-| 13 — Audio / VFX / shaders           | Intégration prototype              | Musique, rigs, VFX et textures de production restants                       |
+| 13 — Audio / VFX / shaders           | Partition et bruitages générés     | Enregistrement musical, rigs, VFX et textures de production restants        |
 | 14 — Performance                     | Instrumentée et mesurée            | 60 FPS sur GPU moyen non certifiés                                          |
 | 15 — Accessibilité / input           | Toutes manettes, remappage         | Qualification sur manettes physiques                                        |
 | 16 — QA complet                      | Chromium logiciel + tests domaine  | Firefox / Safari / WebGPU matériel restants                                 |

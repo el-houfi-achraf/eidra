@@ -62,6 +62,19 @@ export interface DebugSnapshot {
   device: 'keyboard' | 'gamepad';
   /** The controller in hand: family of its glyphs and the layout used to read it. */
   pad: { name: string; family: string; profile: string } | null;
+  /** The score and sounds: loaded cues, streams playing, the current mix, recent cues. */
+  audio: {
+    ready: boolean;
+    cues: number;
+    streams: string[];
+    mix: {
+      music: Record<string, number>;
+      ambience: Record<string, number>;
+      duck: number;
+      level: number;
+    } | null;
+    recent: string[];
+  };
   meshes: number;
   bodies: number;
   renderer: string;

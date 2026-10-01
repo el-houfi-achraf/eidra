@@ -124,6 +124,12 @@ Temps d'image et CPU dans le bruit. Les draw calls supplémentaires viennent des
 
 Protocole standard : 64 / 26 draw calls et 60 474 / 32 151 triangles, identiques ; CPU 4,0 / 2,4 ms et rendu logiciel 148,4 / 46,9 ms en MEDIUM / LOW. Allers-retours de streaming : 320 / 316 meshes (+2 / +9 : l'œil et les colonnes de geysers, moins la marionnette d'élite du Porteur qui n'est plus chargée avec son secteur), 7 / 6 ressources physiques, 2 / 1 chunks, stables. Bundle principal : 1,96 Mo minifié / 488 ko gzip (+5 ko).
 
+### Dixième itération : bande-son et bruitages
+
+Comparaison A / B (build `main` contre ce build, une partie neuve par scène, MEDIUM, 1280 × 720, SwiftShader, médiane de 40 images, moyenne de deux passages, audio actif dans les deux builds). Avant → après : chambre d'éveil 160,1 / 4,9 → 165,1 / 5,2 ms ; arène du Porteur 167,4 / 6,7 → 164,2 / 7,2 ms ; Champs de braise 160,3 / 7,4 → 167,9 / 7,3 ms ; Jardin du déni 149,1 / 6,0 → 151,9 / 5,8 ms (frame / CPU). CPU à ±0,5 ms et frames dans le bruit des mesures : les sons de combat (lecture de l'état de la simulation), le directeur de musique et la diffusion en flux ne coûtent rien de mesurable.
+
+Protocole standard : 64 / 26 draw calls et 60 474 / 32 151 triangles, identiques (l'audio ne dessine rien) ; CPU 4,4 / 3,1 ms et rendu logiciel 138,5 / 52,6 ms en MEDIUM / LOW ; allers-retours de streaming : 320 / 316 meshes, 7 / 6 ressources physiques, 2 / 1 chunks, inchangés. Bundle principal : 1,97 Mo minifié / 492 ko gzip (+4 ko). Mémoire : la musique et les ambiances sont lues en flux (lecteur média), jamais décodées en entier, et une région quittée depuis 20 s les libère ; les bruitages et les motifs sont des tampons décodés d'environ 32 Mo à 48 kHz (166 s de son, queues de réverbération comprises). Téléchargement : environ 1,2 Mo de bruitages et de motifs au démarrage, puis environ 0,6 Mo par thème et 0,4 Mo par ambiance la première fois qu'ils sont entendus (un seul format est téléchargé, OGG ou MP3).
+
 Mesures brutes : [performance.json](evidence/performance.json) (dernière itération).
 
 ## Optimisation et stabilité

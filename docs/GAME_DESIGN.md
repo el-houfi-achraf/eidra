@@ -59,6 +59,10 @@ Chaque boss a sa capacité signature et sa démarche (D032) : on les reconnaît 
 
 Les ennemis gardent `combo`, `lunge` et `enrage` (D028) : le Porteur de cendres enchaîne deux coups avec élan.
 
+## Son et musique
+
+Chaque région a son thème et son ambiance (D033) : le piano hésitant et le célesta des voûtes de Lumérite, la berceuse à la boîte à musique de la galerie de Mira, l'ostinato de violoncelle et le tic-tac du Contrepoids, la harpe et le tambour-cœur des Failles de cendre, la valse de célesta et de voix du Jardin du déni. Chaque boss a le sien, qui prend le relais dès son réveil ; sa chute laisse l'arène silencieuse quelques secondes avant que la région revienne. Les bruitages sont lisibles avant tout : chaque télégraphe de boss a un son d'anticipation, chaque coup qui touche claque (claquement, corps, tintement), les gros impacts creusent la musique, le Commandement du Gardien s'entend comme un chœur qui ordonne. Les pas changent avec le sol (pierre, cendre, mousse), l'atterrissage avec la hauteur de la chute ; le Recueillement monte en bourdonnant et s'interrompt avec lui. Les menus répondent par de petits tintements.
+
 ## Dangers
 
 Colonnes de feu : une braise rougeoie au sol, s'agite 0,7 s avant l'éruption, puis une colonne de 7 m brûle (18 à 20 dégâts, non parable, repousse). Les trois colonnes des Champs de braise éclatent à tour de rôle. Tomber dans la Faille coûte 20 PV et ramène au bord.

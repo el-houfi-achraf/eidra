@@ -1,36 +1,68 @@
-"""TODO_ART: deterministic original placeholder score and effects. No external samples."""
+"""Regenerates EIDRA's soundtrack, stingers, ambience beds and sound effects into
+public/audio (OGG Vorbis, MP3 fallback). Deterministic: the same sources always
+produce the same audio. Requires tools/requirements-audio.txt.
+
+    python3 tools/generate_audio.py            # everything
+    python3 tools/generate_audio.py sfx music  # some groups only
+
+TODO_ART: original synthesized placeholders; no external samples.
+"""
+from __future__ import annotations
+
+import sys
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
-import math, random, struct, wave, tempfile, subprocess
-RATE=22050
-ROOT=Path(__file__).resolve().parents[1]/'public'/'audio'
-FILES={'ambient/nhalis':24,'music/awakening':24,'boss/obedience':24,'combat/slash':.22,'combat/heavy':.4,'combat/impact':.2,'combat/hurt':.35,'combat/parry':.65,'abilities/dash':.3,'footsteps/jump':.18,'abilities/remanence':1.8,'ui/anchor':1.6,'ui/release':3,'footsteps/stone':.12}
-for name,duration in FILES.items():
-    rng=random.Random(name); samples=[]
-    for i in range(int(RATE*duration)):
-        t=i/RATE;noise=rng.uniform(-1,1);fade=min(1,t/.05,(duration-t)/.15)
-        if duration==24:
-            drone=(math.sin(2*math.pi*55*t)+.4*math.sin(2*math.pi*82.5*t)+.15*math.sin(2*math.pi*110*t))/3
-            if name.startswith('ambient'): value=drone*.24+noise*.009
-            else:
-                notes=[220,261.6256,293.6648,329.6276,246.9417,196,293.6648,164.8138]
-                beat=1.5 if name.startswith('music') else .75
-                at=t%beat;note=notes[int(t/beat)%len(notes)]
-                bell=math.sin(2*math.pi*note*t)*math.exp(-at*2.5)+.15*math.sin(2*math.pi*note*3.01*t)*math.exp(-at*6)
-                value=drone*.25+bell*.14
-                if name.startswith('boss'): value+=math.sin(2*math.pi*(60-30*at)*t)*math.exp(-at*15)*.25
-        else:
-            k=t/duration;env=(1-k)**2
-            if 'slash' in name or 'dash' in name or 'stone' in name:value=noise*env*.22
-            elif 'impact' in name or 'hurt' in name or 'heavy' in name:value=(noise*.25+math.sin(2*math.pi*(90-50*k)*t)*.4)*env
-            else:value=sum(math.sin(2*math.pi*f*t)*math.exp(-t*(1.5+j)) for j,f in enumerate([440,659.25,880]))*.14*env
-        samples.append(struct.pack('<h',int(max(-.95,min(.95,value*max(0,fade)))*32767)))
-    destination=ROOT/(name+'.ogg');destination.parent.mkdir(parents=True,exist_ok=True)
-    with tempfile.TemporaryDirectory() as directory:
-        source=Path(directory)/'source.wav'
-        with wave.open(str(source),'wb') as output:output.setnchannels(1);output.setsampwidth(2);output.setframerate(RATE);output.writeframes(b''.join(samples))
-        encoded=Path(directory)/'encoded.ogg'
-        subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-y','-i',str(source),'-c:a','libvorbis','-q:a','3',str(encoded)],check=True)
-        if encoded.stat().st_size<100:raise RuntimeError('Empty encoded audio')
-        (ROOT/(name+'.wav')).write_bytes(source.read_bytes())
-        temporary=destination.with_suffix('.ogg.new');temporary.write_bytes(encoded.read_bytes());temporary.replace(destination)
-    print(destination.relative_to(ROOT),destination.stat().st_size)
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / 'audio'))
+
+import ambience  # noqa: E402
+import music  # noqa: E402
+import sfx  # noqa: E402
+from dsp import MUSIC_RATE, SFX_RATE, write  # noqa: E402
+
+ROOT = Path(__file__).resolve().parents[1] / 'public' / 'audio'
+GROUPS = ('music', 'stingers', 'ambience', 'sfx')
+
+
+def _song(job: tuple[str, str]) -> list[Path]:
+    group, name = job
+    table = music.SONGS if group == 'music' else music.STINGERS
+    return write(ROOT / group / name, table[name]().render(), MUSIC_RATE)
+
+
+def _ambience(name: str) -> list[Path]:
+    return write(ROOT / 'ambience' / name, ambience.AMBIENCES[name](), MUSIC_RATE)
+
+
+def _effect(job: tuple[str, int]) -> list[Path]:
+    name, variant = job
+    return write(ROOT / 'sfx' / f'{name}-{variant}', sfx.render(name, variant), SFX_RATE)
+
+
+def main(groups: list[str]) -> None:
+    unknown = [g for g in groups if g not in GROUPS]
+    if unknown:
+        raise SystemExit(f'Unknown groups {unknown}; choose among {GROUPS}')
+    written: list[Path] = []
+    with ProcessPoolExecutor() as pool:
+        if 'music' in groups:
+            written += sum(pool.map(_song, [('music', n) for n in music.SONGS]), [])
+        if 'stingers' in groups:
+            written += sum(pool.map(_song, [('stingers', n) for n in music.STINGERS]), [])
+        if 'ambience' in groups:
+            written += sum(pool.map(_ambience, ambience.AMBIENCES), [])
+        if 'sfx' in groups:
+            jobs = [(n, v) for n, (_, count, _) in sfx.EFFECTS.items() for v in range(1, count + 1)]
+            written += sum(pool.map(_effect, jobs), [])
+    # Files of a regenerated group that no source produces any more are stale.
+    keep = {p.resolve() for p in written}
+    for group in groups:
+        for stale in (ROOT / group).glob('*'):
+            if stale.is_file() and stale.resolve() not in keep:
+                stale.unlink()
+    total = sum(p.stat().st_size for p in written)
+    print(f'{len(written)} files, {total / 1e6:.1f} MB')
+
+
+if __name__ == '__main__':
+    main(sys.argv[1:] or list(GROUPS))

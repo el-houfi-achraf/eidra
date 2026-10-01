@@ -71,6 +71,16 @@ export async function validateAssets(root = 'public') {
       if (bytes.subarray(0, 4).toString() !== 'OggS')
         throw new Error(`${file}: invalid OGG header`);
     }
+    if (file.endsWith('.mp3')) {
+      const bytes = await readFile(file);
+      // An ID3 tag or an MPEG frame sync.
+      const id3 = bytes.subarray(0, 3).toString() === 'ID3';
+      if (!id3 && !(bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0))
+        throw new Error(`${file}: invalid MP3 header`);
+    }
+    // Every compressed cue ships with its fallback, so any browser can play it.
+    if (file.endsWith('.ogg') && !(await stat(file.replace(/\.ogg$/, '.mp3')).catch(() => null)))
+      throw new Error(`${file}: missing MP3 fallback`);
   }
   return report;
 }

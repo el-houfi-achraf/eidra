@@ -42,3 +42,7 @@ Poses exagérées et lisibles, dans l'esprit des action-plateformes dessinés à
 ## Production
 
 Les modèles procéduraux initiaux portent le statut TODO_ART. Aucun asset généré ne prétend être un modèle final Blender. Pas de textures externes pour le prototype ; textures de production KTX2 / Basis, plafonds de 512 à 2048 px.
+
+## Son
+
+Une partition de chambre mélancolique plutôt qu'un orchestre épique : peu d'instruments à la fois, beaucoup d'air et de réverbération, un motif d'Eidra (ré mineur : quarte montante, pas, retombée) qui revient sous d'autres couleurs dans chaque région et chaque combat. Le froid de la Lumérite (piano, célesta, bourdon), la tendresse de Mira (boîte à musique, harpe), la fatigue des machines (violoncelle en ostinato, tic-tac), la cendre (harpe phrygienne, tambour lent, chœur lointain), le déni (valse au célesta, intervalles augmentés). Les boss ont un caractère : marche obstinée, liturgie d'orgue, tambours en feu, valse tragique. Les bruitages se lisent en couches : une attaque nette (clic, claquement), un corps (bruit filtré, coup sourd), une queue (tintement métallique ou de verre) ; les sons du joueur sont secs et proches, ceux des boss graves et réverbérés. TODO_ART : tout est synthétisé ; un enregistrement de production reste à faire.

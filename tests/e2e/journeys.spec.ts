@@ -315,6 +315,49 @@ test('each boss fights with its own ability and way of moving', async ({ page })
   await expect.poll(async () => (await boss('ilyra')).effects.reflections).toEqual([]);
   expect(errors).toEqual([]);
 });
+test('the score follows the journey, and every gesture is heard', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/?debug=1&renderer=webgl2');
+  await expect(page.locator('body')).toHaveAttribute('data-ready', 'true');
+  const audio = async () => (await snapshot(page)).audio;
+  // The first gesture wakes the audio: the title theme plays in the menu.
+  await page.keyboard.press('ArrowDown');
+  await expect
+    .poll(async () => (await audio()).streams, { timeout: 30000 })
+    .toContain('music/title');
+  await page.getByRole('button', { name: 'Nouvelle partie' }).click();
+  await page.locator('#slot-0').click();
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'PLAYING');
+  expect((await audio()).recent).toContain('ui-confirm');
+  // The vaults: their theme and their ambience.
+  await expect
+    .poll(async () => (await audio()).mix?.music.lumerite ?? 0, { timeout: 30000 })
+    .toBeGreaterThan(0.9);
+  expect((await audio()).mix?.ambience.laboratory).toBeGreaterThan(0.9);
+  await expect.poll(async () => (await snapshot(page)).player.grounded).toBe(true);
+  await hold(page, 'KeyD', 900);
+  await page.keyboard.press('Space');
+  await expect.poll(async () => (await audio()).recent).toContain('land');
+  await page.keyboard.press('KeyJ');
+  await expect.poll(async () => (await audio()).recent).toContain('swing');
+  const heard = (await audio()).recent;
+  expect(heard).toContain('step-stone');
+  expect(heard).toContain('jump');
+  // The Keeper's arena: the door falls, the Keeper roars, its theme takes over.
+  await page.evaluate(() => window.eidra!.teleport(150.5));
+  await expect
+    .poll(async () => (await audio()).mix?.music.keeper ?? 0, { timeout: 45000 })
+    .toBeGreaterThan(0.9);
+  expect((await audio()).recent).toEqual(expect.arrayContaining(['gate-close', 'boss-roar']));
+  // Victory: the theme stops, a stinger sounds, the arena falls silent.
+  await page.evaluate(() => window.eidra!.setBossHealth(0, 'keeper'));
+  await expect
+    .poll(async () => (await audio()).recent)
+    .toEqual(expect.arrayContaining(['boss-death', 'stinger:victory']));
+  await expect.poll(async () => (await audio()).mix?.music, { timeout: 30000 }).toEqual({});
+  expect(errors).toEqual([]);
+});
 test('a sector exit stays sealed until its guardian falls, then stays open', async ({ page }) => {
   await start(page);
   // Between the Veilleur of the awakening chamber and the chamber's exit.
@@ -701,15 +744,32 @@ test('an unmapped controller plays through its hat and is remapped with the pad 
   for (let i = 0; i < 4; i++) await padTap(page, 5);
   await expect(page.locator('#pad-status')).toContainText('Generic USB Joystick');
   await expect(page.locator('#pad-status')).toContainText('Générique');
-  // Down to the first row of bindings, then left to « Sauter ».
+  // Down to the bindings, then across to « Sauter », with the hat alone. The route is
+  // read from where the focus lands after each push: on a slow runner a long frame may
+  // repeat a push, and the next one corrects it.
   const hat = async (value: number): Promise<void> => {
     await padAxis(page, 9, value);
     await frames(page);
     await padAxis(page, 9, 1.2857);
     await frames(page);
   };
-  for (let i = 0; i < 8 && (await focused(page)).endsWith('|'); i++) await hat(0.1429);
-  if (!(await focused(page)).endsWith('|jump')) await hat(0.7143);
+  for (let i = 0; i < 16 && !(await focused(page)).endsWith('|jump'); i++) {
+    const delta = await page.evaluate(() => {
+      const target = document.querySelector<HTMLElement>('[data-pad-action="jump"]');
+      const active = document.activeElement as HTMLElement | null;
+      if (!target || !active) return null;
+      const a = active.getBoundingClientRect(),
+        b = target.getBoundingClientRect();
+      return {
+        dx: b.x + b.width / 2 - (a.x + a.width / 2),
+        dy: b.y + b.height / 2 - (a.y + a.height / 2),
+      };
+    });
+    if (!delta) break;
+    // Rows first (sliders above would take a sideways push as a new value), then across.
+    if (Math.abs(delta.dy) > 6) await hat(delta.dy > 0 ? 0.1429 : -1);
+    else await hat(delta.dx > 0 ? -0.4286 : 0.7143);
+  }
   expect(await focused(page)).toContain('|jump');
   await padTap(page, 0);
   await expect(page.locator('[data-pad-action="jump"] kbd')).toHaveText('Appuyez…');
