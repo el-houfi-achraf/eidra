@@ -122,3 +122,11 @@ Lire README, ROADMAP et AGENT_RULES, lancer `npm ci`, puis `npm run check` et le
 - **Aperçu des chapitres** : la caméra survole un chapitre déjà atteint, sur son thème. **Bande originale** : réécouter les thèmes déjà entendus. **Souvenirs** : les fragments retrouvés, avec leur première phrase. **Crédits** et **Nouveautés**.
 - **Profil local** : choisissez le nom affiché ; il est gardé avec les réglages.
 - **Clavier** : flèches, E et Échap sur l'écran titre, comme l'annonce le pied de page ; la manette change de section avec les gâchettes hautes. Polices Cinzel, Cormorant Garamond et Inter (licence libre OFL). Sauvegardes compatibles.
+
+### Douzième itération : corrections après une partie complète
+
+- **Plus de corniche qui bloque** : cinq dalles arrêtaient Eidra à hauteur de tête (dont celle du fragment de Seris, devant le Porteur). On passe dessous, on y monte d'un saut.
+- **Deux ancrages de plus** : avant le Porteur (chambre du contrepoids) et à l'entrée des Champs de braise. Une défaite ne renvoie plus 60 à 78 m en arrière.
+- **Une interface plus calme** : une seule invite à la fois, en bas de l'écran et jamais sur Eidra ; aucune leçon pendant un boss ; une leçon ignorée finit par se retirer ; des notifications qui se remplacent au lieu de s'empiler ; un nom de zone plus discret ; des dialogues qui laissent voir ceux qui parlent.
+- Le voyage commence à côté du premier ancrage, avec une seule consigne : se déplacer.
+- « Memory Step » s'appelle désormais l'**Écho mémoriel**. Le masque du HUD a les yeux pourpres d'Eidra, la fin de l'Acte II compte les fragments sur sept, la carte tient sur les petits écrans.

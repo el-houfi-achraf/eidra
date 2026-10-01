@@ -168,3 +168,20 @@ L'écran titre suit la maquette du propriétaire : barre du haut (emblème et «
 - **Profil local** : `profileName` (Zod, « Voyageur » par défaut, une valeur vide ou trop longue revient au défaut) s'ajoute aux réglages ; les sauvegardes existantes restent valides. La puce indique « Profil local » et non « En ligne » : le jeu n'a pas de service en ligne. La fenêtre de profil résume le voyage de toutes les parties.
 - **Nouveautés** : la cloche porte un point tant que la dernière nouveauté n'a pas été lue ; ce simple confort par navigateur vit dans `localStorage` (un stockage bloqué laisse le point et le signale dans la console).
 - **Polices** : Cinzel (titres), Cormorant Garamond (titres de cartes, devises) et Inter (texte), sous SIL Open Font License, sous-ensembles latins woff2 (environ 200 ko) placés à côté de la feuille de style pour que Vite les empaquette avec le reste (`base: './'`). Elles ne servent qu'à l'écran titre ; l'interface de jeu garde Georgia et Arial.
+
+## D035 — Après la partie complète : couloir dégagé, ancrages, un seul canal d'interface
+
+Une partie complète jouée au clavier (deux actes, script de touches réelles, captures à chaque moment clé) a relevé des défauts que les tests ne voyaient pas. L'étape 1 les corrige, sans toucher au moteur ni au format de sauvegarde.
+
+- **Corniches à hauteur de tête.** Cinq dalles pendaient entre la taille et la tête d'Eidra au-dessus du sol (la corniche du fragment de Seris avant le Porteur, une dans la galerie, trois dans les Failles) : elles ressemblaient à des corniches sous lesquelles passer, mais l'arrêtaient net. Elles dégagent désormais ses 1,83 m (capsule de 1,7 m et marge de contact) et leur dessus reste à une impulsion du sol (2,3 m). Le test `walkway` interdit cette bande (entre 1 m et 1,95 m au-dessus d'un sol) et vérifie que chaque corniche au-dessus du passage reste à portée d'un saut.
+- **Ancrages.** Une défaite contre le Porteur renvoyait à l'ancrage de Mira, 78 m en arrière, pont de mémoire compris ; une chute dans les Champs de braise, 60 m à travers les colonnes de feu. L'ancrage du contrepoids (x = 136,5) et celui des braises (x = 242,5) raccourcissent ces retours ; les identifiants enregistrés ne changent pas.
+- **Un seul canal d'interface.** Jusqu'à cinq couches se superposaient sur Eidra. Désormais :
+  - une invite à la fois, sur une ligne basse sous ses pieds ; ce qu'elle peut faire ici (un ancrage, un fragment) passe avant une leçon ;
+  - aucune leçon pendant un combat de boss ni pendant sa chute, et une leçon ignorée se retire seule après sa durée `linger` (18 s, 12 s pour les cartes et le Recueillement), mémorisée comme une leçon apprise ;
+  - un nouveau voyage commence à côté du premier ancrage, hors de sa portée (`route.wake`), pour que la première invite soit « Se déplacer » ;
+  - les notifications portent un sujet : une porte scellée puis ouverte remplace son message, les mêmes mots ne s'empilent jamais, deux au plus à l'écran ;
+  - le nom d'une zone est une ligne discrète plus haut, qui s'efface devant un nouveau pouvoir ;
+  - les dialogues se placent bas, sur la bande inférieure, et la caméra descend de 1,2 m, pour que les personnages qui parlent restent visibles au-dessus de la boîte.
+- **Détails.** « Memory Step » devient « Écho mémoriel » partout où un joueur le lit, et les pouvoirs prévus « Fracture du temps » et « Bascule d'âme ». Le masque du HUD prend les yeux pourpres d'Eidra. La fin de l'Acte II compte les fragments sur les sept de l'histoire, comme la carte et l'écran titre. La carte tient sur un écran bas. Revisiter un secteur affiche le nom de son acte, et non plus toujours le laboratoire.
+
+Ce qui reste hors de l'étape 1 et relève des étapes suivantes : le monde en salles, le rythme des pouvoirs, la variété des ennemis, la profondeur du build et de la narration.
