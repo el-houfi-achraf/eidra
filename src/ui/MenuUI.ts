@@ -6,15 +6,7 @@ import { defaultPadBindings, familyNames } from '../../game-data/input/controlle
 import type { PadFamily, PadToken } from '../../game-data/input/controllers';
 import type { SaveData } from '../save/SaveManager';
 import type { GameSession, TitleKind } from '../core/GameSession';
-import {
-  actAt,
-  arenas,
-  chunks,
-  checkpoints,
-  landmarks,
-  route,
-  stages,
-} from '../../game-data/zones/laboratory';
+import { actAt, chunks, checkpoints, landmarks, stages } from '../../game-data/zones/laboratory';
 import { stageFlag } from '../quests/StageProgress';
 import { defaultSettings } from '../config/settings';
 import { offeringData } from '../../game-data/items/offerings';
@@ -29,6 +21,8 @@ import { bossRoster } from '../../game-data/bosses/roster';
 import { titleProgress, trackOrigin } from './TitleProgress';
 import type { TitleProgress } from './TitleProgress';
 import { icons, thumbnail } from './TitleArt';
+import { actOf, bestiary, memories, roomMap, roomsOf } from './Journal';
+import { sentence } from '../core/text';
 import type { IconId } from './TitleArt';
 export interface MenuActions {
   start: (slot: number) => void;
@@ -1104,57 +1098,67 @@ export class MenuUI {
     this.bind('menu', this.actions.menu);
     this.focus();
   }
+  /** Page of the journal shown when it next opens. */
+  private journalTab: 'map' | 'bestiary' | 'memories' = 'map';
+  /**
+   * The journal: the map of the act Eidra is in, room by room; the foes met and
+   * what is told of them; the fragments recovered, in their own words.
+   */
   map(session: GameSession): void {
     const flags = session.narrative.flags;
-    // The map shows the act Eidra is in.
-    const act = actAt(session.actor.x);
-    const next = route.acts[route.acts.indexOf(act) + 1];
-    const sectors = chunks.filter((c) => c.start >= act.from && (!next || c.start < next.from));
-    const left = sectors[0]!.start;
-    const width = sectors.at(-1)!.end - left;
-    const markers = (start: number, end: number, sector: string): string => {
-      const inside = (x: number) => x >= start && x < end;
-      const icons: string[] = [];
-      for (const c of checkpoints)
-        if (inside(c.x))
-          icons.push(
-            `<i class="${c.id === session.checkpoint ? 'active' : ''}" title="${escape(c.name)}">◇</i>`,
-          );
-      for (const m of landmarks)
-        if (inside(m.x) && m.kind !== 'npc')
-          icons.push(
-            `<i class="${session.inventory.collectibles.has(m.id) ? 'found' : ''}" title="${escape(m.label)}">${m.kind === 'memory' ? '❖' : '✦'}</i>`,
-          );
-      // Guardians of the arenas and the sealed exit of each stage.
-      for (const arena of arenas)
-        if (inside((arena.left + arena.right) / 2))
-          icons.push(
-            `<i class="${session.defeated(arena.guardian) ? 'found' : 'danger'}" title="${escape(arena.name)}">☗</i>`,
-          );
-      for (const stage of stages)
-        if (stage.id === sector) {
-          const open = flags.has(stageFlag(stage.id));
-          icons.push(
-            `<i class="${open ? 'found' : 'danger'}" title="${open ? 'Passage ouvert' : 'Passage scellé : vaincre les gardiens du secteur'}">${open ? '⊙' : '⊘'}</i>`,
-          );
-        }
-      return icons.join('');
+    const room = session.room;
+    const act = actOf(room);
+    const svg = roomMap(act, {
+      discovered: session.discovered,
+      room: room.id,
+      x: session.actor.x,
+      y: session.actor.y,
+      checkpoint: session.checkpoint,
+      collected: session.inventory.collectibles,
+      defeated: (id) => session.defeated(id),
+    });
+    const visited = roomsOf(act).filter((r) => session.discovered.has(r.id)).length;
+    const total = roomsOf(act).filter((r) => !r.secret).length;
+    const sealedStages = stages.filter(
+      (stage) =>
+        actOf(chunks.find((c) => c.id === stage.id)!) === act && !flags.has(stageFlag(stage.id)),
+    ).length;
+    const mapPage = `<div class="room-map-frame">${svg}</div><div class="map-key"><span>◇ Ancrage</span><span>✦ Pouvoir</span><span>❖ Fragment</span><span>◆ Reliquaire</span><span class="danger">☗ Gardien</span><span class="mint">● Eidra</span></div><p class="muted">${escape(sentence(room.name))} · ${visited} salle${visited > 1 ? 's' : ''} explorée${visited > 1 ? 's' : ''} sur ${total}${sealedStages ? ` · ⊘ ${sealedStages} passage${sealedStages > 1 ? 's' : ''} scellé${sealedStages > 1 ? 's' : ''}` : ''}</p><p class="muted">◇ ${escape(session.quests.objective(flags))} · ◆ ${session.inventory.shards} éclats</p>`;
+    const foes = bestiary(session.bestiary);
+    const known = foes.filter((f) => f.defeated > 0).length;
+    const bestiaryPage = `<p class="muted">${known} sur ${foes.length} rencontrés et vaincus.</p><ul class="bestiary">${foes
+      .map((foe) =>
+        foe.defeated > 0
+          ? `<li class="known ${foe.boss ? 'boss' : ''}"><strong>${escape(foe.name)}</strong><span class="count">${foe.boss ? 'Vaincu' : `Vaincus : ${foe.defeated}`}</span><p>${escape(foe.lore)}</p></li>`
+          : `<li class="unknown"><strong>???</strong><span class="count">Jamais vaincu</span><p>Une ombre dont la mémoire ne garde rien.</p></li>`,
+      )
+      .join('')}</ul>`;
+    const fragments = memories(session.narrative.memories);
+    const memoriesPage = `<p class="muted">${fragments.filter((m) => m.found).length} fragments sur ${fragments.length}.</p><ol class="fragments-list">${fragments
+      .map((m) =>
+        m.found
+          ? `<li class="found"><b>${m.number}</b><div><strong>${escape(m.speaker)}</strong>${m.lines.map((line) => `<p>${escape(line)}</p>`).join('')}</div></li>`
+          : `<li><b>${m.number}</b><div><strong>FRAGMENT INCONNU</strong><p>Quelque part, une mémoire attend.</p></div></li>`,
+      )
+      .join('')}</ol>`;
+    const tabs = [
+      ['map', 'Carte'],
+      ['bestiary', 'Bestiaire'],
+      ['memories', 'Souvenirs'],
+    ] as const;
+    const panels = { map: mapPage, bestiary: bestiaryPage, memories: memoriesPage };
+    const tab = this.journalTab;
+    this.root.innerHTML = `<div class="modal-scrim"></div><section class="panel map-panel journal-panel"><div class="panel-heading"><div><p class="eyebrow">JOURNAL DE LA RÉMANENCE</p><h2>${escape(act.title)}</h2></div><button id="back" class="text-button">Reprendre le voyage →</button></div><div class="tabs" role="tablist" aria-label="Journal">${tabs.map(([id, name]) => `<button role="tab" id="tab-${id}" aria-selected="${id === tab}" aria-controls="panel-${id}" class="tab ${id === tab ? 'active' : ''}">${name}</button>`).join('')}</div>${tabs.map(([id]) => `<div class="tab-panel" role="tabpanel" id="panel-${id}" aria-labelledby="tab-${id}" ${id === tab ? '' : 'hidden'}>${panels[id]}</div>`).join('')}</section>`;
+    const show = (id: (typeof tabs)[number][0]): void => {
+      for (const [other] of tabs) {
+        const selected = other === id;
+        this.root.querySelector(`#tab-${other}`)?.setAttribute('aria-selected', String(selected));
+        this.root.querySelector(`#tab-${other}`)?.classList.toggle('active', selected);
+        this.root.querySelector<HTMLElement>(`#panel-${other}`)!.hidden = !selected;
+      }
+      this.journalTab = id;
     };
-    const nodes = sectors
-      .map((c) => {
-        const known = session.discovered.has(c.id);
-        const here = session.actor.x >= c.start && session.actor.x < c.end;
-        return `<li class="route-node ${known ? 'discovered' : ''} ${here ? 'current' : ''}"><span class="node-dot"></span><strong>${known ? escape(c.name) : 'INCONNU'}</strong><span class="node-icons">${known ? markers(c.start, c.end, c.id) : ''}</span></li>`;
-      })
-      .join('');
-    const position = Math.max(0, Math.min(100, ((session.actor.x - left) / width) * 100));
-    const shortcut = flags.has('echo-gate-open');
-    // The maintenance duct only exists in the laboratory.
-    const duct =
-      act.from === 0
-        ? `<div class="route-shortcut ${shortcut ? 'open' : ''}" title="Conduit de maintenance"><span>${shortcut ? 'Conduit de maintenance' : 'Passage scellé'}</span></div>`
-        : '';
-    this.root.innerHTML = `<div class="modal-scrim"></div><section class="panel map-panel"><p class="eyebrow">CARTOGRAPHIE DE LA RÉMANENCE</p><h2>${escape(act.title)}</h2><div class="route">${duct}<div class="route-line"></div><div class="route-you" style="left:${position.toFixed(1)}%"><span>Eidra</span></div><ol class="route-nodes">${nodes}</ol></div><div class="map-key"><span>◇ Ancrage</span><span>✦ Pouvoir</span><span>❖ Fragment</span><span class="danger">☗ Gardien</span><span>⊘ Passage scellé</span><span class="mint">● Votre position</span></div><h3>Fragments retrouvés</h3><div class="memory-list">${['kael', 'seris', 'ilyan', 'vaela', 'deren', 'noa', 'aren'].map((id, i) => `<span class="${session.narrative.memories.has(id) ? 'found' : ''}"><b>0${i + 1}</b> ${session.narrative.memories.has(id) ? id.toUpperCase() : 'INCONNU'}</span>`).join('')}</div><p class="muted">◇ ${escape(session.quests.objective(flags))} · ◆ ${session.inventory.shards} éclats</p><button id="back" class="text-button">Reprendre le voyage →</button></section>`;
+    for (const [id] of tabs) this.bind(`tab-${id}`, () => show(id));
     this.bind('back', this.actions.resume);
     this.focus();
   }

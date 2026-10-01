@@ -5,9 +5,11 @@ import {
   chunks,
   gates,
   progressGates,
+  routeChunks,
   stageGate,
   stages,
 } from '../../game-data/zones/laboratory';
+import { roomAt } from '../../src/world/Rooms';
 import { EnemyManager } from '../../src/enemies/EnemyManager';
 import { HYSTERESIS, StageProgress, stageFlag } from '../../src/quests/StageProgress';
 import { makeCombatant } from '../../src/combat/CombatSystem';
@@ -49,7 +51,8 @@ describe('laboratory stages', () => {
   });
   it('covers every sector that has enemies but no arena of its own', () => {
     const guarded = new Set(arenas.map((a) => a.guardian));
-    for (const chunk of chunks) {
+    // Chambers have no sealed exits: their enemies guard nothing but themselves.
+    for (const chunk of routeChunks) {
       const loose = chunk.enemies.filter((e) => !guarded.has(e.id));
       if (loose.length)
         expect(
@@ -64,7 +67,7 @@ describe('laboratory stages', () => {
       expect(
         solids.some((p) => Math.abs(p.x - stage.gate) < p.w / 2 && p.y + p.h / 2 <= 0.05),
       ).toBe(true);
-      for (const anchor of checkpoints)
+      for (const anchor of checkpoints.filter((c) => roomAt(c.x, c.y + 0.5)?.kind === 'route'))
         expect(Math.abs(anchor.x - stage.gate), `${stage.id} / ${anchor.id}`).toBeGreaterThan(
           HYSTERESIS,
         );

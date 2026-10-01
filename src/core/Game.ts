@@ -24,6 +24,7 @@ import { familyNames } from '../../game-data/input/controllers';
 import { rumbleCues } from '../../game-data/input/rumble';
 import { soundCues } from '../../game-data/audio/sounds';
 import type { AudioScene } from '../audio/MusicDirector';
+import { sectorOf } from '../world/Rooms';
 /** The camera's flight over a chapter from the title screen: metres, m/s. */
 const FLYOVER = { lead: 6, length: 64, speed: 2.6, y: 4.4, halfHeight: 7.6 } as const;
 export class Game {
@@ -157,6 +158,7 @@ export class Game {
         this.presentation.radiance(this.session.actor.x, this.session.actor.y, 'memory', 6);
       },
       altar: () => this.openAltar(),
+      enter: (room) => this.presentation.enter(room),
     });
     this.hud = new Hud(this.presentation.scene);
     const events = this.session.events;
@@ -211,7 +213,7 @@ export class Game {
       this.ui.notice('Les sauvegardes existantes n’ont pas pu être lues. Elles sont conservées.');
     }
     this.applySettings(this.settings, false);
-    this.world.update(10, false, new Set());
+    this.world.update(10, 1.2, false, new Set());
     this.session.player.teleport(10, 1.2);
     if (new URLSearchParams(location.search).get('debug') === '1') {
       this.debug = new DebugOverlay(this.presentation.scene);
@@ -297,7 +299,7 @@ export class Game {
       const flight = this.flyover;
       if (flight) {
         flight.x += dt * FLYOVER.speed;
-        this.world.update(flight.x, false, new Set());
+        this.world.update(flight.x, FLYOVER.y, false, new Set());
         if (flight.x >= flight.to) {
           this.endFlyover();
           flight.done();
@@ -317,12 +319,15 @@ export class Game {
         dt,
         this.settings.reducedMotion,
       );
+      this.hud.veil(this.presentation.veil);
       this.audio.listen(this.session.actor.x, this.session.actor.y);
       if (['MAIN_MENU', 'PAUSED', 'GAME_OVER'].includes(this.state.state) && this.input.menu.back)
         this.audio.play('ui-back');
       this.audio.update(dt, this.settings, {
         scene: this.audioScene,
         x: this.session.actor.x,
+        // A chamber plays its sector's theme, wherever it lies along x.
+        sector: this.session.inRoute ? null : sectorOf(this.session.room).id,
         boss: this.session.activeBoss?.data.id ?? null,
       });
       this.debug?.recordCPU(performance.now() - cpuStart);
@@ -386,6 +391,7 @@ export class Game {
     if (this.state.state === 'ENDING') {
       this.world.update(
         route.finale.returnX,
+        1.2,
         this.session.abilities.remanence,
         this.session.relocate(route.finale.returnX),
       );
@@ -402,7 +408,7 @@ export class Game {
     if (!this.flyover) return;
     this.flyover = null;
     this.audio.director.listen(null);
-    this.world.update(10, false, new Set());
+    this.world.update(10, 1.2, false, new Set());
   }
   private async showMenu(): Promise<void> {
     window.clearTimeout(this.deathTimer);
@@ -411,7 +417,7 @@ export class Game {
     if (this.state.state === 'CUTSCENE') this.state.change('ENDING');
     this.state.change('MAIN_MENU');
     this.input.reset();
-    this.world.update(10, false, new Set());
+    this.world.update(10, 1.2, false, new Set());
     this.session.player.teleport(10, 1.2);
     try {
       await this.saving;
@@ -576,6 +582,10 @@ export class Game {
         echo: this.session.abilities.echo,
         checkpoint: this.session.checkpoint,
         chunks: [...this.world.stream.loaded.keys()],
+        room: this.session.room.id,
+        shown: [...this.world.stream.shown.keys()],
+        discovered: [...this.session.discovered],
+        veil: this.presentation.veil,
         enemies: [...this.session.enemies.entities.values()].map((e) => ({
           id: e.actor.id,
           x: e.actor.x,
@@ -608,7 +618,7 @@ export class Game {
       teleport: (x, y = 1.2) => {
         if (!Number.isFinite(x) || !Number.isFinite(y))
           throw new Error('Invalid debug coordinates');
-        this.world.update(x, this.session.abilities.remanence, this.session.relocate(x));
+        this.world.update(x, y, this.session.abilities.remanence, this.session.relocate(x));
         this.session.player.teleport(x, y);
       },
       unlock: (id: AbilityId) => {

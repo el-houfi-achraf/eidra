@@ -38,11 +38,18 @@ test('new game: capsule movement, buffered jump, ability pickup and attack damag
   await page.keyboard.down('Space');
   await expect.poll(async () => (await snapshot(page)).player.y).toBeGreaterThan(1.5);
   await page.keyboard.up('Space');
-  await page.evaluate(() => window.eidra!.teleport(17));
+  // The Élan waits in the chamber of the depths named after it, its mites on guard.
+  await page.evaluate(() => window.eidra!.teleport(27.8, -28.4));
+  await expect.poll(async () => (await snapshot(page)).room).toBe('elans');
   await hold(page, 'KeyD', 300);
   await expect.poll(async () => (await snapshot(page)).abilities).toContain('dash');
+  // A dash away from them, through the doorway into the trial beyond.
+  const from = (await snapshot(page)).player.x;
+  await page.keyboard.down('KeyA');
+  await page.waitForTimeout(60);
   await hold(page, 'ShiftLeft', 70);
-  await expect.poll(async () => (await snapshot(page)).player.x).toBeGreaterThan(18);
+  await page.keyboard.up('KeyA');
+  await expect.poll(async () => (await snapshot(page)).player.x).toBeLessThan(from - 2);
   await page.evaluate(() => window.eidra!.teleport(31));
   await page.keyboard.down('KeyD');
   await expect

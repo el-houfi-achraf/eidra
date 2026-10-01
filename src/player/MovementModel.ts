@@ -68,9 +68,10 @@ export class MovementModel {
    * A downward strike that connects launches the character upwards and refreshes
    * the dash, so enemies and projectiles can be used as stepping stones.
    */
-  bounce(speed = 10.5): void {
+  bounce(speed = 10.5, hold = 0.22): void {
     this.vy = speed;
-    this.lift = 0.22;
+    // Seconds the rise ignores a released jump: the bounce has its own height.
+    this.lift = hold;
     this.dashCooldown = 0;
     this.dashTime = 0;
     this.grounded = false;

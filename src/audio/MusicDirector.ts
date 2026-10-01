@@ -1,12 +1,14 @@
 import { bossThemes, sectorScores } from '../../game-data/audio/music';
 import type { AmbienceId, Surface, TrackId } from '../../game-data/audio/music';
-import { chunks } from '../../game-data/zones/laboratory';
+import { routeChunks } from '../../game-data/zones/laboratory';
 /** What the game is showing, as far as the score is concerned. */
 export type AudioScene = 'menu' | 'playing' | 'paused' | 'dead' | 'ending';
 export interface MusicContext {
   scene: AudioScene;
   /** Eidra's position along the route. */
   x: number;
+  /** Sector of the chamber she is in, which wins over `x`; null along the route. */
+  sector?: string | null;
   /** Boss being fought, if any. */
   boss: string | null;
 }
@@ -30,7 +32,7 @@ export const RETURN_FADE = 4;
 export const DEATH_FADE = 0.8;
 /** Metres past a sector's border before its theme gives way (no flapping on the line). */
 export const HYSTERESIS = 2;
-const sectors = chunks.map((c) => ({ id: c.id, start: c.start, end: c.end }));
+const sectors = routeChunks.map((c) => ({ id: c.id, start: c.start, end: c.end }));
 /**
  * Decides which music and ambience play and how loud, from where Eidra is and what
  * is happening: a theme per region crossfaded at the borders, the boss's theme
@@ -74,7 +76,7 @@ export class MusicDirector {
     this.dip = Math.max(this.dip, Math.min(1, amount));
   }
   update(dt: number, context: MusicContext): Mix {
-    const score = sectorScores[this.sectorAt(context.x)];
+    const score = sectorScores[context.sector ?? this.sectorAt(context.x)];
     const theme = context.boss ? bossThemes[context.boss] : undefined;
     if (!context.boss) this.silence = Math.max(0, this.silence - dt);
     let target: TrackId | null = null;

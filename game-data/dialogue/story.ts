@@ -12,6 +12,8 @@ export const dialogues = {
       'Tu marches comme quelqu’un que j’ai connu.',
       'Il laissait toujours cette porte ouverte. Pour que je retrouve le chemin.',
       'Ici, les murs ont oublié de tomber. Écoute-les : ils se souviennent encore.',
+      'Le pont, plus loin, s’est effacé. Ce qu’on voulait oublier, on le descendait dans le puits.',
+      'Si tu veux qu’il revienne, c’est en bas qu’il faut chercher.',
     ],
   }),
   miraReturn: DialogueSchema.parse({
@@ -36,6 +38,31 @@ export const dialogues = {
     lines: [
       '« Rien ne doit être éternel. Pas même ce que nous avons construit. »',
       'Sous la poussière, les machines attendent une permission de s’arrêter.',
+    ],
+  }),
+  // Act I — fragments hidden in the depths and the lofts of the laboratory.
+  deren: DialogueSchema.parse({
+    speaker: 'FRAGMENT · DEREN',
+    flag: 'memory-deren',
+    lines: [
+      '« J’ai classé chaque nom. Puis on m’a demandé d’en effacer un. Un seul. »',
+      'Une plume s’arrête au-dessus d’une page. L’encre sèche avant qu’elle ne se décide.',
+    ],
+  }),
+  noa: DialogueSchema.parse({
+    speaker: 'FRAGMENT · NOA',
+    flag: 'memory-noa',
+    lines: [
+      '« Je montais ici pour regarder la ville respirer. Un soir, elle a retenu son souffle. »',
+      'Le vent passe encore par la lucarne. Il porte une chanson que plus personne ne chante.',
+    ],
+  }),
+  aren: DialogueSchema.parse({
+    speaker: 'FRAGMENT · AREN',
+    flag: 'memory-aren',
+    lines: [
+      '« Mira, si tu trouves ceci, ne m’attends pas. Laisse la porte ouverte quand même. »',
+      'Un dessin d’enfant gravé dans la pierre : deux silhouettes et une porte. L’une d’elles a été grattée.',
     ],
   }),
   sael: DialogueSchema.parse({

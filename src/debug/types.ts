@@ -46,7 +46,15 @@ export interface DebugSnapshot {
   remanence: boolean;
   echo: MemoryFrame | null;
   checkpoint: string;
+  /** Rooms loaded (shown or waiting behind a door). */
   chunks: string[];
+  /** The room Eidra is in, and the rooms drawn around her. */
+  room: string;
+  shown: string[];
+  /** Rooms discovered so far. */
+  discovered: string[];
+  /** 0..1 black veil of a door's cut. */
+  veil: number;
   enemies: { id: string; x: number; y: number; health: number; state: string }[];
   /** The Faceless Guardian (Act I). */
   boss: BossSnapshot;

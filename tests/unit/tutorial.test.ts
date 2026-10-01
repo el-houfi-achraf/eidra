@@ -1,24 +1,31 @@
 import { describe, it, expect } from 'vitest';
 import { TutorialDirector, hintFlag } from '../../src/quests/TutorialDirector';
 import { tutorialHints } from '../../game-data/quests/tutorial';
-import { chunks } from '../../game-data/zones/laboratory';
+import { routeChunks } from '../../game-data/zones/laboratory';
+import { roomById } from '../../src/world/Rooms';
 const context = (
   x: number,
   flags = new Set<string>(),
   abilities: string[] = [],
   wounded = false,
+  room?: string,
 ) => ({
   x,
   flags,
   abilities: new Set(abilities),
   wounded,
+  room,
+  route: room === undefined,
 });
 describe('Contextual tutorial', () => {
   it('shows the hint of the current area only once its requirements are met', () => {
     const t = new TutorialDirector();
     expect(t.update(context(5))?.id).toBe('move');
     expect(t.update(context(30))?.id).toBe('attack');
-    expect(t.update(context(30, new Set(), ['dash']))?.id).toBe('dash');
+    // The Élan is taught in the chamber where it is found, not along the route.
+    expect(t.update(context(30, new Set(), ['dash']))?.id).toBe('attack');
+    expect(t.update(context(30, new Set(), ['dash'], false, 'elans'))?.id).toBe('dash');
+    expect(t.update(context(30, new Set(), [], false, 'elans'))).toBeNull();
     expect(t.update(context(86))).toBeNull();
     expect(t.update(context(86, new Set(), ['remanence']))?.id).toBe('remanence');
     // At the edge of the rift, once the Seconde impulsion is recovered.
@@ -67,9 +74,18 @@ describe('Contextual tutorial', () => {
   it('validates hint data and keeps every band inside the world', () => {
     expect(new Set(tutorialHints.map((h) => h.id)).size).toBe(tutorialHints.length);
     for (const hint of tutorialHints) {
+      if (hint.room) {
+        expect(roomById(hint.room), hint.id).toBeDefined();
+        continue;
+      }
       expect(hint.from).toBeLessThan(hint.to);
       expect(hint.from).toBeGreaterThanOrEqual(0);
-      expect(hint.to).toBeLessThanOrEqual(chunks.at(-1)!.end);
+      expect(hint.to).toBeLessThanOrEqual(routeChunks.at(-1)!.end);
     }
+  });
+  it('keeps the bands of the route to the route: none shows in a chamber', () => {
+    const t = new TutorialDirector();
+    expect(t.update(context(5))?.id).toBe('move');
+    expect(t.update(context(5, new Set(), [], false, 'mira-well'))).toBeNull();
   });
 });

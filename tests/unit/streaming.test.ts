@@ -9,10 +9,11 @@ it('unloads obsolete chunks and keeps bounded resources across repeated travel',
         live--;
       },
       setMemory: () => undefined,
+      setShown: () => undefined,
     };
   });
   for (let i = 0; i < 100; i++) {
-    manager.update(i % 2 ? 180 : 5, false);
+    manager.update(i % 2 ? 180 : 5, 1, false);
     expect(live).toBeLessThanOrEqual(3);
   }
   manager.dispose();

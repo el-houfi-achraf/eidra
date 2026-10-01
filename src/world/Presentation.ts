@@ -22,7 +22,10 @@ import type { RawTexture } from '@babylonjs/core/Materials/Textures/rawTexture';
 import { Palette } from './Palette';
 import { Backdrop } from './Backdrop';
 import { Atmosphere } from './Atmosphere';
-import { mixRgb, tintAt } from './Mood';
+import { mixRgb, roomTint, tintAt } from './Mood';
+import { boundsOf, SHELL } from './Rooms';
+import { RISE } from '../ai/EnemyFSM';
+import type { ChunkData } from '../../game-data/zones/laboratory';
 import type { Tint } from './Mood';
 import { CameraRig } from '../camera/CameraRig';
 import { CharacterView } from '../animation/CharacterView';
@@ -117,6 +120,11 @@ export class Presentation {
   resting = false;
   /** A dialogue is on screen: the camera frames the speakers above its box. */
   talking = false;
+  /** Room the view frames; a door into or out of a chamber cuts through black. */
+  private room: ChunkData | null = null;
+  private veilAmount = 0;
+  /** The next frame cuts the camera straight to its framing (a door, a respawn). */
+  private cut = false;
   private stepDistance = 0;
   private lastHeroX = Number.NaN;
   private wasDashing = false;
@@ -322,11 +330,23 @@ export class Presentation {
     this.camera.punch(0.12);
     this.camera.shake(0.5);
   }
+  /** Eidra stepped into another room: crossing into or out of a chamber cuts through black. */
+  enter(room: ChunkData): void {
+    const from = this.room;
+    this.room = room;
+    if (!from || (from.kind === 'route' && room.kind === 'route')) return;
+    this.veilAmount = 1;
+    this.cut = true;
+  }
+  /** 0..1 opacity of the black between two rooms, eased out. */
+  get veil(): number {
+    return this.veilAmount * this.veilAmount * (3 - 2 * this.veilAmount);
+  }
   /** Respawn: Eidra gathers back out of light at the anchor. */
   reformHero(x: number, y: number): void {
     this.shatter = -1;
     this.reform = 1;
-    this.camera.snap(x, y);
+    this.cut = true;
     this.effects.ring(x, y, 'memory', 4, 0.8);
     for (let i = 0; i < 6; i++) this.motes.gather(x, y, this.palette.crystal);
   }
@@ -357,6 +377,12 @@ export class Presentation {
     const hx = menu ? TITLE_HERO.x : p.x,
       hy = menu ? TITLE_HERO.y : p.y;
     this.camera.talking = this.talking;
+    // A chamber holds the view within its walls.
+    const room = session.room;
+    const bounds = !menu && room.kind === 'chamber' ? boundsOf(room) : null;
+    if (this.cut && !menu) this.camera.snap(p.x, p.y, m.facing, bounds);
+    this.cut = false;
+    this.veilAmount = menu ? 0 : Math.max(0, this.veilAmount - dt / 0.4);
     this.camera.update(
       dt,
       p.x,
@@ -365,6 +391,7 @@ export class Presentation {
       menu ? null : session.arenas.active,
       settings,
       frame,
+      bounds,
     );
     if (menu) this.shatter = -1;
     for (const [id, t] of this.flashes) this.flashes.set(id, t - dt);
@@ -510,8 +537,9 @@ export class Presentation {
         false,
         settings.reducedMotion,
       );
-    this.mira.root.setEnabled(p.x > 45 && p.x < 105);
-    if (p.x > 45 && p.x < 105)
+    const nearMira = session.inRoute && p.x > 45 && p.x < 105;
+    this.mira.root.setEnabled(nearMira);
+    if (nearMira)
       this.mira.update(
         76,
         1.15 + Math.sin(this.time) * 0.07,
@@ -536,15 +564,26 @@ export class Presentation {
       }
     });
     this.effects.update(dt);
-    this.emitter.set(this.camera.camera.position.x, 4, 2);
+    this.emitter.set(this.camera.camera.position.x, this.camera.camera.position.y - 4.8, 2);
     // Each sector has its own colour identity: fog, sky, mist and dust follow the camera.
     const cx = this.camera.camera.position.x;
     // The title shows the dawn of its vista instead of a sector.
-    const tint = view === 'title' && this.titleStage ? this.titleStage.tint : tintAt(cx);
+    const tint =
+      view === 'title' && this.titleStage
+        ? this.titleStage.tint
+        : view === 'play' && room.kind === 'chamber'
+          ? roomTint(room)
+          : tintAt(cx);
     this.scene.fogColor.copyFromFloats(...tint.fog);
     clear.set(tint.fog[0], tint.fog[1], tint.fog[2], 1);
     this.backdrop.update(cx, this.camera.camera.position.y, tint);
-    this.atmosphere.update(cx, this.time, tint, settings.reducedMotion);
+    this.atmosphere.update(
+      cx,
+      this.time,
+      tint,
+      settings.reducedMotion,
+      view === 'play' && room.kind === 'chamber' ? room.bottom + SHELL : 0,
+    );
     if (tint !== this.lastTint) {
       this.lastTint = tint;
       this.dust.color1 = new Color4(...tint.light, 0.32);
@@ -554,7 +593,7 @@ export class Presentation {
     this.palette.shaft.alpha = settings.reducedMotion
       ? 0.5
       : 0.46 + Math.sin(this.time * 0.7) * 0.06 + Math.sin(this.time * 1.9) * 0.03;
-    this.sun.position.x = p.x + 8;
+    this.sun.position.set(p.x + 8, p.y + 17, -12);
     // Gates burst out of the floor in a spray of dust, and sink in a glimmer.
     for (const gate of session.world.takeGateChanges())
       if (Math.abs(gate.x - this.camera.camera.position.x) < this.camera.halfWidth + 2) {
@@ -601,19 +640,36 @@ export class Presentation {
         ranged: entity.data.ranged,
         flash,
       });
+      // An ambusher lies as a carving, then rises when Eidra comes close.
+      const rising =
+        entity.data.ambush && entity.fsm.state === 'DETECT'
+          ? 1 - Math.min(1, entity.fsm.timer / RISE)
+          : 0;
+      const lying = entity.fsm.dormant ? 1 : rising;
+      // Flyers bob while they hover, never during a dive.
+      const bob = entity.data.flying && !entity.dive ? Math.sin(this.time * 2 + a.x) * 0.2 : 0;
       if (alive)
         visual.view.update(
           a.x,
-          a.y + (entity.kind === 'wisp' ? Math.sin(this.time * 2) * 0.2 : 0),
+          a.y + bob,
           entity.facing,
           this.time,
           entity.fsm.state === 'CHASE' ? entity.data.speed : 0,
           attack,
           false,
           settings.reducedMotion,
-          { ...pose, hit: flash, warning, dying: dying ?? 0, grounded: true },
+          {
+            ...pose,
+            hit: flash,
+            warning: warning && !entity.fsm.dormant,
+            dying: dying ?? 0,
+            grounded: true,
+            kneel: lying,
+            squash: (pose.squash ?? 0) + 0.25 * lying,
+            lean: (pose.lean ?? 0) - 0.25 * lying,
+          },
         );
-      visual.ring.position.set(a.x, 0.07, 0);
+      visual.ring.position.set(a.x, entity.ground + 0.07, 0);
       visual.ring.scaling.setAll(1 + (warning ? entity.fsm.timer / entity.fsm.windup : 0));
       visual.ring.setEnabled(warning && a.health > 0);
     }
@@ -628,8 +684,8 @@ export class Presentation {
   }
   private renderVents(session: GameSession): void {
     const live = new Set<string>();
-    for (const chunk of session.world.stream.loaded.values())
-      for (const vent of chunk.data.hazards) {
+    for (const room of session.world.stream.shownRooms)
+      for (const vent of room.hazards) {
         live.add(vent.id);
         let view = this.vents.get(vent.id);
         if (!view) {
@@ -652,15 +708,15 @@ export class Presentation {
         const height = state === 'burning' ? 1 : state === 'warning' ? 0.08 + t * 0.12 : 0;
         view.column.setEnabled(height > 0);
         view.column.scaling.y = Math.max(0.01, height);
-        view.column.position.set(vent.x, (VENT_HEIGHT * height) / 2, -0.2);
+        view.column.position.set(vent.x, vent.y + (VENT_HEIGHT * height) / 2, -0.2);
         view.column.visibility =
           state === 'burning' ? 0.95 - t * 0.35 : 0.5 + Math.sin(this.time * 40) * 0.3;
         const glowSize = state === 'burning' ? 4 : 1.6 + t * 1.8;
         view.glow.scaling.setAll(glowSize);
-        view.glow.position.set(vent.x, 0.2, -0.3);
+        view.glow.position.set(vent.x, vent.y + 0.2, -0.3);
         view.glow.visibility = state === 'idle' ? 0.35 : 0.9;
         if (state === 'burning' && Math.random() < 0.25)
-          this.effects.burst(vent.x, 0.5 + Math.random() * 3, 'damage', 1);
+          this.effects.burst(vent.x, vent.y + 0.5 + Math.random() * 3, 'damage', 1);
       }
     for (const [id, view] of this.vents)
       if (!live.has(id)) {

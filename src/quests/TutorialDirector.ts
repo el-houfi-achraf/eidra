@@ -2,6 +2,10 @@ import { tutorialHints } from '../../game-data/quests/tutorial';
 import type { HintAction, TutorialHint } from '../../game-data/quests/tutorial';
 export interface HintContext {
   x: number;
+  /** Room Eidra is in; hints tied to a room only show there. */
+  room?: string;
+  /** In the route rooms (bands of x only mean something there). Defaults to true. */
+  route?: boolean;
   abilities: ReadonlySet<string>;
   flags: ReadonlySet<string>;
   /** Hurt and able to afford a Recueillement. */
@@ -23,8 +27,9 @@ export class TutorialDirector {
           !context.flags.has(hintFlag(hint.id)) &&
           !(hint.until && context.flags.has(hint.until)) &&
           hint.requires.every((id) => context.abilities.has(id)) &&
-          context.x >= hint.from &&
-          context.x <= hint.to &&
+          (hint.room
+            ? hint.room === context.room
+            : context.route !== false && context.x >= hint.from && context.x <= hint.to) &&
           (!hint.wounded || context.wounded) &&
           (!hint.cards || context.cards === true),
       ) ?? null;

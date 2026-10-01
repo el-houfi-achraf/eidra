@@ -1,8 +1,11 @@
 import { z } from 'zod';
+import { enemyKinds } from '../enemies/roster';
 import { ashArenas, ashCheckpoints, ashChunks, ashLandmarks, ashPits, ashStages } from './ashes';
+import { depthChambers, depthCheckpoints, depthLandmarks, depthSeals } from './depths';
 /**
- * The world as one continuous route along x: Act I, the laboratory (below), then
- * Act II, the Failles de cendre (`ashes.ts`).
+ * The world as rooms on a 2D plane (D036). The route rooms follow one another along
+ * x: Act I, the laboratory (below), then Act II, the Failles de cendre (`ashes.ts`).
+ * Chambers hang above and below them (`depths.ts`), joined by doors.
  */
 const PlatformSchema = z.object({
   x: z.number(),
@@ -13,7 +16,7 @@ const PlatformSchema = z.object({
 });
 const SpawnSchema = z.object({
   id: z.string(),
-  kind: z.enum(['watcher', 'wisp', 'sentinel', 'crawler', 'ember']),
+  kind: z.enum(enemyKinds),
   x: z.number(),
   y: z.number().default(1),
   patrol: z.tuple([z.number(), z.number()]).optional(),
@@ -22,6 +25,8 @@ const SpawnSchema = z.object({
 const HazardSchema = z.object({
   id: z.string(),
   x: z.number(),
+  /** Floor the column bursts from. */
+  y: z.number().default(0),
   width: z.number().positive(),
   period: z.number().positive(),
   active: z.number().positive(),
@@ -29,18 +34,73 @@ const HazardSchema = z.object({
   damage: z.number().positive(),
 });
 export type Hazard = z.infer<typeof HazardSchema>;
+/** Lowest and highest points of a route room: below `ROUTE_BOTTOM`, Eidra has fallen. */
+export const ROUTE_BOTTOM = -5;
+export const ROUTE_TOP = 11;
+/**
+ * Gates rise from the floor into the vault: no ledge of a route room lets Eidra
+ * leap over one (the counterweight's climb passes nine metres up beside its seal).
+ */
+export const GATE_HEIGHT = ROUTE_TOP + 1;
+/**
+ * An opening in a chamber's walls: a range of y on the left or right side, a range
+ * of x on the top or bottom. It leads into whichever room lies across that side.
+ */
+const DoorSchema = z
+  .object({
+    side: z.enum(['left', 'right', 'top', 'bottom']),
+    from: z.number(),
+    to: z.number(),
+  })
+  .refine((door) => door.to - door.from >= 1.6, 'a door lets Eidra through');
+export type Door = z.infer<typeof DoorSchema>;
+/**
+ * A slab barring a way until it opens for good (saved as `open:<id>`): a cracked
+ * wall gives way under blows; a shutter slides open from its lever, on the far side.
+ */
+const SealSchema = z
+  .object({
+    id: z.string(),
+    kind: z.enum(['cracked', 'shutter']).default('cracked'),
+    x: z.number(),
+    y: z.number(),
+    w: z.number().positive(),
+    h: z.number().positive(),
+    /** Blows a cracked wall takes. */
+    hits: z.number().int().positive().default(3),
+    /** Where Eidra pulls a shutter's lever. */
+    lever: z.object({ x: z.number(), y: z.number() }).optional(),
+  })
+  .refine((seal) => seal.kind === 'cracked' || seal.lever, 'a shutter has a lever');
+export type Seal = z.infer<typeof SealSchema>;
+export const sealFlag = (id: string): string => `open:${id}`;
+/**
+ * A room. Route rooms run along x, between `start` and `end`, from `ROUTE_BOTTOM`
+ * to `ROUTE_TOP`, open to their neighbours on either side. Chambers are closed
+ * boxes (`start`..`end` × `bottom`..`top`) whose walls open only at their doors.
+ */
 export const ChunkSchema = z
   .object({
     id: z.string(),
     name: z.string(),
+    kind: z.enum(['route', 'chamber']).default('route'),
+    /** Route room whose mood, music and ground a chamber shares; a route room is its own. */
+    sector: z.string().optional(),
     start: z.number(),
     end: z.number(),
+    bottom: z.number().default(ROUTE_BOTTOM),
+    top: z.number().default(ROUTE_TOP),
+    doors: z.array(DoorSchema).default([]),
+    /** Hidden behind a cracked wall: the map shows nothing of it until it is found. */
+    secret: z.boolean().default(false),
     platforms: z.array(PlatformSchema),
     enemies: z.array(SpawnSchema),
     hazards: z.array(HazardSchema).default([]),
     seed: z.number(),
   })
-  .refine((chunk) => chunk.hazards.every((h) => h.active < h.period), 'vents must rest');
+  .refine((chunk) => chunk.hazards.every((h) => h.active < h.period), 'vents must rest')
+  .refine((chunk) => chunk.end > chunk.start && chunk.top > chunk.bottom, 'a room has a size')
+  .refine((chunk) => chunk.kind === 'chamber' || chunk.doors.length === 0, 'route rooms are open');
 export const chunks = [
   {
     id: 'awakening',
@@ -54,6 +114,9 @@ export const chunks = [
       { x: 21, y: 2.8, w: 3, h: 0.5 },
       { x: 26, y: 4.3, w: 3, h: 0.5, memory: true },
       { x: 31, y: 5.1, w: 5, h: 0.5, memory: true },
+      // Past Kael's fragment, remembered steps climb to the crypt over the room.
+      { x: 37.2, y: 6.85, w: 2.5, h: 0.3, memory: true },
+      { x: 34, y: 8.85, w: 2.2, h: 0.3, memory: true },
     ],
     enemies: [{ id: 'watcher-1', kind: 'watcher', x: 34 }],
   },
@@ -64,7 +127,8 @@ export const chunks = [
     end: 80,
     seed: 31,
     platforms: [
-      { x: 60, y: -1, w: 40, h: 2 },
+      // Past Mira, the floor opens on the well down to the archives (78 to 80).
+      { x: 59, y: -1, w: 38, h: 2 },
       // Head-high slabs clear Eidra (1.83 m) and stay within one jump (top 2.3 m).
       { x: 50, y: 2.15, w: 5, h: 0.3 },
       { x: 61, y: 3.5, w: 4, h: 0.5 },
@@ -101,6 +165,13 @@ export const chunks = [
       // Ledge of Seris's fragment, in the antechamber before the Keeper's arena, so the
       // Keeper (2.97 m tall) never has to walk under a slab lower than its head.
       { x: 144.5, y: 2.15, w: 3, h: 0.3 },
+      // Ledges up to the opening in the vault (135 to 138): the way to the cage. The
+      // lowest clears Eidra's head, so the walk to the seal stays free.
+      { x: 133, y: 2.15, w: 2.4, h: 0.3 },
+      { x: 139, y: 3.85, w: 2.4, h: 0.3 },
+      { x: 133.4, y: 5.55, w: 2.6, h: 0.3 },
+      { x: 139, y: 7.25, w: 2.4, h: 0.3 },
+      { x: 136.5, y: 8.85, w: 2.2, h: 0.3 },
     ],
     // The Porteur du dernier ordre is a boss (game-data/bosses/keeper.ts).
     enemies: [],
@@ -115,23 +186,42 @@ export const chunks = [
     enemies: [],
   },
   ...ashChunks,
+  ...depthChambers,
 ].map((value) => ChunkSchema.parse(value));
 export type ChunkData = z.infer<typeof ChunkSchema>;
-export const checkpoints = [
+/** The rooms along x, in order: the route of both acts. */
+export const routeChunks = chunks.filter((chunk) => chunk.kind === 'route');
+/**
+ * Cracked walls and shutters of the world. They belong to no single room: one
+ * stands in a doorway and must be seen, and solid, from both sides of it.
+ */
+export const seals = depthSeals.map((seal) => SealSchema.parse(seal));
+const CheckpointSchema = z.object({
+  id: z.string(),
+  x: z.number(),
+  /** Top of the floor the anchor stands on. */
+  y: z.number().default(0),
+  name: z.string(),
+});
+export type Checkpoint = z.infer<typeof CheckpointSchema>;
+export const checkpoints: Checkpoint[] = [
   { id: 'awakening', x: 7, name: 'Ancrage de l’éveil' },
   { id: 'mira', x: 73, name: 'Ancrage de Mira' },
   // Before the Keeper: a defeat no longer sends Eidra back across the memory bridge.
   { id: 'counterweight', x: 136.5, name: 'Ancrage du contrepoids' },
   { id: 'threshold', x: 160, name: 'Ancrage du seuil' },
+  ...depthCheckpoints,
   ...ashCheckpoints,
-];
+].map((value) => CheckpointSchema.parse(value));
+/**
+ * Powers, fragments, reliquaries and Mira. Act I spaces its three powers out: the
+ * Élan, the Rémanence and the Écho mémoriel wait in its chambers (`depths.ts`).
+ */
 export const landmarks = [
-  { id: 'dash', x: 18, y: 1.2, kind: 'ability', label: 'Élan de Lumérite' },
   { id: 'mira', x: 76, y: 1, kind: 'npc', label: 'Mira' },
-  { id: 'remanence', x: 80.5, y: 1.4, kind: 'ability', label: 'Rémanence' },
-  { id: 'memory-step', x: 119, y: 1.4, kind: 'ability', label: 'Écho mémoriel' },
   { id: 'kael', x: 31, y: 6.2, kind: 'memory', label: 'Fragment de Kael' },
   { id: 'seris', x: 144.5, y: 3.2, kind: 'memory', label: 'Fragment de Seris' },
+  ...depthLandmarks,
   ...ashLandmarks,
 ] as const;
 

@@ -25,6 +25,14 @@ export const EnemySchema = z.object({
   enrage: z.number().min(0).max(1).default(0),
   /** Speed of its shots, metres per second. */
   projectileSpeed: z.number().positive().default(7),
+  /** Metres a flyer dives towards Eidra with each blow, before climbing back. */
+  swoop: z.number().nonnegative().default(0),
+  /** `front`: blows from the side it faces glance off its shell, unless it reels. */
+  guard: z.enum(['none', 'front']).default('none'),
+  /** Lies still as a carving until Eidra comes close, then rises. */
+  ambush: z.boolean().default(false),
+  /** What the journal tells of it, once met. */
+  lore: z.string().default(''),
 });
 export const enemyData = {
   watcher: EnemySchema.parse({
@@ -42,6 +50,7 @@ export const enemyData = {
     ranged: false,
     scale: 1,
     contact: 10,
+    lore: 'Il veille encore une porte que plus personne ne franchit. Son unique œil ne cligne plus depuis longtemps.',
   }),
   wisp: EnemySchema.parse({
     id: 'wisp',
@@ -59,6 +68,7 @@ export const enemyData = {
     scale: 0.75,
     contact: 8,
     flying: true,
+    lore: 'Un souvenir qui a perdu son propriétaire. Il dérive et jette au loin ce qu’il ne reconnaît plus.',
   }),
   sentinel: EnemySchema.parse({
     id: 'sentinel',
@@ -77,6 +87,7 @@ export const enemyData = {
     contact: 14,
     combo: 2,
     lunge: 1.2,
+    lore: 'Il porte l’urne des cendres de ceux qu’il a gardés. Deux coups, toujours : l’ordre en exigeait deux.',
   }),
   // Act II: low, fast ash beast that lunges at Eidra.
   crawler: EnemySchema.parse({
@@ -95,6 +106,7 @@ export const enemyData = {
     scale: 0.85,
     contact: 10,
     lunge: 2.4,
+    lore: 'Né de la cendre des forges, il rampe vers toute chaleur et bondit sur elle.',
   }),
   // Act II: keeps its distance and throws three embers in a row.
   ember: EnemySchema.parse({
@@ -114,7 +126,110 @@ export const enemyData = {
     contact: 8,
     combo: 3,
     projectileSpeed: 9,
+    lore: 'Sa braise ne s’éteint jamais. Il la lance par trois, comme on récite une prière apprise.',
+  }),
+  // Act I depths — wax moth: hovers, then dives at Eidra and climbs back.
+  moth: EnemySchema.parse({
+    id: 'moth',
+    name: 'Phalène de cire',
+    health: 20,
+    damage: 12,
+    speed: 2.6,
+    range: 6.5,
+    detection: 11,
+    stagger: 0.3,
+    windup: 0.8,
+    recover: 1.3,
+    drops: 2,
+    ranged: false,
+    scale: 0.7,
+    contact: 8,
+    flying: true,
+    swoop: 6.5,
+    lore: 'Elle se nourrissait de la cire des archives. Elle plonge vers toute lumière, et la tienne brille.',
+  }),
+  // Act I depths — walled husk: a shell on its front, open from behind and from above.
+  husk: EnemySchema.parse({
+    id: 'husk',
+    name: 'Coque murée',
+    health: 70,
+    damage: 18,
+    speed: 1.1,
+    range: 2,
+    detection: 8,
+    stagger: 0.1,
+    windup: 1,
+    recover: 1.5,
+    drops: 4,
+    ranged: false,
+    scale: 1.2,
+    contact: 12,
+    lunge: 0.8,
+    guard: 'front',
+    lore: 'Un archiviste s’est muré dans sa carapace pour ne plus rien entendre. Elle ne protège que son visage.',
+  }),
+  // Act I depths — dust mite: tiny, quick, harmless alone, dangerous in a swarm.
+  mite: EnemySchema.parse({
+    id: 'mite',
+    name: 'Mite de poussière',
+    health: 12,
+    damage: 8,
+    speed: 4.2,
+    range: 1,
+    detection: 9,
+    stagger: 0.4,
+    windup: 0.45,
+    recover: 0.7,
+    drops: 1,
+    ranged: false,
+    scale: 0.5,
+    contact: 6,
+    lore: 'La poussière des pages oubliées a fini par avoir faim. Elle ne vient jamais seule.',
+  }),
+  // Act I — watching lantern: hangs still and fires slow pairs of sparks.
+  lantern: EnemySchema.parse({
+    id: 'lantern',
+    name: 'Lanterne-guetteuse',
+    health: 30,
+    damage: 12,
+    speed: 0,
+    range: 12,
+    detection: 14,
+    stagger: 0.3,
+    windup: 1.3,
+    recover: 1.8,
+    drops: 3,
+    ranged: true,
+    scale: 0.85,
+    contact: 6,
+    flying: true,
+    combo: 2,
+    projectileSpeed: 6,
+    lore: 'On l’alluma pour surveiller les couloirs. Elle a oublié pourquoi, pas comment tirer.',
+  }),
+  // Act I — recumbent effigy: a tomb carving that rises when Eidra comes close.
+  gisant: EnemySchema.parse({
+    id: 'gisant',
+    name: 'Gisant',
+    health: 55,
+    damage: 20,
+    speed: 2,
+    range: 2.2,
+    detection: 4.5,
+    stagger: 0.2,
+    windup: 0.6,
+    recover: 1.2,
+    drops: 4,
+    ranged: false,
+    scale: 1.15,
+    contact: 10,
+    combo: 2,
+    lunge: 1.6,
+    ambush: true,
+    lore: 'Taillé dans la pierre d’une tombe, il attend qu’on s’approche assez pour lui rappeler qu’il a été vivant.',
   }),
 };
 export type EnemyKind = keyof typeof enemyData;
+/** Every kind of enemy, for the spawns of the rooms to name. */
+export const enemyKinds = Object.keys(enemyData) as [EnemyKind, ...EnemyKind[]];
 export type EnemyData = z.infer<typeof EnemySchema>;

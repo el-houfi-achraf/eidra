@@ -12,7 +12,8 @@ import {
 } from '../../game-data/audio/music';
 import { bossRoster } from '../../game-data/bosses/roster';
 import { PatternKindSchema } from '../../game-data/bosses/schema';
-import { chunks } from '../../game-data/zones/laboratory';
+import { chunks, routeChunks } from '../../game-data/zones/laboratory';
+import { chambers, sectorOf } from '../../src/world/Rooms';
 import { Cooldowns, VariantPicker, pitchSpread } from '../../src/audio/SoundBank';
 import {
   BOSS_FADE,
@@ -51,7 +52,9 @@ describe('audio data', () => {
         expect(existsSync(AUDIO + file), file).toBe(true);
   });
   it('scores every sector of the route and gives every boss its own theme', () => {
-    for (const chunk of chunks) expect(sectorScores[chunk.id], chunk.id).toBeDefined();
+    for (const chunk of routeChunks) expect(sectorScores[chunk.id], chunk.id).toBeDefined();
+    // A chamber plays its sector's score.
+    for (const room of chambers) expect(sectorScores[sectorOf(room).id], room.id).toBeDefined();
     const themes = bossRoster.map((b) => bossThemes[b.id]);
     expect(themes.every(Boolean)).toBe(true);
     expect(new Set(themes).size).toBe(bossRoster.length);
@@ -238,6 +241,7 @@ describe('combat cues', () => {
     const vent: Hazard = {
       id: 'v',
       x: 10,
+      y: 0,
       width: 1.6,
       period: 3,
       active: 1,

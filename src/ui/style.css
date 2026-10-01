@@ -2438,3 +2438,161 @@ body[data-device='gamepad'] .title-action:focus {
     padding: 9px 16px;
   }
 }
+/* Journal: the map of an act, room by room, its bestiary and its fragments. */
+.journal-panel {
+  max-height: 92vh;
+  overflow: auto;
+}
+.room-map-frame {
+  border: 1px solid var(--line);
+  background: radial-gradient(ellipse at 50% 40%, #12302f66, #050c0d 75%);
+  padding: 10px;
+}
+.room-map {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 46vh;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+}
+.room-map .room {
+  fill: #12302c;
+  stroke: #8fb9a8;
+  stroke-width: 0.35;
+}
+.room-map .room.route {
+  fill: #183a36;
+}
+.room-map .room.secret {
+  stroke: var(--gold);
+}
+.room-map .room.glimpsed {
+  fill: none;
+  stroke: #5f7f76;
+  stroke-dasharray: 1 1;
+}
+.room-map .room.current {
+  stroke: #8effdb;
+  stroke-width: 0.7;
+  fill: #1d4a43;
+}
+.room-map .door {
+  stroke: #e9d3a0;
+  stroke-width: 0.9;
+  stroke-linecap: round;
+}
+.room-map .icon {
+  font-size: 3.2px;
+  text-anchor: middle;
+  dominant-baseline: central;
+  fill: #cfe7dc;
+}
+.room-map .icon.anchor {
+  fill: #a8ffe4;
+}
+.room-map .icon.anchor.active {
+  fill: #fff6d0;
+}
+.room-map .icon.ability,
+.room-map .icon.memory,
+.room-map .icon.cache {
+  fill: var(--gold);
+}
+.room-map .icon.found {
+  fill: #5c7a71;
+}
+.room-map .icon.danger {
+  fill: #ee6b5f;
+}
+.room-map .label {
+  font-size: 2.3px;
+  letter-spacing: 0.12px;
+  text-anchor: middle;
+  fill: #9fb8ad;
+}
+.room-map .you {
+  fill: #8effdb;
+  stroke: #e9fff6;
+  stroke-width: 0.3;
+  animation: breathe 1.6s infinite;
+}
+.bestiary {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.bestiary li {
+  border: 1px solid var(--line);
+  padding: 12px 14px;
+  background: #0b1d2088;
+}
+.bestiary strong {
+  display: block;
+  font-family: 'Cinzel', Georgia, serif;
+  font-weight: 400;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: #d9e6dd;
+}
+.bestiary .count {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.bestiary p {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #a9bdb4;
+  margin: 8px 0 0;
+}
+.bestiary .unknown {
+  opacity: 0.45;
+}
+.bestiary .boss strong {
+  color: #f1d9a3;
+}
+.fragments-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.fragments-list li {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 0 12px;
+  color: #59786a;
+}
+.fragments-list b {
+  font-family: Georgia, serif;
+  font-weight: 400;
+  font-size: 26px;
+}
+.fragments-list strong {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+}
+.fragments-list p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.fragments-list .found {
+  color: #d6e3da;
+}
+.fragments-list .found b,
+.fragments-list .found strong {
+  color: var(--gold);
+}
+@media (max-height: 760px) {
+  .room-map {
+    max-height: 40vh;
+  }
+}

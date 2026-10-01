@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { MoodSchema } from '../zones/moods';
-import { chunks, route } from '../zones/laboratory';
+import { route, routeChunks } from '../zones/laboratory';
 import { musicTracks } from '../audio/music';
 import type { TrackId } from '../audio/music';
 /**
@@ -79,7 +79,7 @@ export const chapters: readonly Chapter[] = route.acts.map((act, i) =>
     number: String(i).padStart(2, '0'),
     title: act.title,
     from: act.from,
-    to: route.acts[i + 1]?.from ?? chunks.at(-1)!.end,
+    to: route.acts[i + 1]?.from ?? routeChunks.at(-1)!.end,
   }),
 );
 /** The chapter a point of the route belongs to. */

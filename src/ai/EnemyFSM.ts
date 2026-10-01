@@ -24,6 +24,9 @@ export const STRIKE = 0.2;
 export const FOLLOW_UP = 0.45;
 /** Enraged windups and recoveries shrink by this factor. */
 export const ENRAGED_HASTE = 0.7;
+/** Seconds a startled enemy takes to react; an ambusher takes longer to rise. */
+export const STARTLE = 0.25;
+export const RISE = 0.7;
 export class EnemyFSM {
   state: EnemyState = 'IDLE';
   timer = 0;
@@ -49,6 +52,10 @@ export class EnemyFSM {
   get pace(): number {
     return this.enraged ? 1.3 : 1;
   }
+  /** An ambusher still lying as a carving: it neither moves nor hurts until it rises. */
+  get dormant(): boolean {
+    return this.data.ambush && this.state === 'IDLE';
+  }
   update(dt: number, board: Blackboard): void {
     this.attackTriggered = false;
     if (
@@ -71,10 +78,12 @@ export class EnemyFSM {
       case 'IDLE':
       case 'PATROL':
         if (board.distance < this.data.detection) this.enter('DETECT');
-        else if (this.timer > 2) this.enter(this.state === 'IDLE' ? 'PATROL' : 'IDLE');
+        // An ambusher lies still: no idle wandering betrays it.
+        else if (this.timer > 2 && !this.data.ambush)
+          this.enter(this.state === 'IDLE' ? 'PATROL' : 'IDLE');
         break;
       case 'DETECT':
-        if (this.timer > 0.25) this.enter('CHASE');
+        if (this.timer > (this.data.ambush ? RISE : STARTLE)) this.enter('CHASE');
         break;
       case 'CHASE':
         if (board.homeDistance > 17) this.enter('RETURN');
