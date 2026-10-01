@@ -6,6 +6,12 @@ import { damp } from '../core/math';
 import type { Settings } from '../config/settings';
 /** Distance between the camera and the play plane (z = 0). */
 const DISTANCE = 32;
+/** A fixed framing: centre of the view and half its height on the play plane, metres. */
+export interface Frame {
+  x: number;
+  y: number;
+  halfHeight: number;
+}
 /**
  * 2.5D framing with a long-lens perspective camera. The play plane keeps the
  * same size as the former orthographic framing, while background and foreground
@@ -35,6 +41,12 @@ export class CameraRig {
     this.x = Math.max(9, x + facing * 2.3);
     this.y = Math.max(3.5, y + 1.5);
   }
+  /** Cuts straight to a framing (the title vista, a chapter preview). */
+  hold(frame: Frame): void {
+    this.x = frame.x;
+    this.y = frame.y;
+    this.halfHeight = frame.halfHeight;
+  }
   /** Brief zoom towards the action on heavy blows and parries. */
   punch(amount: number): void {
     this.zoom = Math.min(0.12, this.zoom + amount);
@@ -47,19 +59,20 @@ export class CameraRig {
     /** A sealed arena: the camera frames the whole chamber instead of following. */
     arena: { left: number; right: number } | null,
     settings: Settings,
-    menu = false,
+    /** In the menus the camera holds a framing (the title vista, a chapter preview). */
+    menu: Frame | null = null,
   ): void {
     this.clock += dt;
     this.trauma = Math.max(0, this.trauma - dt * 2.5);
     this.zoom = settings.reducedMotion ? 0 : damp(this.zoom, 0, 7, dt);
     const aspect = this.scene.getEngine().getAspectRatio(this.camera) || 16 / 9;
     const targetX = menu
-      ? 10
+      ? menu.x
       : arena
         ? (arena.left + arena.right) / 2
         : Math.max(9, x + facing * 2.3);
     this.x = damp(this.x, targetX, menu ? 2 : 4.5 * settings.cameraSensitivity, dt);
-    this.y = damp(this.y, menu ? 3.8 : Math.max(3.5, y + 1.5), 3.2, dt);
+    this.y = damp(this.y, menu ? menu.y : Math.max(3.5, y + 1.5), 3.2, dt);
     const shake = settings.reducedMotion ? 0 : this.trauma ** 2 * settings.shake * 0.25;
     this.camera.position.set(
       this.x + Math.sin(this.clock * 81) * shake,
@@ -70,7 +83,7 @@ export class CameraRig {
     this.camera.setTarget(this.target);
     // Wide chambers pull the camera back until both gates are in view.
     const framed = arena ? Math.max(7.2, ((arena.right - arena.left) / 2 + 0.8) / aspect) : 7.2;
-    this.halfHeight = damp(this.halfHeight, menu ? 10 : framed, 2.5, dt);
+    this.halfHeight = damp(this.halfHeight, menu ? menu.halfHeight : framed, 2.5, dt);
     const half = this.halfHeight * (1 - this.zoom);
     this.camera.fov = 2 * Math.atan(half / Math.hypot(DISTANCE, 4.8));
   }
