@@ -19,6 +19,7 @@ import type { World } from '../world/World';
 import type { Settings } from '../config/settings';
 import type { SaveData } from '../save/SaveManager';
 import {
+  actAt,
   checkpoints,
   landmarks,
   chunks,
@@ -662,7 +663,7 @@ export class GameSession {
         this.fx.title(
           'area',
           zone.name,
-          first ? 'Nouvelle zone découverte' : 'Laboratoire de l’éveil',
+          first ? 'Nouvelle zone découverte' : actAt(zone.start).title,
         );
       }
     }
