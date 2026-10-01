@@ -60,6 +60,15 @@ export class MusicDirector {
   victory(): void {
     this.silence = VICTORY_SILENCE;
   }
+  /** A theme chosen on the title screen (soundtrack page, chapter preview). */
+  private listening: TrackId | null = null;
+  /** Plays a theme of the score instead of the title theme while the menus show. */
+  listen(id: TrackId | null): void {
+    this.listening = id;
+  }
+  get chosen(): TrackId | null {
+    return this.listening;
+  }
   /** Ducks the music by `amount` (0..1), recovering over a moment. */
   duck(amount: number): void {
     this.dip = Math.max(this.dip, Math.min(1, amount));
@@ -71,7 +80,10 @@ export class MusicDirector {
     let target: TrackId | null = null;
     let fadeIn = CROSSFADE,
       fadeOut = CROSSFADE;
-    if (context.scene === 'menu' || context.scene === 'ending') target = 'title';
+    // A theme chosen in the menus lasts as long as the menus do.
+    if (context.scene !== 'menu') this.listening = null;
+    if (context.scene === 'menu') target = this.listening ?? 'title';
+    else if (context.scene === 'ending') target = 'title';
     else if (context.scene === 'dead') fadeOut = DEATH_FADE;
     else if (theme) {
       target = theme;
