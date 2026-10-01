@@ -13,7 +13,7 @@ const PlatformSchema = z.object({
 });
 const SpawnSchema = z.object({
   id: z.string(),
-  kind: z.enum(['watcher', 'wisp', 'sentinel', 'keeper', 'crawler', 'ember', 'warden']),
+  kind: z.enum(['watcher', 'wisp', 'sentinel', 'crawler', 'ember']),
   x: z.number(),
   y: z.number().default(1),
   patrol: z.tuple([z.number(), z.number()]).optional(),
@@ -101,7 +101,8 @@ export const chunks = [
       // Keeper (2.97 m tall) never has to walk under a slab lower than its head.
       { x: 144.5, y: 2, w: 3, h: 0.5 },
     ],
-    enemies: [{ id: 'keeper', kind: 'keeper', x: 154, patrol: [149, 157.2] }],
+    // The Porteur du dernier ordre is a boss (game-data/bosses/keeper.ts).
+    enemies: [],
   },
   {
     id: 'obedience',

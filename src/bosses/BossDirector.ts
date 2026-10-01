@@ -1,8 +1,18 @@
-import type { BossData, BossPattern } from '../../game-data/bosses/schema';
+import type { BossData, BossPattern, PatternKind } from '../../game-data/bosses/schema';
 export type BossState =
   'dormant' | 'intro' | 'approach' | 'windup' | 'attack' | 'recover' | 'transition' | 'dead';
 /** Seconds between two waves of a `nova`. */
 export const NOVA_INTERVAL = 0.45;
+/** Patterns released in pulses during their attack: seconds between two pulses. */
+export const PULSES: Partial<Record<PatternKind, number>> = {
+  nova: NOVA_INTERVAL,
+  eruption: 0.14,
+  command: 0.4,
+};
+/** Seconds a `leap` spends in the air. */
+export const LEAP_TIME = 0.6;
+/** First geyser of an `eruption`, metres in front of the boss. */
+const ERUPTION_START = 1.6;
 /** Chained follow-ups wind up faster than a fresh pattern. */
 export const COMBO_HASTE = 0.6;
 /** Longest chain of follow-ups before the boss must recover. */
@@ -20,14 +30,16 @@ export class BossDirector {
   rotation = 0;
   /** Follow-ups chained since the last recovery. */
   chain = 0;
-  /** True on the step a blow lands (every wave of a `nova`). */
+  /** True on the step a blow lands (every pulse of a `nova`, `eruption` or `command`). */
   trigger = false;
   /** Waves already released by the current `nova`. */
   waves = 0;
   direction = -1;
-  /** Ground marks of a `rain`, or the arrival point of a `blink`. */
+  /** Ground marks of a `rain` or an `eruption`; the arrival of a `blink` or a `leap`. */
   targets: number[] = [];
   private current: BossPattern;
+  /** Pattern forced for the next turn of the rotation (debug, tests). */
+  private queued: string | null = null;
   constructor(
     readonly data: BossData,
     /** Horizontal bounds of the arena, for marks and blinks. */
@@ -50,7 +62,15 @@ export class BossDirector {
   /** Seconds the attack state lasts once released. */
   get strike(): number {
     const kind = this.current.kind;
-    return kind === 'charge' ? 0.7 : kind === 'nova' ? NOVA_INTERVAL * this.current.count : 0.24;
+    const pulse = PULSES[kind];
+    if (pulse) return pulse * this.current.count + (kind === 'eruption' ? 0.3 : 0);
+    return kind === 'charge'
+      ? 0.7
+      : kind === 'leap'
+        ? LEAP_TIME
+        : kind === 'standard' || kind === 'mirror'
+          ? 0.4
+          : 0.24;
   }
   /** The boss ignores damage while it is introduced and while it changes phase. */
   get armored(): boolean {
@@ -75,6 +95,8 @@ export class BossDirector {
     playerX = Number.NaN,
   ): void {
     this.trigger = false;
+    // Where the boss stands, from Eidra's position and the distance between them.
+    const bossX = playerX - direction * distance;
     if (health <= 0) {
       this.state = 'dead';
       this.targets = [];
@@ -104,7 +126,7 @@ export class BossDirector {
         break;
       case 'approach':
         if (distance < 4 || this.timer > 2 * (this.data.haste[this.phase - 1] ?? 1))
-          this.begin(this.current, direction, playerX);
+          this.begin(this.current, direction, playerX, bossX);
         break;
       case 'windup':
         if (this.timer > this.windup) {
@@ -113,13 +135,10 @@ export class BossDirector {
           this.waves = 1;
         }
         break;
-      case 'attack':
-        // A nova releases its waves in rhythm.
-        if (
-          this.current.kind === 'nova' &&
-          this.waves < this.current.count &&
-          this.timer >= this.waves * NOVA_INTERVAL
-        ) {
+      case 'attack': {
+        // Pulsed patterns release their waves, geysers or checks in rhythm.
+        const pulse = PULSES[this.current.kind];
+        if (pulse && this.waves < this.current.count && this.timer >= this.waves * pulse) {
           this.trigger = true;
           this.waves++;
         }
@@ -128,13 +147,14 @@ export class BossDirector {
           if (combo && this.phase >= combo.phase && this.chain < MAX_CHAIN) {
             this.chain++;
             const next = this.data.patterns.find((p) => p.id === combo.pattern)!;
-            this.begin(next, direction, playerX);
+            this.begin(next, direction, playerX, bossX);
           } else {
             this.targets = [];
             this.enter('recover');
           }
         }
         break;
+      }
       case 'recover':
         if (this.timer > this.current.recover) {
           this.chain = 0;
@@ -154,17 +174,39 @@ export class BossDirector {
   }
   /** Moves to the next pattern of the current phase's rotation. */
   private advance(): void {
+    if (this.queued) {
+      const id = this.queued;
+      this.queued = null;
+      if (this.cycle().some((p) => p.id === id)) return this.select(id);
+    }
     const cycle = this.cycle();
     this.rotation = (this.rotation + 1) % cycle.length;
     this.current = cycle[this.rotation]!;
   }
   /** Starts the windup of `pattern`, marking the ground if it needs it. */
-  private begin(pattern: BossPattern, direction: number, playerX: number): void {
+  private begin(pattern: BossPattern, direction: number, playerX: number, bossX: number): void {
     this.current = pattern;
     this.direction = direction;
     const [low, high] = this.bounds;
     const clamp = (x: number): number => Math.max(low, Math.min(high, x));
     const x = Number.isFinite(playerX) ? playerX : (low + high) / 2;
+    if (pattern.kind === 'eruption') {
+      // A line of geysers racing from the boss towards Eidra, stopped by the walls.
+      const from = Number.isFinite(bossX) ? bossX : x - direction * 4;
+      this.targets = [];
+      for (let i = 0; i < pattern.count; i++) {
+        const at = from + direction * (ERUPTION_START + i * pattern.range);
+        if (at < low || at > high) break;
+        this.targets.push(at);
+      }
+      this.enter('windup');
+      return;
+    }
+    if (pattern.kind === 'leap') {
+      this.targets = [clamp(x)];
+      this.enter('windup');
+      return;
+    }
     if (pattern.kind === 'rain') {
       const half = (pattern.count - 1) / 2;
       this.targets = Array.from({ length: pattern.count }, (_, i) =>
@@ -186,6 +228,13 @@ export class BossDirector {
     if (index < 0) throw new Error(`Pattern ${id} is not in phase ${this.phase}'s rotation`);
     this.rotation = index;
     this.current = cycle[index]!;
+  }
+  /** Makes `id` the next pattern: at once while approaching, else after this one. */
+  queue(id: string): void {
+    if (!this.cycle().some((p) => p.id === id))
+      throw new Error(`Pattern ${id} is not in phase ${this.phase}'s rotation`);
+    if (['dormant', 'intro', 'approach'].includes(this.state)) this.select(id);
+    else this.queued = id;
   }
   private enter(state: BossState): void {
     this.state = state;

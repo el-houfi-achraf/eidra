@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { arenas, checkpoints, chunks, gates } from '../../game-data/zones/laboratory';
 import { enemyData } from '../../game-data/enemies/roster';
+import { bossRoster } from '../../game-data/bosses/roster';
 import { ArenaDirector } from '../../src/bosses/ArenaDirector';
 import { EnemyManager } from '../../src/enemies/EnemyManager';
 import { bodyBand, clampToGates, walkableSpan } from '../../src/enemies/Terrain';
@@ -92,10 +93,14 @@ describe('guarded arenas', () => {
       expect(arena.roam[1]).toBeLessThan(arena.right);
       expect(ids.has(`${arena.id}-left`) && ids.has(`${arena.id}-right`)).toBe(true);
     }
-    const keeper = chunks.flatMap((c) => c.enemies).find((e) => e.kind === 'keeper')!;
+    // Every arena is guarded by a boss that waits inside it, past the trigger.
+    for (const arena of arenas) {
+      const boss = bossRoster.find((b) => b.id === arena.guardian)!;
+      expect(boss.arena).toBe(arena.id);
+      expect(boss.spawn.x).toBeGreaterThan(arena.trigger);
+      expect(boss.spawn.x).toBeLessThan(arena.right);
+    }
     const lastOrder = arenas.find((a) => a.guardian === 'keeper')!;
-    expect(keeper.x).toBeGreaterThan(lastOrder.trigger);
-    expect(keeper.x).toBeLessThan(lastOrder.right);
     // The threshold anchor is the reward for the Keeper, not a way around it.
     expect(checkpoints.find((c) => c.id === 'threshold')!.x).toBeGreaterThan(lastOrder.right);
   });
@@ -133,16 +138,23 @@ describe('guarded arenas', () => {
 });
 
 describe('guardians inside their arenas', () => {
-  it('keeps the Keeper behind its closed gate while chasing', () => {
-    const manager = new EnemyManager();
-    const counterweight = chunks.find((c) => c.enemies.some((e) => e.kind === 'keeper'))!;
-    manager.sync([counterweight]);
-    const keeper = manager.entities.get('keeper')!;
-    const arena = arenas.find((a) => a.guardian === 'keeper')!;
-    const player = makeCombatant('eidra', 100, arena.left - 3, 1);
-    player.invulnerable = 99;
-    for (let i = 0; i < 900; i++) manager.update(1 / 60, player, () => undefined, [arena.left]);
-    expect(keeper.actor.x - keeper.actor.radius).toBeGreaterThan(arena.left);
+  it('keeps every boss inside its arena, whatever its way of moving', () => {
+    for (const data of bossRoster) {
+      const manager = new EnemyManager();
+      const encounter = manager.encounter(data.id)!;
+      const arena = encounter.arena;
+      const player = makeCombatant('eidra', 100, arena.trigger + 1, 1);
+      player.invulnerable = 99;
+      manager.update(1 / 60, player, () => undefined);
+      // Lured beyond its gates, then back and forth, it never leaves the arena.
+      for (const x of [arena.left - 3, arena.right - 1, arena.trigger + 0.5]) {
+        player.x = x;
+        for (let i = 0; i < 600; i++) manager.update(1 / 60, player, () => undefined);
+        expect(encounter.actor.x, data.id).toBeGreaterThanOrEqual(arena.roam[0]);
+        expect(encounter.actor.x, data.id).toBeLessThanOrEqual(arena.roam[1]);
+        expect(encounter.actor.x - encounter.actor.radius, data.id).toBeGreaterThan(arena.left);
+      }
+    }
   });
   it('confines the Guardian to its arena and only wakes it past the trigger', () => {
     const manager = new EnemyManager();

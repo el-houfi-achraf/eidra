@@ -27,26 +27,6 @@ export const EnemySchema = z.object({
   projectileSpeed: z.number().positive().default(7),
 });
 export const enemyData = {
-  // Act I elite: a banner-bearer that chains two cleaves with lunges, three when enraged.
-  keeper: EnemySchema.parse({
-    id: 'keeper',
-    name: 'LE PORTEUR DU DERNIER ORDRE',
-    health: 180,
-    damage: 24,
-    speed: 1.6,
-    range: 2.5,
-    detection: 9,
-    stagger: 0.12,
-    windup: 0.95,
-    recover: 1.4,
-    drops: 10,
-    ranged: false,
-    scale: 1.65,
-    contact: 16,
-    combo: 2,
-    lunge: 2.2,
-    enrage: 0.5,
-  }),
   watcher: EnemySchema.parse({
     id: 'watcher',
     name: 'Veilleur fêlé',
@@ -134,26 +114,6 @@ export const enemyData = {
     contact: 8,
     combo: 3,
     projectileSpeed: 9,
-  }),
-  // Act II elite of the Brasier: three lunging cleaves, faster still when enraged.
-  warden: EnemySchema.parse({
-    id: 'warden',
-    name: 'LA SENTINELLE DE CENDRE',
-    health: 280,
-    damage: 26,
-    speed: 1.9,
-    range: 2.8,
-    detection: 12,
-    stagger: 0.1,
-    windup: 0.85,
-    recover: 1.3,
-    drops: 14,
-    ranged: false,
-    scale: 1.85,
-    contact: 18,
-    combo: 3,
-    lunge: 3.2,
-    enrage: 0.5,
   }),
 };
 export type EnemyKind = keyof typeof enemyData;

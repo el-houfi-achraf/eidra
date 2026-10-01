@@ -16,6 +16,7 @@ export const ilyraData = BossSchema.parse({
   radius: 1.2,
   height: 3.8,
   speed: 3,
+  movement: 'glide',
   intro: 2.4,
   transition: 1.8,
   phases: [0.66, 0.33],
@@ -91,6 +92,19 @@ export const ilyraData = BossSchema.parse({
       damage: 22,
       range: 4,
       cue: 'TAILLE — PARADE OU ESQUIVE',
+    },
+    // Signature: denial. She hides among reflections of herself.
+    {
+      id: 'reflections',
+      kind: 'mirror',
+      phase: 2,
+      windup: 1.0,
+      recover: 0.8,
+      damage: 14,
+      range: 1,
+      count: 2,
+      duration: 7,
+      cue: 'REFLETS — TROUVEZ LA VRAIE',
     },
     {
       id: 'bloom',

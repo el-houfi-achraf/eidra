@@ -17,6 +17,7 @@ export const guardianData = BossSchema.parse({
   radius: 1.7,
   height: 4.8,
   speed: 2.4,
+  movement: 'hover',
   intro: 2.2,
   transition: 1.6,
   phases: [0.6, 0.28],
@@ -62,6 +63,18 @@ export const guardianData = BossSchema.parse({
       range: 2.6,
       count: 5,
       cue: 'PLUIE D’ÉCLATS — QUITTEZ LES MARQUES',
+    },
+    // Signature: obedience. Whoever moves under his gaze is struck.
+    {
+      id: 'command',
+      kind: 'command',
+      phase: 2,
+      windup: 1.2,
+      recover: 1.1,
+      damage: 20,
+      range: 1,
+      count: 4,
+      cue: 'OBÉISSEZ — NE BOUGEZ PLUS',
     },
     {
       id: 'blink',

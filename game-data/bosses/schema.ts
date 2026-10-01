@@ -8,6 +8,16 @@ import { z } from 'zod';
  * - `volley`: `count` shards aimed at Eidra in a fan;
  * - `blink`: vanish and reappear behind Eidra (a mark shows where);
  * - `nova`: `count` successive pairs of ground waves, to jump in rhythm.
+ * Signature abilities, one per boss:
+ * - `standard`: a banner planted where the boss stands sends ground waves both ways
+ *   every 1.3 s for `duration` seconds;
+ * - `command`: `count` checks 0.4 s apart; each time Eidra has moved since the last,
+ *   a shard falls on her (stand still to be spared);
+ * - `eruption`: `count` fire geysers burst one after another along the floor towards
+ *   Eidra, `range` metres apart;
+ * - `leap`: a bound through the air onto Eidra's marked position, waves on landing;
+ * - `mirror`: the boss splits into `count` reflections that shoot for `duration`
+ *   seconds; each shatters in one blow, and striking the real one dispels them.
  */
 export const PatternKindSchema = z.enum([
   'sweep',
@@ -17,7 +27,18 @@ export const PatternKindSchema = z.enum([
   'volley',
   'blink',
   'nova',
+  'standard',
+  'command',
+  'eruption',
+  'leap',
+  'mirror',
 ]);
+/**
+ * How a boss moves between blows: `march` in heavy steps, `hover` above the ground,
+ * `leap` in bounds, `glide` like a drifting veil.
+ */
+export const MovementSchema = z.enum(['march', 'hover', 'leap', 'glide']);
+export type Movement = z.infer<typeof MovementSchema>;
 export type PatternKind = z.infer<typeof PatternKindSchema>;
 export const PatternSchema = z.object({
   id: z.string(),
@@ -28,8 +49,10 @@ export const PatternSchema = z.object({
   recover: z.number().positive(),
   damage: z.number().nonnegative(),
   range: z.number().positive(),
-  /** Marks, shards or wave pairs released. */
+  /** Marks, shards, wave pairs, geysers, checks or reflections released. */
   count: z.number().int().min(1).default(1),
+  /** Seconds a lasting effect remains (a planted banner, reflections). */
+  duration: z.number().positive().optional(),
   /** Pattern chained straight after this one (shorter windup), from the given phase. */
   combo: z.object({ pattern: z.string(), phase: z.number().int().min(1).max(3) }).optional(),
   /** Only reached as a combo follow-up, never picked from the rotation. */
@@ -55,6 +78,7 @@ export const BossSchema = z
     height: z.number().positive(),
     /** Approach speed in the first phase, metres per second. */
     speed: z.number().positive(),
+    movement: MovementSchema.default('march'),
     /** Armoured introduction, in seconds. */
     intro: z.number().positive(),
     /** Armoured roar between phases, in seconds. */
@@ -72,12 +96,17 @@ export const BossSchema = z
       if (boss.phases[i]! >= boss.phases[i - 1]!)
         ctx.addIssue({ code: 'custom', message: `${boss.id}: phase thresholds must descend` });
     const ids = new Set(boss.patterns.map((p) => p.id));
+    if (ids.size !== boss.patterns.length)
+      ctx.addIssue({ code: 'custom', message: `${boss.id}: pattern ids must be unique` });
     for (const pattern of boss.patterns)
       if (pattern.combo && !ids.has(pattern.combo.pattern))
         ctx.addIssue({
           code: 'custom',
           message: `${boss.id}: unknown combo ${pattern.combo.pattern}`,
         });
+    for (const pattern of boss.patterns)
+      if ((pattern.kind === 'standard' || pattern.kind === 'mirror') && !pattern.duration)
+        ctx.addIssue({ code: 'custom', message: `${boss.id}: ${pattern.id} needs a duration` });
     for (let phase = 1; phase <= boss.phases.length + 1; phase++)
       if (!boss.patterns.some((p) => !p.followUp && p.phase <= phase))
         ctx.addIssue({ code: 'custom', message: `${boss.id}: phase ${phase} has no pattern` });

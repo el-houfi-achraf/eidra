@@ -96,3 +96,12 @@ Lire README, ROADMAP et AGENT_RULES, lancer `npm ci`, puis `npm run check` et le
 - **Cartes** : la résonance tourne autour d'Eidra en cartes rouges ; appui bref sur la touche de soin = lancer une carte (éventail de trois pendant une riposte), appui maintenu = Recueillement ; bouclier de cartes pendant la parade ; rafale de cartes à l'attaque chargée, plus longue.
 - **Mouvements** : combo de bâton en trois coups (balayage, arc montant, estoc), bâton levé à la charge, pointé vers le bas au pogo avec gerbe rouge, traîné en arrière à la course et au dash, dash à traînée pourpre, jambes repliées à l'impulsion, écartées à l'apex, tendues à la chute.
 - Astuce contextuelle du lancer, commandes et aide-mémoire mis à jour ; sauvegarde inchangée.
+
+### Neuvième itération : quatre boss, quatre capacités
+
+- **Quatre vrais boss** (D032) : le Porteur du dernier ordre et la Sentinelle de cendre deviennent des boss à deux phases (introduction, transition, barre de vie à repère, annonces), aux côtés du Gardien Sans Visage et d'Ilyra.
+- **Une capacité signature chacun** : l'**Étendard** du Porteur, planté dans le sol, envoie des ondes à sauter pendant qu'il continue à frapper ; le **Commandement** du Gardien (« NE BOUGEZ PLUS ») fait tomber un éclat sur Eidra si elle bouge sous son regard ; la Sentinelle **bondit** sur la marque d'Eidra et lance une **éruption** de geysers en ligne ; Ilyra se divise en **Reflets** qui tirent — trouvez la vraie.
+- **Une démarche chacun** : marche lourde qui soulève la poussière, lévitation, bonds, glisse.
+- **Nouvelles apparences** : livrée bleu et or et écusson du Porteur, bannière qui quitte son dos quand elle est plantée ; éclats en orbite du Gardien ; cornes, cape de braise, suie et braises de la Sentinelle ; couronne de fleurs, mèches roses et pétales d'Ilyra.
+- **Lisibilité** : marques au sol jusqu'à l'atterrissage du bond et jusqu'à chaque geyser, œil au-dessus d'Eidra qui rougit quand il punit, reflets qui scintillent brièvement.
+- Sauvegarde inchangée : un Porteur ou une Sentinelle vaincus dans une partie existante restent vaincus.
