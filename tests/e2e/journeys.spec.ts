@@ -99,6 +99,110 @@ test('settings, remapping and keyboard without a gamepad survive reload', async 
   expect(s.gamepad).toBe(false);
   expect(s.renderer).toBe('WebGL2');
 });
+test('the title screen: sections, the journey so far, its score, a preview and a profile', async ({
+  page,
+}) => {
+  test.setTimeout(120000);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/?debug=1&renderer=webgl2');
+  await expect(page.locator('body')).toHaveAttribute('data-ready', 'true');
+  // Before any journey: no « Continuer », nothing to load, the first chapter.
+  await expect(page.locator('.title-nav [aria-current="page"]')).toHaveText('Accueil');
+  await expect(page.locator('#continue')).toHaveCount(0);
+  await expect(page.locator('#load')).toBeDisabled();
+  await expect(page.locator('.fragments')).toContainText('00/07');
+  await expect(page.locator('.chapter-card')).toContainText('CHAPITRE 00');
+  // The keys the footer promises: arrows move, E selects, Escape goes back.
+  await expect(page.locator('.title-keys')).toContainText('Sélectionner');
+  await expect(page.locator('#new')).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('#settings')).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(page.locator('#new')).toBeFocused();
+  await page.keyboard.press('KeyE');
+  await expect(page.locator('#slot-0')).toBeFocused();
+  await expect(page.locator('.title-nav [aria-current="page"]')).toHaveText('Jouer');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#new')).toBeFocused();
+  // A journey into Act II, saved, then back to the title.
+  await page.locator('#new').click();
+  await page.locator('#slot-0').click();
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'PLAYING');
+  await page.evaluate(() => window.eidra!.teleport(50));
+  await page.waitForTimeout(300);
+  await page.evaluate(() => window.eidra!.teleport(222));
+  await expect.poll(async () => (await snapshot(page)).chunks).toContain('cinder-gate');
+  // Sael's transmission greets the act.
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'CUTSCENE');
+  await skipDialogue(page);
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'PLAYING');
+  await page.evaluate(() => window.eidra!.save());
+  await page.waitForTimeout(300);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'PAUSED');
+  await page.locator('#menu').click();
+  await expect(page.locator('#continue')).toBeFocused();
+  await expect(page.locator('#continue')).toContainText('Ancrage de');
+  await expect(page.locator('.chapter-card')).toContainText('Les Failles de cendre');
+  // The soundtrack holds the themes heard on the way; one plays over the title.
+  await page.locator('.title-nav [data-section="extras"]').click();
+  await expect(page.locator('.memory-gallery li')).toHaveCount(7);
+  await page.getByRole('tab', { name: 'Bande originale' }).click();
+  await expect(page.locator('[data-theme]')).toHaveCount(4);
+  await page.locator('[data-theme="mira"]').click();
+  await expect(page.locator('[data-theme="mira"]')).toHaveAttribute('aria-pressed', 'true');
+  const music = async (id: string) => (await snapshot(page)).audio.mix?.music[id] ?? 0;
+  await expect.poll(() => music('mira'), { timeout: 20000 }).toBeGreaterThan(0.9);
+  await page.locator('[data-theme="mira"]').click();
+  await expect.poll(() => music('title'), { timeout: 20000 }).toBeGreaterThan(0.9);
+  // The preview of Act II flies over its sectors to its theme, then returns.
+  await page.keyboard.press('Escape');
+  await page.locator('[data-slide="1"]').click();
+  await page.locator('[data-run="1"]').click();
+  await expect(page.locator('.preview-caption')).toContainText('CHAPITRE 01');
+  await expect(page.locator('.title-bar')).toBeHidden();
+  await expect.poll(async () => (await snapshot(page)).chunks).toContain('cinder-gate');
+  await expect.poll(() => music('ashes'), { timeout: 20000 }).toBeGreaterThan(0.9);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.title-bar')).toBeVisible();
+  await expect.poll(async () => (await snapshot(page)).chunks).toContain('awakening');
+  await expect.poll(() => music('title'), { timeout: 20000 }).toBeGreaterThan(0.9);
+  // The profile's name and the news, kept across a reload.
+  await expect(page.locator('#news .unread')).toHaveCount(1);
+  await page.locator('#news').click();
+  await expect(page.locator('#title-pop')).toContainText('Une bande-son originale');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#title-pop')).toHaveCount(0);
+  await page.locator('#profile').click();
+  await page.locator('#profile-name').fill('Achraf');
+  await page.locator('#profile-name').press('Enter');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#profile')).toContainText('Achraf');
+  // Written to the browser's database before the reload.
+  const stored = () =>
+    page.evaluate(
+      () =>
+        new Promise<string>((resolve, reject) => {
+          const open = indexedDB.open('eidra-saves');
+          open.onerror = () => reject(open.error);
+          open.onsuccess = () => {
+            const read = open.result.transaction('settings').objectStore('settings').get('current');
+            read.onsuccess = () => {
+              resolve((read.result as { profileName?: string } | undefined)?.profileName ?? '');
+              open.result.close();
+            };
+          };
+        }),
+    );
+  await expect.poll(stored).toBe('Achraf');
+  await page.reload();
+  await expect(page.locator('body')).toHaveAttribute('data-ready', 'true');
+  await expect(page.locator('#profile')).toContainText('Achraf');
+  await expect(page.locator('#news .unread')).toHaveCount(0);
+  expect((await snapshot(page)).settings.profileName).toBe('Achraf');
+  expect(errors).toEqual([]);
+});
 test('memory bridge creates collision and echo holds the counterweight gate', async ({ page }) => {
   await start(page);
   await page.evaluate(() => {
