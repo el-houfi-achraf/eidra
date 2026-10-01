@@ -64,6 +64,7 @@ function maskEmblem(): string {
 /** Babylon GUI heads-up display. It reads the session and never changes it. */
 export class Hud {
   private texture: AdvancedDynamicTexture;
+  private curtain: Rectangle;
   private health: Rectangle;
   private chip: Rectangle;
   private energy: Rectangle;
@@ -101,6 +102,14 @@ export class Hud {
     this.texture = AdvancedDynamicTexture.CreateFullscreenUI('eidra-hud', true, scene);
     this.texture.idealWidth = 1440;
     if (this.texture.layer) this.texture.layer.applyPostProcess = false;
+    // Black veil the view cuts through at a chamber's door, under every gauge.
+    this.curtain = new Rectangle('room-veil');
+    this.curtain.thickness = 0;
+    this.curtain.background = '#000000';
+    this.curtain.alpha = 0;
+    this.curtain.isHitTestVisible = false;
+    this.curtain.isVisible = false;
+    this.texture.addControl(this.curtain);
     const container = new Rectangle('status');
     container.width = '340px';
     container.height = '110px';
@@ -341,6 +350,11 @@ export class Hud {
   /** Shows a foe's health bar for a few seconds after it is struck. */
   enemyDamaged(id: string): void {
     this.barTimers.set(id, 3);
+  }
+  /** Opacity 0..1 of the black veil between two rooms. */
+  veil(alpha: number): void {
+    this.curtain.isVisible = alpha > 0.002;
+    this.curtain.alpha = alpha;
   }
   update(session: GameSession, visible: boolean, dt = 1 / 60, reducedMotion = false): void {
     this.texture.rootContainer.isVisible = visible;

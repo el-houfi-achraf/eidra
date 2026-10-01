@@ -6,11 +6,14 @@ import { PhysicsAggregate } from '@babylonjs/core/Physics/v2/physicsAggregate';
 import { PhysicsShapeType } from '@babylonjs/core/Physics/v2/IPhysicsEnginePlugin';
 import type { Scene } from '@babylonjs/core/scene';
 import type { ChunkData } from '../../game-data/zones/laboratory';
-import { checkpoints, chunks, landmarks, shortcuts } from '../../game-data/zones/laboratory';
+import { checkpoints, landmarks, routeChunks, shortcuts } from '../../game-data/zones/laboratory';
 import type { Palette } from './Palette';
 import type { DisposableChunk } from './SceneManager';
 import { paintScenery } from './Scenery';
 import type { PaintedGeometry } from './PaintedGeometry';
+import { roomAt, shell } from './Rooms';
+/** Opacity of remembered slabs before Rémanence: seen from the start, solid only later. */
+export const MEMORY_GHOST = 0.32;
 // TODO_ART: original procedural blockout. Replace through the validated Blender → GLB pipeline.
 export class ChunkView implements DisposableChunk {
   private farLayers: Mesh | null = null;
@@ -55,23 +58,32 @@ export class ChunkView implements DisposableChunk {
         );
       }
     }
+    // A chamber's walls, floor and vault: colliders only, the scenery paints the rock.
+    for (const wall of shell(data)) {
+      const mesh = this.box('shell', wall.x, wall.y, 0, wall.w, wall.h, 4.8, p.stone);
+      mesh.isVisible = false;
+      this.bodies.push(
+        new PhysicsAggregate(mesh, PhysicsShapeType.BOX, { mass: 0, friction: 0 }, scene),
+      );
+    }
+    const here = (x: number, y: number): boolean => roomAt(x, y)?.id === data.id;
     for (const c of checkpoints)
-      if (c.x >= data.start && c.x < data.end) {
-        this.box('anchor-base', c.x, 0.15, 1.1, 2, 0.3, 2, p.dark);
+      if (here(c.x, c.y + 0.5)) {
+        this.box('anchor-base', c.x, c.y + 0.15, 1.1, 2, 0.3, 2, p.dark);
         const ring = MeshBuilder.CreateTorus(
           'anchor-ring',
           { diameter: 2.3, thickness: 0.07, tessellation: 40 },
           scene,
         );
-        ring.position.set(c.x, 1.7, 1);
+        ring.position.set(c.x, c.y + 1.7, 1);
         ring.rotation.x = Math.PI / 2;
         ring.material = p.gold;
         this.add(ring);
-        const gem = this.crystal(c.x, 1.7, 1, 0.32, p.crystal);
+        const gem = this.crystal(c.x, c.y + 1.7, 1, 0.32, p.crystal);
         this.crystals.push(gem);
       }
     for (const marker of landmarks)
-      if (marker.x >= data.start && marker.x < data.end && marker.kind !== 'npc') {
+      if (here(marker.x, marker.y) && marker.kind !== 'npc') {
         const gem = this.crystal(
           marker.x,
           marker.y,
@@ -85,7 +97,7 @@ export class ChunkView implements DisposableChunk {
         this.markerMeshes.get(marker.id)?.push(base);
       }
     for (const passage of shortcuts)
-      if (passage.x >= data.start && passage.x < data.end) {
+      if (here(passage.x, passage.y)) {
         const ring = MeshBuilder.CreateTorus(
           'maintenance-door',
           { diameter: 2.4, thickness: 0.12, tessellation: 32 },
@@ -131,7 +143,7 @@ export class ChunkView implements DisposableChunk {
       this.box('seal-line', 135, 0.01, -1.8, 10, 0.05, 0.07, p.trim);
     }
     // The world's far end: a wall after the last sector.
-    if (data === chunks.at(-1)) {
+    if (data === routeChunks.at(-1)) {
       this.box('exit', data.end - 1, 3, 0, 1, 7, 5, p.dark);
       this.bodies.push(
         new PhysicsAggregate(this.meshes.at(-1)!, PhysicsShapeType.BOX, { mass: 0 }, scene),
@@ -175,16 +187,21 @@ export class ChunkView implements DisposableChunk {
       mesh.material = material;
       return this.add(mesh);
     };
-    paint(scenery.near, 'painted-near', p.painted);
-    this.farLayers = paint(scenery.far, 'painted-far', p.painted);
-    const front = paint(scenery.front, 'painted-front', p.paintedSoft);
+    const offset = scenery.offset;
+    const raise = (mesh: Mesh | null): Mesh | null => {
+      if (mesh) mesh.position.y = offset;
+      return mesh;
+    };
+    raise(paint(scenery.near, 'painted-near', p.painted));
+    this.farLayers = raise(paint(scenery.far, 'painted-far', p.painted));
+    const front = raise(paint(scenery.front, 'painted-front', p.paintedSoft));
     if (front) front.hasVertexAlpha = true;
-    this.glowLayer = paint(scenery.glow, 'light-pools', p.halo);
-    const shafts = paint(scenery.shafts, 'light-shafts', p.shaft);
-    this.memoryView = paint(scenery.memory, 'painted-memory', p.paintedMemory);
+    this.glowLayer = raise(paint(scenery.glow, 'light-pools', p.halo));
+    const shafts = raise(paint(scenery.shafts, 'light-shafts', p.shaft));
+    this.memoryView = raise(paint(scenery.memory, 'painted-memory', p.paintedMemory));
     if (this.memoryView) {
       this.memoryView.hasVertexAlpha = true;
-      this.memoryView.visibility = 0.14;
+      this.memoryView.visibility = MEMORY_GHOST;
     }
     this.shaftMeshes = shafts ? [shafts] : [];
     for (const mesh of this.meshes) {
@@ -231,12 +248,15 @@ export class ChunkView implements DisposableChunk {
     for (const [id, meshes] of this.markerMeshes)
       for (const m of meshes) m.setEnabled(!collected.has(id));
   }
+  setShown(shown: boolean): void {
+    this.root.setEnabled(shown);
+  }
   setMemory(active: boolean): void {
     if (this.activeMemory === active) return;
     this.activeMemory = active;
     for (const body of this.memoryBodies) body.dispose();
     this.memoryBodies = [];
-    if (this.memoryView) this.memoryView.visibility = active ? 1 : 0.14;
+    if (this.memoryView) this.memoryView.visibility = active ? 1 : MEMORY_GHOST;
     for (const mesh of this.memoryMeshes) {
       if (active)
         this.memoryBodies.push(

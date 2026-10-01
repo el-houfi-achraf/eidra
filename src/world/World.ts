@@ -6,7 +6,13 @@ import type { Scene } from '@babylonjs/core/scene';
 import type { Palette } from './Palette';
 import { ChunkView } from './ChunkView';
 import { SceneManager } from './SceneManager';
-import { gates as gateLayout } from '../../game-data/zones/laboratory';
+import {
+  GATE_HEIGHT,
+  gates as gateLayout,
+  sealFlag,
+  seals,
+} from '../../game-data/zones/laboratory';
+import { paintSeal } from './Scenery';
 interface Gate {
   x: number;
   mesh: Mesh;
@@ -15,11 +21,17 @@ interface Gate {
   raised: number;
   closed: boolean;
 }
-const GATE_HEIGHT = 8;
+/** A cracked wall or shutter: solid and drawn until it opens for good. */
+interface SealView {
+  body: PhysicsAggregate | null;
+  collider: Mesh;
+  view: Mesh | null;
+}
 export class World {
   private quality: 'LOW' | 'MEDIUM' | 'HIGH' | 'ULTRA' = 'MEDIUM';
   readonly stream: SceneManager<ChunkView>;
   private gates = new Map<string, Gate>();
+  private seals = new Map<string, SealView>();
   private lastTime = Number.NaN;
   /** Gates that started rising or sinking since the presentation last looked. */
   private changes: { x: number; closed: boolean }[] = [];
@@ -46,14 +58,36 @@ export class World {
       mesh.setEnabled(false);
       this.gates.set(id, { x, mesh, body: null, raised: 0, closed: false });
     }
+    for (const seal of seals) {
+      const collider = MeshBuilder.CreateBox(
+        `${seal.id}-seal`,
+        { width: seal.w, height: seal.h, depth: 4.8 },
+        scene,
+      );
+      collider.position.set(seal.x, seal.y, 0);
+      collider.isVisible = false;
+      collider.isPickable = false;
+      const view = paintSeal(seal).build(scene, `${seal.id}-seal-paint`);
+      if (view) {
+        view.material = p.painted;
+        view.isPickable = false;
+      }
+      const body = new PhysicsAggregate(
+        collider,
+        PhysicsShapeType.BOX,
+        { mass: 0, friction: 0 },
+        scene,
+      );
+      this.seals.set(seal.id, { body, collider, view });
+    }
   }
   setQuality(preset: 'LOW' | 'MEDIUM' | 'HIGH' | 'ULTRA'): void {
     this.quality = preset;
     for (const chunk of this.stream.loaded.values()) chunk.setQuality(preset);
   }
-  /** Streams sectors around `x` and applies the gates that are currently closed. */
-  update(x: number, memory: boolean, closed: ReadonlySet<string>): void {
-    this.stream.update(x, memory);
+  /** Streams the rooms around (x, y) and applies the gates that are currently closed. */
+  update(x: number, y: number, memory: boolean, closed: ReadonlySet<string>): void {
+    this.stream.update(x, y, memory);
     for (const [id, gate] of this.gates)
       this.gate(gate, closed.has(id) && Math.abs(x - gate.x) < 45);
   }
@@ -94,11 +128,28 @@ export class World {
       gate.mesh.position.y = GATE_HEIGHT / 2 - (1 - eased) * GATE_HEIGHT;
     }
     for (const chunk of this.stream.loaded.values()) chunk.update(time, collected, flags);
+    // Opened seals give way for good.
+    for (const [id, seal] of this.seals)
+      if (flags.has(sealFlag(id)) && (seal.body || seal.view?.isEnabled())) {
+        seal.body?.dispose();
+        seal.body = null;
+        seal.view?.setEnabled(false);
+      } else if (!flags.has(sealFlag(id)) && !seal.body) {
+        // A new journey or another save closes it again.
+        seal.body = new PhysicsAggregate(
+          seal.collider,
+          PhysicsShapeType.BOX,
+          { mass: 0, friction: 0 },
+          this.scene,
+        );
+        seal.view?.setEnabled(true);
+      }
   }
   get bodyCount(): number {
     return (
       [...this.stream.loaded.values()].reduce((sum, c) => sum + c.bodyCount, 1) +
-      [...this.gates.values()].filter((g) => g.body).length
+      [...this.gates.values()].filter((g) => g.body).length +
+      [...this.seals.values()].filter((seal) => seal.body).length
     );
   }
   dispose(): void {
@@ -106,6 +157,11 @@ export class World {
     for (const gate of this.gates.values()) {
       gate.body?.dispose();
       gate.mesh.dispose();
+    }
+    for (const seal of this.seals.values()) {
+      seal.body?.dispose();
+      seal.collider.dispose();
+      seal.view?.dispose();
     }
   }
 }

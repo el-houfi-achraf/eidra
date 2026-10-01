@@ -6,12 +6,13 @@ import { EnemyFSM, STRIKE } from '../ai/EnemyFSM';
 import { BossDirector, LEAP_TIME } from '../bosses/BossDirector';
 import { makeCombatant } from '../combat/CombatSystem';
 import type { Combatant, Hitbox } from '../combat/CombatSystem';
-import { arenas, chunks } from '../../game-data/zones/laboratory';
+import { arenas } from '../../game-data/zones/laboratory';
 import type { Arena, ChunkData } from '../../game-data/zones/laboratory';
-import { walkableSpan, clampToGates } from './Terrain';
+import { bodyBand, walkableSpan, clampToGates } from './Terrain';
 import type { Solid } from './Terrain';
-/** Solid (non-memory) slabs of the whole laboratory, used to bound enemy movement. */
-const solids: Solid[] = chunks.flatMap((chunk) => chunk.platforms.filter((p) => !p.memory));
+import { worldSolids } from '../world/Rooms';
+/** Solid slabs and chamber walls of the whole world, used to bound enemy movement. */
+const solids: Solid[] = worldSolids;
 /** Seconds between two pulses of a planted standard. */
 export const STANDARD_INTERVAL = 1.3;
 /** Seconds between two shots of a reflection. */
@@ -146,7 +147,29 @@ export interface EnemyEntity {
   kind: string;
   facing: number;
   rewarded: boolean;
+  /** Top of the floor under its spawn, where its warning ring is drawn. */
+  ground: number;
+  /** Height a flyer hovers at, and climbs back to after a dive. */
+  altitude: number;
+  /** A dive under way: where it heads, and whether it has struck yet. */
+  dive: { x: number; y: number; struck: boolean } | null;
+  /** Seconds a slow-turning shell has been facing away from Eidra. */
+  turning: number;
 }
+/**
+ * A shell guards the side its bearer faces: a blow travelling towards its face
+ * glances off, unless it reels from its own lunge. From behind, or from above
+ * (a plunge), it is open.
+ */
+export function guarded(entity: EnemyEntity, direction: number, plunge: boolean): boolean {
+  if (entity.data.guard !== 'front' || plunge) return false;
+  if (entity.fsm.state === 'RECOVER' || entity.fsm.state === 'STAGGER') return false;
+  return direction === -entity.facing;
+}
+/** Seconds a guarded body takes to turn round: long enough to get behind its shell. */
+export const TURN_TIME = 0.9;
+/** Climb back to its altitude after a dive, m/s. */
+const CLIMB = 3.2;
 export interface Projectile {
   sourceId: string;
   x: number;
@@ -182,7 +205,12 @@ export class EnemyManager {
           height,
           base.flying,
         );
+        const floor = bodyBand(solids, spawn.x, spawn.y, height)?.[0] ?? spawn.y - 1;
         this.entities.set(spawn.id, {
+          ground: floor,
+          altitude: spawn.y,
+          dive: null,
+          turning: 0,
           actor: makeCombatant(spawn.id, base.health, spawn.x, spawn.y, radius, height),
           fsm: new EnemyFSM(base),
           data: base,
@@ -205,7 +233,19 @@ export class EnemyManager {
     for (const entity of this.entities.values()) {
       const a = entity.actor,
         delta = player.x - a.x;
-      entity.facing = Math.sign(delta) || 1;
+      const toward = Math.sign(delta) || 1;
+      // A shell turns round slowly, and never in the middle of a blow.
+      if (entity.data.guard === 'front' && toward !== entity.facing) {
+        const busy = entity.fsm.state === 'ALERT' || entity.fsm.state === 'ATTACK';
+        entity.turning = busy ? entity.turning : entity.turning + dt;
+        if (entity.turning >= TURN_TIME) {
+          entity.facing = toward;
+          entity.turning = 0;
+        }
+      } else {
+        entity.facing = toward;
+        entity.turning = 0;
+      }
       entity.fsm.update(dt, {
         distance: Math.hypot(delta, player.y - a.y),
         homeDistance: Math.abs(a.x - entity.home),
@@ -217,7 +257,8 @@ export class EnemyManager {
         this.defeated.add(a.id);
         continue;
       }
-      if (entity.fsm.state === 'CHASE')
+      // A shell turning round stands still until it faces Eidra again.
+      if (entity.fsm.state === 'CHASE' && entity.turning === 0)
         a.x += entity.facing * entity.data.speed * entity.fsm.pace * dt;
       // A lunge carries the body forward during the blow.
       if (entity.fsm.state === 'ATTACK' && entity.data.lunge > 0 && entity.fsm.timer <= STRIKE)
@@ -226,9 +267,25 @@ export class EnemyManager {
         a.x += Math.sign(entity.home - a.x) * entity.data.speed * dt;
       if (entity.fsm.state === 'PATROL') a.x += Math.sin(entity.fsm.timer * 2) * dt * 0.5;
       a.x = clampToGates(a.x + a.knockback * dt, entity.home, a.radius, gates, entity.patrol);
-      if (entity.data.contact > 0 && touching(a, player) && !(plunging && a.y < player.y))
+      // A diver drops on where Eidra was, then climbs back to its height.
+      if (entity.data.swoop > 0) this.swoop(entity, player, dt, onAttack);
+      if (
+        entity.data.contact > 0 &&
+        !entity.fsm.dormant &&
+        touching(a, player) &&
+        !(plunging && a.y < player.y)
+      )
         onAttack(contact(a, player, entity.data.contact), a);
-      if (entity.fsm.attackTriggered) {
+      if (entity.fsm.attackTriggered && entity.data.swoop > 0) {
+        const dx = player.x - a.x,
+          dy = player.y - a.y;
+        const reach = Math.min(1, entity.data.swoop / Math.max(0.1, Math.hypot(dx, dy)));
+        entity.dive = {
+          x: a.x + dx * reach,
+          y: Math.max(entity.ground + 0.6, a.y + dy * reach),
+          struck: false,
+        };
+      } else if (entity.fsm.attackTriggered) {
         if (entity.data.ranged) {
           const len = Math.max(0.1, Math.hypot(delta, player.y - a.y));
           this.projectiles.push({
@@ -283,6 +340,31 @@ export class EnemyManager {
     }
     this.projectiles = this.projectiles.filter((p) => p.life > 0);
   }
+  /** The dive of a flyer: a rush on its mark during the blow, a slow climb back after. */
+  private swoop(
+    entity: EnemyEntity,
+    player: Combatant,
+    dt: number,
+    onAttack: (hit: Hitbox, source: Combatant) => void,
+  ): void {
+    const a = entity.actor,
+      dive = entity.dive;
+    if (dive && entity.fsm.state === 'ATTACK') {
+      const k = Math.min(1, dt / Math.max(dt, STRIKE - entity.fsm.timer + dt));
+      a.x += (dive.x - a.x) * k;
+      a.y += (dive.y - a.y) * k;
+      a.x = Math.max(entity.patrol[0], Math.min(entity.patrol[1], a.x));
+      if (!dive.struck && touching(a, player)) {
+        dive.struck = true;
+        onAttack({ ...contact(a, player, entity.data.damage), stagger: 0.22, force: 5 }, a);
+      }
+      return;
+    }
+    entity.dive = null;
+    if (a.y !== entity.altitude)
+      a.y +=
+        Math.sign(entity.altitude - a.y) * Math.min(Math.abs(entity.altitude - a.y), CLIMB * dt);
+  }
   /** One boss fight: waking, moving within the arena, contact and its patterns' blows. */
   private fight(
     encounter: BossEncounter,
@@ -292,8 +374,9 @@ export class EnemyManager {
     plunging: boolean,
   ): void {
     const { actor: boss, arena, data } = encounter;
-    // Far from its arena, a boss simply waits.
+    // Far from its arena, a boss simply waits (in a chamber above or below it, too).
     if (player.x < arena.left - 30 || player.x > arena.right + 30) return;
+    if (Math.abs(player.y - data.spawn.y) > 12) return;
     if (!encounter.defeated && player.x > arena.trigger && player.x < arena.right)
       encounter.director.activate();
     const director = encounter.director,

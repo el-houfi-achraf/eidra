@@ -46,7 +46,15 @@ export interface DebugSnapshot {
   remanence: boolean;
   echo: MemoryFrame | null;
   checkpoint: string;
+  /** Rooms loaded (shown or waiting behind a door). */
   chunks: string[];
+  /** The room Eidra is in, and the rooms drawn around her. */
+  room: string;
+  shown: string[];
+  /** Rooms discovered so far. */
+  discovered: string[];
+  /** 0..1 black veil of a door's cut. */
+  veil: number;
   enemies: { id: string; x: number; y: number; health: number; state: string }[];
   /** The Faceless Guardian (Act I). */
   boss: BossSnapshot;
@@ -91,10 +99,15 @@ export interface DebugAPI {
   snapshot: () => DebugSnapshot;
   teleport: (x: number, y?: number) => void;
   unlock: (id: AbilityId) => void;
+  /** Hurts Eidra; a negative amount heals her. */
   damage: (amount: number) => void;
+  /** Lays every enemy of the shown rooms low (they return at the next respawn). */
+  defeatEnemies: () => void;
   addShards: (amount: number) => void;
   /** Sets the resonance (0..99): the cards orbiting Eidra. */
   setResonance: (value: number) => void;
+  /** Memory energy 0..100 (what the Rémanence and the Écho spend). */
+  setEnergy: (value: number) => void;
   /** Defaults to the Faceless Guardian. */
   setBossHealth: (value: number, id?: string) => void;
   /** Makes a boss use `pattern` next, at once or after its current blow (it must be in its current phase's rotation). */

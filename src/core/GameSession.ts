@@ -22,7 +22,6 @@ import {
   actAt,
   checkpoints,
   landmarks,
-  chunks,
   shortcuts,
   gates,
   progressGates,
@@ -30,22 +29,38 @@ import {
   arenas,
   pits,
   route,
+  ROUTE_BOTTOM,
+  GATE_HEIGHT,
+  sealFlag,
+  seals,
 } from '../../game-data/zones/laboratory';
+import type { ChunkData, Seal } from '../../game-data/zones/laboratory';
+import { chamberAt, draftAt, roomAt, roomById, sectorOf, SHELL, worldSolids } from '../world/Rooms';
 import { cardData, focusData } from '../../game-data/abilities/abilities';
 import { CardSystem } from '../combat/Cards';
 import type { AbilityId } from '../../game-data/abilities/abilities';
 import type { DialogueId } from '../../game-data/dialogue/story';
 import type { BossEncounter } from '../enemies/EnemyManager';
+import { guarded } from '../enemies/EnemyManager';
+import { sentence } from './text';
 import { scorches } from '../combat/Hazards';
 import { CombatCues } from '../audio/CombatCues';
 import { sectorScores } from '../../game-data/audio/music';
 import type { StingerId } from '../../game-data/audio/music';
 import type { CueId } from '../../game-data/audio/sounds';
 export type BurstKind = 'gold' | 'damage' | 'memory' | 'dust' | 'heal' | 'crimson';
-/** Walls that stop thrown cards: every solid slab of the route (memories excluded). */
-const walls = chunks.flatMap((chunk) => chunk.platforms.filter((p) => !p.memory));
+/** Walls that stop thrown cards: every solid slab and chamber wall (memories excluded). */
 const inWall = (x: number, y: number): boolean =>
-  walls.some((w) => Math.abs(x - w.x) < w.w / 2 && Math.abs(y - w.y) < w.h / 2);
+  worldSolids.some((w) => Math.abs(x - w.x) < w.w / 2 && Math.abs(y - w.y) < w.h / 2);
+/** Height of Eidra's centre above the ground she stands on. */
+const STANDING = 0.98;
+/** Gravity of her movement (MovementModel), m/s². */
+const GRAVITY = 28;
+/** Height above a sill the updraft lifts her centre to: feet 0.7 m over it. */
+const UPDRAFT_CLEARANCE = STANDING + 0.7;
+/** A seal of the shown rooms as a body blows can land on. */
+const sealBody = (seal: Seal): Combatant =>
+  makeCombatant(`seal:${seal.id}`, seal.hits, seal.x, seal.y, seal.w / 2, seal.h);
 export type TitleKind = 'area' | 'boss' | 'victory';
 export interface SessionEffects {
   /** A notification; one with a `topic` replaces the previous one on that topic. */
@@ -65,7 +80,10 @@ export interface SessionEffects {
   title: (kind: TitleKind, title: string, subtitle: string) => void;
   unlock: (id: AbilityId) => void;
   altar: () => void;
+  /** Eidra steps into another room: a chamber's door fades the view through. */
+  enter: (room: ChunkData) => void;
 }
+
 export class GameSession {
   readonly player: PlayerController;
   readonly actor = makeCombatant('eidra', 100, 4, 1, 0.35, 1.7);
@@ -89,6 +107,8 @@ export class GameSession {
   readonly inventory = new Inventory();
   readonly events = new EventBus();
   readonly discovered = new Set<string>();
+  /** Foes fallen, by kind (bosses by their own id): the journal's bestiary. */
+  readonly bestiary = new Map<string, number>();
   checkpoint = 'awakening';
   playtime = 0;
   slot = 1;
@@ -115,6 +135,13 @@ export class GameSession {
   private fallen = new Set<string>();
   /** Bosses whose introduction has been announced since the last respawn. */
   private introduced = new Set<string>();
+  /** Blows each cracked wall has taken (it gives way, and stays open, at its count). */
+  private cracks = new Map<string, number>();
+  /**
+   * Last firm ground Eidra stood on: a fall into a chamber's pit returns her
+   * there, as a rift of the route returns her to its bank.
+   */
+  private foothold = { x: 0, y: 0 };
   constructor(
     scene: Scene,
     readonly world: World,
@@ -134,6 +161,7 @@ export class GameSession {
     this.inventory.healthUpgrades = 0;
     this.quests.completed.clear();
     this.discovered.clear();
+    this.bestiary.clear();
     for (const encounter of this.enemies.bosses) encounter.defeated = false;
     this.fallen.clear();
     this.respawn();
@@ -153,6 +181,8 @@ export class GameSession {
     this.quests.completed = new Set(save.quests);
     this.discovered.clear();
     save.discoveredAreas.forEach((id) => this.discovered.add(id));
+    this.bestiary.clear();
+    for (const [kind, count] of Object.entries(save.bestiary)) this.bestiary.set(kind, count);
     for (const encounter of this.enemies.bosses)
       encounter.defeated = save.bosses.includes(encounter.data.id);
     this.fallen = new Set(
@@ -161,8 +191,9 @@ export class GameSession {
       ),
     );
     this.respawn();
-    this.world.update(save.position.x, false, this.relocate(save.position.x));
+    this.world.update(save.position.x, save.position.y, false, this.relocate(save.position.x));
     this.player.teleport(save.position.x, save.position.y);
+    this.foothold = { ...save.position };
     this.actor.health = Math.max(1, Math.min(this.actor.maxHealth, save.health));
   }
   snapshot(settings: Settings): SaveData {
@@ -187,6 +218,7 @@ export class GameSession {
       flags: [...this.narrative.flags],
       settings,
       playtime: this.playtime,
+      bestiary: Object.fromEntries(this.bestiary),
     };
   }
   respawn(): void {
@@ -215,10 +247,45 @@ export class GameSession {
     this.actor.invulnerable = 1;
     this.actor.stagger = 0;
     this.actor.knockback = 0;
-    this.world.update(point.x, false, this.relocate(point.x));
-    this.player.teleport(point.x, 1.2);
+    this.cracks.clear();
+    const y = point.y + 1.2;
+    this.world.update(point.x, y, false, this.relocate(point.x));
+    this.player.teleport(point.x, y);
     this.actor.x = point.x;
-    this.actor.y = 1.2;
+    this.actor.y = y;
+    this.foothold = { x: point.x, y };
+  }
+  /**
+   * Under a doorway overhead, a draft catches a rising leap and carries Eidra above
+   * the sill of the room beyond, so a leap that reaches it always lands beside it.
+   */
+  private updraft(): void {
+    const motion = this.player.motion;
+    if (motion.vy <= 0) return;
+    const draft = draftAt(this.room, this.actor.x, this.actor.y);
+    // No draft blows through a closed grate.
+    if (!draft || this.sealed(this.actor.x, draft.boundary)) return;
+    const sill = draft.upper.kind === 'route' ? 0 : draft.upper.bottom + SHELL;
+    const rise = sill + UPDRAFT_CLEARANCE - this.actor.y;
+    if (rise <= 0) return;
+    const speed = Math.sqrt(2 * GRAVITY * rise);
+    // Once carried, the rise already reaches the sill: no fresh push each step.
+    if (speed > motion.vy + 0.5) motion.bounce(speed, speed / GRAVITY);
+  }
+  /** The room Eidra is in. */
+  get room(): ChunkData {
+    return this.world.stream.room;
+  }
+  /** In the rooms along x, where the route's own events, gates and arenas live. */
+  get inRoute(): boolean {
+    return this.room.kind === 'route';
+  }
+  /** Her feet are on firm, lasting ground: no remembered slab, no open void below. */
+  private firmGround(x: number, y: number): boolean {
+    const feet = y - STANDING;
+    return worldSolids.some(
+      (s) => Math.abs(s.y + s.h / 2 - feet) < 0.25 && Math.abs(x - s.x) <= s.w / 2 - 0.2,
+    );
   }
   update(dt: number, input: InputManager, settings: Settings): void {
     // Hit-stop: the world holds its breath for a few frames when a blow lands.
@@ -265,7 +332,7 @@ export class GameSession {
     this.footstepTime -= dt;
     const pace = Math.abs(p.motion.vx);
     if (p.motion.grounded && pace > 1 && p.motion.dashTime === 0 && this.footstepTime <= 0) {
-      this.fx.sound(`step-${sectorScores[this.zone]?.surface ?? 'stone'}`);
+      this.fx.sound(`step-${sectorScores[sectorOf(this.room).id]?.surface ?? 'stone'}`);
       this.footstepTime = Math.min(0.5, Math.max(0.24, 2 / pace));
     }
     if (!p.motion.grounded) this.fall = Math.min(this.fall, p.motion.vy);
@@ -325,8 +392,8 @@ export class GameSession {
     const echo = this.abilities.echo;
     this.echoOpen =
       this.narrative.flags.has('echo-gate-open') ||
-      Math.abs(this.actor.x - 130) < 1.3 ||
-      (echo !== null && Math.abs(echo.x - 130) < 1.3 && echo.y < 2);
+      (this.inRoute && Math.abs(this.actor.x - 130) < 1.3 && this.actor.y < 2.5) ||
+      (echo !== null && Math.abs(echo.x - 130) < 1.3 && echo.y > -1 && echo.y < 2);
     if (this.echoOpen && this.actor.x > 142.5 && !this.narrative.flags.has('echo-gate-open')) {
       this.narrative.flags.add('echo-gate-open');
       this.fx.notice('Le contrepoids se souvient. Le passage reste ouvert.');
@@ -364,8 +431,8 @@ export class GameSession {
     }
     // Ember vents burst on the session clock, so visuals and damage agree.
     this.hazardTime += dt;
-    for (const chunk of this.world.stream.loaded.values())
-      for (const vent of chunk.data.hazards)
+    for (const room of this.world.stream.shownRooms)
+      for (const vent of room.hazards)
         if (scorches(vent, this.hazardTime, this.actor.x, this.actor.y, this.actor.radius))
           this.takeHit(
             {
@@ -383,17 +450,22 @@ export class GameSession {
             settings,
           );
     const closed = this.closedGates();
-    this.world.update(this.actor.x, this.abilities.remanence, closed);
-    this.enemies.sync([...this.world.stream.loaded.values()].map((c) => c.data));
+    this.world.update(this.actor.x, this.actor.y, this.abilities.remanence, closed);
+    this.updraft();
+    this.enemies.sync(this.world.stream.shownRooms);
+    // Gates stand in the route: a chamber's bodies never meet them.
+    const shut = this.inRoute
+      ? gates.filter((gate) => closed.has(gate.id)).map((gate) => gate.x)
+      : [];
     this.enemies.update(
       dt,
       this.actor,
       (hit, source) => this.takeHit(hit, source, settings),
-      gates.filter((gate) => closed.has(gate.id)).map((gate) => gate.x),
+      shut,
       // From the press, a plunge takes priority over the body it lands on (pogo).
       this.combat.attacking && this.combat.attackKind === 'down',
     );
-    const hazards = [...this.world.stream.loaded.values()].flatMap((chunk) => chunk.data.hazards);
+    const hazards = this.world.stream.shownRooms.flatMap((room) => room.hazards);
     for (const cue of this.cues.update(this.enemies, hazards, this.hazardTime, this.actor))
       this.fx.sound(cue.id, cue.x, cue.y);
     if (this.combat.active) {
@@ -416,10 +488,16 @@ export class GameSession {
           this.fx.sound('pogo');
         }
       }
+      this.strikeSeals(hit);
     }
     // Thrown cards fly on, stop against walls and closed gates, and spend themselves on a body.
-    const shut = gates.filter((gate) => closed.has(gate.id)).map((gate) => gate.x);
-    this.cards.update(dt, (x, y) => inWall(x, y) || shut.some((gx) => Math.abs(x - gx) < 0.3));
+    this.cards.update(
+      dt,
+      (x, y) =>
+        inWall(x, y) ||
+        this.sealed(x, y) ||
+        shut.some((gx) => Math.abs(x - gx) < 0.3 && y < GATE_HEIGHT),
+    );
     for (const enemy of this.enemies.actors) {
       if (enemy.health <= 0) continue;
       const boss = this.enemies.encounter(enemy.id);
@@ -446,6 +524,7 @@ export class GameSession {
     for (const entity of this.enemies.entities.values())
       if (entity.actor.health <= 0 && !entity.rewarded) {
         entity.rewarded = true;
+        this.bestiary.set(entity.kind, (this.bestiary.get(entity.kind) ?? 0) + 1);
         this.inventory.shards += entity.data.drops;
         this.combat.hitStop.trigger(0.09);
         this.fx.burst(entity.actor.x, entity.actor.y, 'gold');
@@ -468,7 +547,7 @@ export class GameSession {
       }
     for (const encounter of this.enemies.bosses) this.announce(encounter);
     // Guarded chambers: sealing and clearing are announced; gates follow `closedGates`.
-    const arena = this.arenas.update(this.actor.x, this.isDefeated);
+    const arena = this.arenas.update(this.inRoute ? this.actor.x : Number.NaN, this.isDefeated);
     if (arena?.type === 'sealed') {
       // Bosses announce themselves; elites get the arena's title card.
       if (!this.enemies.encounter(arena.arena.guardian))
@@ -491,7 +570,13 @@ export class GameSession {
     for (const stage of this.stages.sealed(this.narrative.flags)) {
       const id = stageGate(stage.id);
       const ahead = stage.gate - this.actor.x;
-      if (!this.stages.beyond(id) && ahead > 0 && ahead < 3.5 && !this.warned.has(id)) {
+      if (
+        this.inRoute &&
+        !this.stages.beyond(id) &&
+        ahead > 0 &&
+        ahead < 3.5 &&
+        !this.warned.has(id)
+      ) {
         this.warned.add(id);
         const left = this.stages.remaining(stage, down);
         this.fx.notice(
@@ -508,6 +593,8 @@ export class GameSession {
         ? null
         : this.tutorial.update({
             x: this.actor.x,
+            room: this.room.id,
+            route: this.inRoute,
             abilities: this.abilities.unlocked,
             flags: this.narrative.flags,
             wounded:
@@ -516,7 +603,15 @@ export class GameSession {
             cards: this.focus.resonance >= cardData.cost,
           });
     if (this.hint && this.tutorial.linger(dt, this.narrative.flags)) this.hint = null;
-    if (this.actor.y < -5) {
+    if (this.player.motion.grounded && this.firmGround(this.actor.x, this.actor.y))
+      this.foothold = { x: this.actor.x, y: this.actor.y };
+    const x = this.actor.x,
+      y = this.actor.y;
+    // Below the route, unless a chamber opens there; out of a chamber, through a pit.
+    const fell =
+      (y < ROUTE_BOTTOM && !chamberAt(x, y)) ||
+      (this.room.kind === 'chamber' && y < this.room.bottom && !roomAt(x, y));
+    if (fell) {
       this.takeHit(
         {
           x: this.actor.x,
@@ -533,9 +628,9 @@ export class GameSession {
         true,
       );
       if (this.actor.health > 0) {
-        const pit = pits.find((p) => this.actor.x > p.from && this.actor.x < p.to);
-        const safe = pit?.safe ?? checkpoints.find((c) => c.id === this.checkpoint)?.x ?? 7;
-        this.player.teleport(safe, 1.4);
+        const pit = this.inRoute ? pits.find((p) => x > p.from && x < p.to) : undefined;
+        if (pit) this.player.teleport(pit.safe, 1.4);
+        else this.player.teleport(this.foothold.x, this.foothold.y + 0.2);
       }
     }
     if (this.actor.health <= 0) {
@@ -561,6 +656,7 @@ export class GameSession {
       encounter.defeated = true;
       // `boss-defeated` completes Act I's quest; every boss also leaves its own flag.
       if (data.id === 'faceless-guardian') this.narrative.flags.add('boss-defeated');
+      this.bestiary.set(data.id, (this.bestiary.get(data.id) ?? 0) + 1);
       this.narrative.flags.add(`defeated:${data.id}`);
       this.events.emit('BOSS_DEFEATED', { id: data.id });
       const shards = Math.round(data.health / 20);
@@ -610,6 +706,15 @@ export class GameSession {
   }
   private hurtEnemy(enemy: Combatant, hit: Hitbox, source: 'melee' | 'card' | 'echo'): void {
     const byPlayer = source === 'melee';
+    if (this.shielded(enemy, hit, source)) {
+      // The blow glances off the shell: a clang, sparks, a short jolt back.
+      this.combat.hitStop.trigger(0.04);
+      this.fx.burst(enemy.x - hit.direction * enemy.radius, enemy.y, 'gold');
+      this.fx.sound('hit-armor', enemy.x, enemy.y);
+      this.fx.shake(0.15);
+      if (byPlayer) this.actor.knockback = -hit.direction * 5;
+      return;
+    }
     const dealt = this.combat.damage.apply(
       enemy,
       enemy.id === 'faceless-guardian' ? { ...hit, stagger: 0 } : hit,
@@ -634,6 +739,15 @@ export class GameSession {
       if (source === 'card') this.fx.sound('hit', enemy.x, enemy.y);
       this.fx.shake(finisher ? 0.4 : 0.22);
     }
+  }
+  /**
+   * A shell guards the side its bearer faces: blows from in front glance off,
+   * unless it reels from its own lunge. From behind, or from above, it is open.
+   */
+  private shielded(enemy: Combatant, hit: Hitbox, source: 'melee' | 'card' | 'echo'): boolean {
+    const entity = this.enemies.entities.get(enemy.id);
+    const plunge = source === 'melee' && this.combat.attackKind === 'down';
+    return entity !== undefined && guarded(entity, hit.direction, plunge);
   }
   private takeHit(hit: Hitbox, source: Combatant, settings: Settings, fall = false): void {
     if (!fall && !new HurtboxSystem().overlaps(hit, this.actor)) return;
@@ -664,22 +778,27 @@ export class GameSession {
   private updateProgression(input: InputManager): void {
     const x = this.actor.x,
       y = this.actor.y;
-    const zone = chunks.find((c) => x >= c.start && x < c.end);
-    if (zone) {
+    const zone = this.room;
+    if (zone.id !== this.zone) {
       const first = !this.discovered.has(zone.id);
       this.discovered.add(zone.id);
-      if (zone.id !== this.zone) {
-        this.zone = zone.id;
+      this.zone = zone.id;
+      this.fx.enter(zone);
+      // Sectors of the route get the large card; chambers, a word on the way in.
+      if (zone.kind === 'route')
         this.fx.title(
           'area',
           zone.name,
           first ? 'Nouvelle zone découverte' : actAt(zone.start).title,
         );
-      }
+      else if (first && zone.secret) {
+        this.fx.title('area', zone.name, 'Passage secret découvert');
+        this.fx.stinger('ability');
+      } else if (first) this.fx.notice(`${sentence(zone.name)} — salle découverte`, 'room');
     }
     this.interaction = '';
     for (const point of checkpoints)
-      if (Math.abs(x - point.x) < 2 && y < 2.5) {
+      if (Math.abs(x - point.x) < 2 && y > point.y - 0.5 && y < point.y + 2.5) {
         const current = point.id === this.checkpoint;
         this.interaction = current
           ? `${input.label(InputAction.Interact)} · Autel de l’ancrage — repos et offrandes`
@@ -728,6 +847,16 @@ export class GameSession {
           this.fx.save();
         }
       }
+      if (marker.kind === 'cache') {
+        this.interaction = `${input.label(InputAction.Interact)} · Ouvrir le ${marker.label.toLowerCase()}`;
+        if (input.consume(InputAction.Interact)) {
+          this.inventory.collect(marker.id, marker.shards);
+          this.fx.burst(marker.x, marker.y, 'gold');
+          this.fx.sound('shard');
+          this.fx.notice(`◆ +${marker.shards} éclats`, 'cache');
+          this.fx.save();
+        }
+      }
     }
     for (const passage of shortcuts) {
       if (Math.hypot(x - passage.x, y - passage.y) > 1.8) continue;
@@ -736,14 +865,34 @@ export class GameSession {
         ? `${input.label(InputAction.Interact)} · ${passage.label}`
         : 'Conduit scellé — un contrepoids retient la porte';
       if (unlocked && input.consume(InputAction.Interact)) {
-        this.world.update(passage.toX, this.abilities.remanence, this.relocate(passage.toX));
+        this.world.update(
+          passage.toX,
+          passage.toY,
+          this.abilities.remanence,
+          this.relocate(passage.toX),
+        );
         this.player.teleport(passage.toX, passage.toY);
         this.fx.sound('gate-open');
         this.fx.notice(passage.label);
         break;
       }
     }
+    // Levers of the shutters, on the side the shutter keeps.
+    for (const seal of seals) {
+      if (!seal.lever || Math.hypot(x - seal.lever.x, y - seal.lever.y - 0.9) > 1.6) continue;
+      const open = this.narrative.flags.has(sealFlag(seal.id));
+      this.interaction = open
+        ? 'Levier — le passage reste ouvert'
+        : `${input.label(InputAction.Interact)} · Actionner le levier`;
+      if (!open && input.consume(InputAction.Interact)) this.open(seal, 'Un passage s’ouvre.');
+    }
     const flags = this.narrative.flags;
+    // The route's own beats: none of them happen from a chamber above or below.
+    if (!this.inRoute) {
+      for (const id of this.quests.update(this.narrative.flags))
+        this.events.emit('QUEST_UPDATED', { id });
+      return;
+    }
     if (x > 163 && x < 197 && !flags.has('heard-sael')) this.dialogue('sael');
     // Act I closes on Mira's farewell; the route then opens onto Act II.
     if (x > route.aftermath && this.defeated('faceless-guardian') && !flags.has('slice-complete'))
@@ -781,7 +930,39 @@ export class GameSession {
     this.fx.dialogue();
   }
   get zoneName(): string {
-    return chunks.find((c) => c.id === this.zone)?.name ?? 'CHAMBRE D’ÉVEIL';
+    return roomById(this.zone)?.name ?? 'CHAMBRE D’ÉVEIL';
+  }
+  /** A cracked wall or a shutter of the shown rooms barring that point. */
+  private sealed(x: number, y: number): boolean {
+    return seals.some(
+      (seal) =>
+        !this.narrative.flags.has(sealFlag(seal.id)) &&
+        Math.abs(x - seal.x) < seal.w / 2 &&
+        Math.abs(y - seal.y) < seal.h / 2,
+    );
+  }
+  /** Blows landing on cracked walls; one gives way at its count of blows. */
+  private strikeSeals(hit: Hitbox): void {
+    for (const seal of seals) {
+      if (seal.kind !== 'cracked' || this.narrative.flags.has(sealFlag(seal.id))) continue;
+      if (!this.combat.hitboxes.test(hit, sealBody(seal))) continue;
+      const taken = (this.cracks.get(seal.id) ?? 0) + 1;
+      this.cracks.set(seal.id, taken);
+      this.fx.burst(seal.x, seal.y, 'dust');
+      this.fx.shake(0.18);
+      this.fx.sound('hit-armor', seal.x, seal.y);
+      if (taken >= seal.hits) this.open(seal, 'Le mur cède.');
+    }
+  }
+  /** A seal opens for good: saved, so the way stays open. */
+  private open(seal: Seal, text: string): void {
+    this.narrative.flags.add(sealFlag(seal.id));
+    this.fx.burst(seal.x, seal.y, 'dust');
+    this.fx.burst(seal.x, seal.y, 'gold');
+    this.fx.shake(0.4);
+    this.fx.sound('gate-open', seal.x, seal.y);
+    this.fx.notice(text, `seal:${seal.id}`);
+    this.fx.save();
   }
   /** A guardian or enemy is down: bosses persist in the save, others until the next death. */
   defeated(guardian: string): boolean {

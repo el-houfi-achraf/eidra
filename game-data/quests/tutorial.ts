@@ -17,9 +17,11 @@ const HintSchema = z.object({
   id: z.string(),
   action: HintActionSchema,
   text: z.string(),
-  /** Horizontal band of the laboratory where the hint may appear. */
-  from: z.number(),
-  to: z.number(),
+  /** Horizontal band of the route where the hint may appear. */
+  from: z.number().default(0),
+  to: z.number().default(0),
+  /** Or the room where it appears, instead of a band of the route. */
+  room: z.string().optional(),
   /** Abilities that must be recovered first. */
   requires: z.array(z.string()).default([]),
   /** Flag after which the hint is pointless. */
@@ -62,8 +64,7 @@ export const tutorialHints = [
     id: 'dash',
     action: 'dash',
     text: 'Élan — traverser les attaques sans être touchée',
-    from: 18,
-    to: 40,
+    room: 'elans',
     requires: ['dash'],
   },
   { id: 'attack', action: 'attack', text: 'Frapper', from: 26, to: 40 },
@@ -80,6 +81,13 @@ export const tutorialHints = [
     text: 'Rémanence — faire réapparaître le pont oublié',
     from: 82,
     to: 92,
+    requires: ['remanence'],
+  },
+  {
+    id: 'remanence-roots',
+    action: 'remanence',
+    text: 'Rémanence — rappeler les marches oubliées',
+    room: 'roots',
     requires: ['remanence'],
   },
   {

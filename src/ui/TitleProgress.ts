@@ -6,6 +6,7 @@ import { bossThemes, musicTracks, sectorScores } from '../../game-data/audio/mus
 import type { TrackId } from '../../game-data/audio/music';
 import { chunks } from '../../game-data/zones/laboratory';
 import { bossRoster } from '../../game-data/bosses/roster';
+import { sentence } from '../core/text';
 /** What the title screen tells of the journey so far, read from the save slots. */
 export interface TitleProgress {
   /** The save « Continuer » resumes: the most recent one. */
@@ -55,8 +56,7 @@ export function titleProgress(saves: readonly (SaveData | null)[]): TitleProgres
     themes: (Object.keys(musicTracks) as TrackId[]).filter((id) => heard.has(id)),
   };
 }
-/** « GALERIE DES VEILLEURS » → « Galerie des veilleurs ». */
-const sentence = (name: string): string => name.charAt(0) + name.slice(1).toLowerCase();
+
 /** Where a theme is heard: the title, a boss fight or a region of the route. */
 export function trackOrigin(id: TrackId): string {
   if (id === 'title') return 'Thème principal';

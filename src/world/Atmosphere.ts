@@ -19,6 +19,8 @@ interface Band {
   drift: number;
   /** Presets that draw this band. */
   presets: readonly string[];
+  /** Height of the band above the floor. */
+  y: number;
 }
 const WIDTH = 140;
 /**
@@ -68,7 +70,7 @@ export class Atmosphere {
       material.disableDepthWrite = true;
       material.backFaceCulling = false;
       mesh.material = material;
-      this.bands.push({ mesh, material, texture, strength, tile, drift, presets });
+      this.bands.push({ mesh, material, texture, strength, tile, drift, presets, y });
     };
     band('floor-mist', 2.9, 0.6, 3.2, 0.85, 26, 0.012, ['MEDIUM', 'HIGH', 'ULTRA']);
     band('hall-mist', 10, 2.5, 9, 0.75, 38, -0.008, ['MEDIUM', 'HIGH', 'ULTRA']);
@@ -77,12 +79,13 @@ export class Atmosphere {
   setQuality(preset: string): void {
     this.preset = preset;
   }
-  update(x: number, time: number, tint: Tint, reducedMotion: boolean): void {
+  /** `floor`: height of the ground the mist pools on (a chamber's floor, the route's 0). */
+  update(x: number, time: number, tint: Tint, reducedMotion: boolean, floor = 0): void {
     for (const band of this.bands) {
       const visible = band.presets.includes(this.preset) && tint.haze > 0.01;
       band.mesh.setEnabled(visible);
       if (!visible) continue;
-      band.mesh.position.x = x;
+      band.mesh.position.set(x, floor + band.y, band.mesh.position.z);
       // Offset by the camera travel: the mist is anchored in the world while it drifts.
       band.texture.uOffset = x / band.tile + (reducedMotion ? 0 : time * band.drift);
       // Unlit: the emissive colour tints the white mist texture.

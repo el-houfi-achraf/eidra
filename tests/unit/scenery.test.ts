@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { chunks } from '../../game-data/zones/laboratory';
+import { chunks, routeChunks } from '../../game-data/zones/laboratory';
+import { chambers, openings, sectorOf, SHELL, solidsOf } from '../../src/world/Rooms';
 import { moods, MoodSchema } from '../../game-data/zones/moods';
 import { BLEND, tintAt, hexToRgb } from '../../src/world/Mood';
 import { PaintedGeometry, random } from '../../src/world/PaintedGeometry';
@@ -15,15 +16,17 @@ const vertices = (g: PaintedGeometry): { x: number; y: number; z: number; a: num
   }));
 
 describe('area moods', () => {
-  it('gives every laboratory sector a valid colour identity', () => {
-    for (const chunk of chunks) {
+  it('gives every route sector a valid colour identity, and every chamber one to share', () => {
+    for (const chunk of routeChunks) {
       expect(moods[chunk.id], chunk.id).toBeDefined();
       expect(() => MoodSchema.parse(moods[chunk.id])).not.toThrow();
     }
+    for (const room of chambers)
+      expect(moods[room.id] ?? moods[sectorOf(room).id], room.id).toBeDefined();
     expect(hexToRgb('#ff8000')).toEqual([1, 128 / 255, 0]);
   });
   it('keeps each sector pure in its middle and cross-fades smoothly at borders', () => {
-    for (const chunk of chunks) {
+    for (const chunk of routeChunks) {
       const middle = tintAt((chunk.start + chunk.end) / 2);
       expect(middle.fog).toEqual(hexToRgb(moods[chunk.id]!.fog));
     }
@@ -124,6 +127,7 @@ describe('painted scenery', () => {
   });
   it('never paints over the fighters: only slab dressing enters the play band', () => {
     for (const { chunk, scenery } of sets) {
+      if (chunk.kind === 'chamber') continue;
       const slabs = chunk.platforms.filter((p) => !p.memory);
       for (const v of vertices(scenery.near))
         if (v.z < LAYERS.rear - 0.3) {
@@ -150,6 +154,53 @@ describe('painted scenery', () => {
         expect(v.y <= -0.4 || v.y >= 9, `${chunk.id} front at y ${v.y.toFixed(2)}`).toBe(true);
       }
     }
+  });
+  it('keeps a chamber’s play band clear: only its slabs, its rock and its doorways', () => {
+    for (const { chunk: room, scenery } of sets) {
+      if (room.kind !== 'chamber') continue;
+      // Chambers are painted with their floor at 0, then raised into place.
+      expect(scenery.offset, room.id).toBeCloseTo(room.bottom + SHELL);
+      const vault = room.top - SHELL - scenery.offset;
+      const slabs = solidsOf(room).map((p) => ({ ...p, y: p.y - scenery.offset }));
+      const inRock = (x: number, y: number): boolean =>
+        x <= room.start + SHELL + 0.3 ||
+        x >= room.end - SHELL - 0.3 ||
+        y <= 0.3 ||
+        y >= vault - 1.8;
+      for (const v of vertices(scenery.near))
+        if (v.z < LAYERS.rear - 0.3) {
+          // Dressing in front of the fighters stays below their knees; behind, tufts rise.
+          const onSlab = slabs.some(
+            (p) =>
+              v.x >= p.x - p.w / 2 - 0.8 &&
+              v.x <= p.x + p.w / 2 + 0.8 &&
+              v.y <= p.y + p.h / 2 + (v.z < 0 ? 0.3 : 2.5) &&
+              v.y >= p.y - p.h / 2 - 1.9,
+          );
+          expect(
+            onSlab || inRock(v.x, v.y),
+            `${room.id} (${v.x.toFixed(2)}, ${v.y.toFixed(2)}, ${v.z})`,
+          ).toBe(true);
+        }
+      for (const v of vertices(scenery.far)) expect(v.z).toBeGreaterThanOrEqual(LAYERS.mid - 0.5);
+      // Its out-of-focus foreground hangs from the vault only.
+      for (const v of vertices(scenery.front)) {
+        expect(v.z).toBeLessThan(-6);
+        expect(v.y, `${room.id} front`).toBeGreaterThanOrEqual(vault - 2.5);
+      }
+    }
+  });
+  it('opens the vault and the floor of a route room where a chamber meets it', () => {
+    const watchers = sets.find((s) => s.chunk.id === 'watchers')!;
+    const holes = openings(watchers.chunk);
+    // The well under the gallery and the loft above Mira's anchor.
+    expect(holes).toContainEqual({ side: 'bottom', from: 78, to: 80 });
+    expect(holes).toContainEqual({ side: 'top', from: 71, to: 73 });
+    const ceiling = vertices(watchers.scenery.near).filter(
+      (v) => v.z === LAYERS.ceiling && v.y > 11,
+    );
+    expect(ceiling.some((v) => v.x > 71.2 && v.x < 72.8)).toBe(false);
+    expect(ceiling.some((v) => v.x > 60 && v.x < 70)).toBe(true);
   });
   it('paints remembered slabs only where memory platforms exist', () => {
     for (const { chunk, scenery } of sets) {

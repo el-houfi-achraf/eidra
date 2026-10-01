@@ -4,10 +4,30 @@ import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import type { Scene } from '@babylonjs/core/scene';
 import { damp } from '../core/math';
 import type { Settings } from '../config/settings';
+import type { Bounds } from '../world/Rooms';
 /** Distance between the camera and the play plane (z = 0). */
 const DISTANCE = 32;
 /** Metres the view drops while a dialogue is on screen. */
 const TALK_LIFT = 1.2;
+/**
+ * Centre of a view of half-size (halfWidth, halfHeight) kept inside `bounds`: a
+ * chamber's walls frame the screen as the room's own edges. A room smaller than
+ * the view is centred.
+ */
+export function confine(
+  x: number,
+  y: number,
+  bounds: Bounds,
+  halfWidth: number,
+  halfHeight: number,
+): [number, number] {
+  const fit = (v: number, low: number, high: number, half: number): number =>
+    high - low <= half * 2 ? (low + high) / 2 : Math.max(low + half, Math.min(high - half, v));
+  return [
+    fit(x, bounds.left, bounds.right, halfWidth),
+    fit(y, bounds.bottom, bounds.top, halfHeight),
+  ];
+}
 /** A fixed framing: centre of the view and half its height on the play plane, metres. */
 export interface Frame {
   x: number;
@@ -41,10 +61,27 @@ export class CameraRig {
   shake(amount: number): void {
     this.trauma = Math.min(1, this.trauma + amount);
   }
-  /** Cuts straight to a new framing (respawn), instead of sweeping across the level. */
-  snap(x: number, y: number, facing = 1): void {
-    this.x = Math.max(9, x + facing * 2.3);
-    this.y = Math.max(3.5, y + 1.5);
+  /** Cuts straight to a new framing (respawn, a door), instead of sweeping across the level. */
+  snap(x: number, y: number, facing = 1, bounds: Bounds | null = null): void {
+    [this.x, this.y] = this.aim(x, y, facing, bounds);
+  }
+  /** Where the view centres on Eidra: ahead of her, a little above, inside a chamber. */
+  private aim(
+    x: number,
+    y: number,
+    facing: number,
+    bounds: Bounds | null,
+    lift = 0,
+  ): [number, number] {
+    if (!bounds) return [Math.max(9, x + facing * 2.3), Math.max(3.5, y + 1.5) - lift];
+    const aspect = this.scene.getEngine().getAspectRatio(this.camera) || 16 / 9;
+    return confine(
+      x + facing * 2.3,
+      y + 1.5 - lift,
+      bounds,
+      this.halfHeight * aspect,
+      this.halfHeight,
+    );
   }
   /** Cuts straight to a framing (the title vista, a chapter preview). */
   hold(frame: Frame): void {
@@ -66,19 +103,18 @@ export class CameraRig {
     settings: Settings,
     /** In the menus the camera holds a framing (the title vista, a chapter preview). */
     menu: Frame | null = null,
+    /** A chamber: the view stays within its walls. */
+    bounds: Bounds | null = null,
   ): void {
     this.clock += dt;
     this.trauma = Math.max(0, this.trauma - dt * 2.5);
     this.zoom = settings.reducedMotion ? 0 : damp(this.zoom, 0, 7, dt);
     const aspect = this.scene.getEngine().getAspectRatio(this.camera) || 16 / 9;
-    const targetX = menu
-      ? menu.x
-      : arena
-        ? (arena.left + arena.right) / 2
-        : Math.max(9, x + facing * 2.3);
-    this.x = damp(this.x, targetX, menu ? 2 : 4.5 * settings.cameraSensitivity, dt);
     this.lift = damp(this.lift, this.talking && !menu ? TALK_LIFT : 0, 3, dt);
-    this.y = damp(this.y, menu ? menu.y : Math.max(3.5, y + 1.5) - this.lift, 3.2, dt);
+    const [aimX, aimY] = this.aim(x, y, facing, bounds, this.lift);
+    const targetX = menu ? menu.x : arena ? (arena.left + arena.right) / 2 : aimX;
+    this.x = damp(this.x, targetX, menu ? 2 : 4.5 * settings.cameraSensitivity, dt);
+    this.y = damp(this.y, menu ? menu.y : aimY, 3.2, dt);
     const shake = settings.reducedMotion ? 0 : this.trauma ** 2 * settings.shake * 0.25;
     this.camera.position.set(
       this.x + Math.sin(this.clock * 81) * shake,

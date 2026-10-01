@@ -138,6 +138,25 @@ Protocole standard : 64 / 26 draw calls et 60 474 / 32 151 triangles, identiques
 
 Mesures brutes : [performance.json](evidence/performance.json) (dernière itération).
 
+### Treizième itération : l'Acte I en salles
+
+Comparaison A / B : build `main` (étape 1 fusionnée) contre ce build, même protocole (rendu logiciel SwiftShader, 1280 × 720, MEDIUM, une partie neuve par scène, médianes de 40 images, deux passages ; quatre passages, ordre alterné, pour l'éveil et les braises). Frame / CPU en ms, draw calls :
+
+| Scène                         | `main`             | Salles             | Meshes / corps physiques / salles chargées |
+| ----------------------------- | ------------------ | ------------------ | ------------------------------------------ |
+| Chambre d'éveil (x 10)        | 162,8 / 5,10 · 66  | 160,6 / 5,22 · 62  | 316 / 6 / 1 → 340 / 19 / 2                 |
+| Pont du souvenir (rive, x 84) | 155,5 / 5,6 · 76   | 162,2 / 6,1 · 72   | 330 / 7 / 2 → 350 / 19 / 3                 |
+| Arène du Porteur (x 150)      | 169,0 / 7,0 · 93   | 166,6 / 6,5 · 93   | 324 / 7 / 2 → 359 / 33 / 3                 |
+| Champs de braise (x 250)      | 171,6 / 7,52 · 106 | 174,2 / 7,53 · 105 | 351 / 9 / 2 → 359 / 13 / 2                 |
+| Archives englouties (chambre) | —                  | 167,0 / 7,6 · 90   | 418 / 56 / 5                               |
+| Escalier noyé (chambre)       | —                  | 159,2 / 7,4 · 68   | 384 / 51 / 4                               |
+| Cage du contrepoids (chambre) | —                  | 157,7 / 7,2 · 70   | 392 / 60 / 4                               |
+| Racines du souvenir (chambre) | —                  | 148,8 / 6,0 · 82   | 384 / 40 / 3                               |
+
+Sur la route, les écarts restent dans le bruit de la mesure (± 4 % en frame, CPU identique à 0,1 ms près sur quatre passages) et les draw calls baissent ou restent égaux. Les chambres coûtent autant qu'une salle de la route : une seule est affichée à la fois. Les meshes et les corps physiques augmentent parce que les salles à une porte sont **chargées mais cachées** (leur sol est là quand Eidra passe) et que chaque coque de chambre est faite de boîtes statiques ; un mesh caché ne coûte pas de draw call. Le plus haut : 418 meshes et 60 corps statiques.
+
+Protocole standard (`tools/benchmark.mjs`) : 64 → 60 / 26 → 24 draw calls et 60 474 → 60 630 / 32 151 → 32 124 triangles en MEDIUM / LOW ; CPU 4,8 / 3,2 ms, inchangé ; rendu logiciel 156,2 / 69,4 ms. Douze allers-retours entre x 123 et x 7 : 353 / 340 meshes, 33 / 19 ressources physiques, 3 / 2 salles chargées, identiques à chaque passage (aucune fuite) et sans erreur navigateur. Bundle principal : 2,04 Mo minifié / 512 ko gzip (+35 ko minifié / +12 ko gzip : données des 20 chambres, salles, carte et journal, cinq ennemis).
+
 ## Optimisation et stabilité
 
 La fusion Babylon des décors statiques par matériau a réduit le menu d’environ 230 à 46 draw calls dans le contrôle avant / après. Les colliders, marqueurs et structures mémoire restent séparés. Matériaux partagés, au plus trois chunks actifs, deux lumières, effets réutilisés par pools, niveaux de visibilité pour les décors éloignés.

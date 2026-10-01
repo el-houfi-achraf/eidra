@@ -1,11 +1,12 @@
-import type { ChunkData } from '../../game-data/zones/laboratory';
+import type { ChunkData, Seal } from '../../game-data/zones/laboratory';
 import { checkpoints } from '../../game-data/zones/laboratory';
 import { moods } from '../../game-data/zones/moods';
 import type { Mood } from '../../game-data/zones/moods';
 import { PaintedGeometry, random } from './PaintedGeometry';
 import type { Paint, Point, RGBA } from './PaintedGeometry';
-import { mixRgb, tintAt } from './Mood';
+import { mixRgb, roomTint, tintAt } from './Mood';
 import type { RGB, Tint } from './Mood';
+import { openings, roomAt, sectorOf, SHELL } from './Rooms';
 /**
  * Painted set of a sector, as flat silhouettes stacked in depth like cut-out
  * layers: the nearer, the darker; the further, the more they melt into the haze.
@@ -26,6 +27,11 @@ export interface Scenery {
   shafts: PaintedGeometry;
   /** Remembered slabs, drawn as pale ghosts until Rémanence makes them solid. */
   memory: PaintedGeometry;
+  /**
+   * Height the layers are painted from: chambers are painted as if their floor
+   * stood at the route's ground level, then raised or lowered into place.
+   */
+  offset: number;
 }
 /** Depth of each painted layer. */
 export const LAYERS = {
@@ -46,16 +52,36 @@ const FACE = -0.5;
 const BACK = 2.4;
 /** Ground slabs continue as dark earth down to the bottom of the screen. */
 const EARTH = -14;
+/** Colours the painters read: the route's blend along x, or one chamber's tint. */
+let tone: (x: number) => Tint = tintAt;
 const smooth = (a: number, b: number, x: number): number => {
   const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
 };
 const rgba = (c: RGB, a = 1): RGBA => [c[0], c[1], c[2], a];
+/** An axis-aligned quad between two corners, slightly irregular. */
+function g4(
+  g: PaintedGeometry,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  z: number,
+  paint: Paint,
+): void {
+  const a = Math.min(x0, x1),
+    b = Math.max(x0, x1);
+  g.band([a, (a + b) / 2, b], [y0, y0 - 0.03, y0], [y1, y1 + 0.02, y1], z, paint);
+}
 /**
  * Colour of a layer at a given depth (0 = nearest, 1 = distant): darkest near,
  * lifting towards the horizon far away, with mist pooling near the floor.
  */
-export function layerPaint(depth: number, lift = 0, tintOf: (x: number) => Tint = tintAt): Paint {
+export function layerPaint(
+  depth: number,
+  lift = 0,
+  tintOf: (x: number) => Tint = (x) => tone(x),
+): Paint {
   return (x, y) => {
     const t = tintOf(x);
     const base =
@@ -70,7 +96,7 @@ export function layerPaint(depth: number, lift = 0, tintOf: (x: number) => Tint 
 }
 /** The sector's light colour at `x`, scaled: lanterns, windows, halos. */
 const glowAt = (x: number, strength: number): RGBA => {
-  const l = tintAt(x).light;
+  const l = tone(x).light;
   return [l[0] * strength, l[1] * strength, l[2] * strength, 1];
 };
 const lightPaint =
@@ -488,24 +514,24 @@ export function tree(
 /** Walkable slabs: dark mass, pale irregular lip along the edge, tufts and roots. */
 function dressPlatforms(g: PaintedGeometry, rng: Rng, data: ChunkData, mood: Mood): void {
   const groundPaint: Paint = (x, y) => {
-    const t = tintAt(x);
+    const t = tone(x);
     return rgba(mixRgb(t.ground, t.near, 0.25 + 0.1 * Math.sin(x * 1.7 + y)));
   };
   const facePaint =
     (top: number): Paint =>
     (x, y) => {
-      const t = tintAt(x);
+      const t = tone(x);
       const deep = mixRgb(t.near, [0, 0, 0], 0.55 * smooth(top - 1.4, top - 3, y));
       return rgba(mixRgb(deep, mixRgb(t.ground, t.lip, 0.12), smooth(top - 1.4, top, y)));
     };
   const lipPaint: Paint = (x, y) => {
-    const t = tintAt(x);
+    const t = tone(x);
     return rgba(mixRgb(t.lip, t.ground, 0.25 + 0.2 * Math.sin(x * 3.1 + y * 7)));
   };
-  const tuftPaint: Paint = (x) => rgba(mixRgb(tintAt(x).lip, tintAt(x).ground, 0.45));
-  const backTuft: Paint = (x) => rgba(mixRgb(tintAt(x).ground, tintAt(x).lip, 0.15));
-  const rootPaint: Paint = (x) => rgba(mixRgb(tintAt(x).near, tintAt(x).ground, 0.3));
-  const stonePaint: Paint = (x) => rgba(mixRgb(tintAt(x).ground, tintAt(x).lip, 0.22));
+  const tuftPaint: Paint = (x) => rgba(mixRgb(tone(x).lip, tone(x).ground, 0.45));
+  const backTuft: Paint = (x) => rgba(mixRgb(tone(x).ground, tone(x).lip, 0.15));
+  const rootPaint: Paint = (x) => rgba(mixRgb(tone(x).near, tone(x).ground, 0.3));
+  const stonePaint: Paint = (x) => rgba(mixRgb(tone(x).ground, tone(x).lip, 0.22));
   for (const p of data.platforms) {
     if (p.memory) continue;
     const left = p.x - p.w / 2,
@@ -591,12 +617,12 @@ function dressPlatforms(g: PaintedGeometry, rng: Rng, data: ChunkData, mood: Moo
 /** Slabs of the past: luminous surface, bright rim and threads of light dripping below. */
 function paintMemories(g: PaintedGeometry, rng: Rng, data: ChunkData): void {
   const pale: Paint = (x) => {
-    const t = tintAt(x);
+    const t = tone(x);
     return rgba(mixRgb(t.mist, t.light, 0.45), 0.8);
   };
   const rim: Paint = (x) => glowAt(x, 1);
   const thread: Paint = (x, y) => {
-    const t = tintAt(x);
+    const t = tone(x);
     return rgba(mixRgb(t.mist, t.light, 0.6), 0.1 + 0.5 * smooth(-3, 0.5, y));
   };
   for (const p of data.platforms) {
@@ -633,9 +659,100 @@ function paintMemories(g: PaintedGeometry, rng: Rng, data: ChunkData): void {
       );
   }
 }
-/** Paints one sector. Deterministic: the chunk seed drives every random choice. */
+/** Paints one room. Deterministic: the room's seed drives every random choice. */
 export function paintScenery(data: ChunkData): Scenery {
+  if (data.kind === 'chamber') {
+    const tint = roomTint(data);
+    tone = () => tint;
+    try {
+      return paintChamber(data);
+    } finally {
+      tone = tintAt;
+    }
+  }
+  return paintRoute(data);
+}
+/** Inside one of the ranges, grown by `pad`. */
+const within = (x: number, ranges: readonly { from: number; to: number }[], pad: number): boolean =>
+  ranges.some((r) => x > r.from - pad && x < r.to + pad);
+/** Splits a sampled band into runs that avoid the ranges (openings in a vault or a wall). */
+function bandAround(
+  g: PaintedGeometry,
+  xs: readonly number[],
+  bottoms: readonly number[],
+  tops: readonly number[],
+  z: number,
+  paint: Paint,
+  ranges: readonly { from: number; to: number }[],
+): void {
+  let run: number[] = [];
+  const flush = (): void => {
+    if (run.length > 1)
+      g.band(
+        run.map((i) => xs[i]!),
+        run.map((i) => bottoms[i]!),
+        run.map((i) => tops[i]!),
+        z,
+        paint,
+      );
+    run = [];
+  };
+  xs.forEach((x, i) => {
+    if (within(x, ranges, 0)) flush();
+    else run.push(i);
+  });
+  flush();
+}
+/** A shaft mouth: darkness deepening away from the opening, so a hole reads as a way. */
+function throat(
+  g: PaintedGeometry,
+  from: number,
+  to: number,
+  edge: number,
+  depth: number,
+  z: number,
+  vertical: boolean,
+  /** Metres over which the darkness deepens; the rest of the way is black. */
+  fadeLength = Math.abs(depth),
+): void {
+  const end = edge + Math.sign(depth) * fadeLength;
+  const fade: Paint = (x, y) => {
+    const t = tone(x);
+    const k = vertical ? smooth(edge, end, y) : smooth(edge, end, x);
+    return rgba(mixRgb(mixRgb(t.near, [0, 0, 0], 0.55), [0, 0, 0], k), 1);
+  };
+  if (vertical) {
+    const xs = steps(from, to, 0.5);
+    const a = Math.min(edge, edge + depth),
+      b = Math.max(edge, edge + depth);
+    const rows = steps(a, b, Math.abs(depth) / 6);
+    for (let r = 1; r < rows.length; r++)
+      g.band(
+        xs,
+        xs.map(() => rows[r - 1]!),
+        xs.map(() => rows[r]!),
+        z,
+        fade,
+      );
+  } else {
+    const a = Math.min(edge, edge + depth),
+      b = Math.max(edge, edge + depth);
+    const xs = steps(a, b, Math.abs(depth) / 8);
+    g.band(
+      xs,
+      xs.map(() => from),
+      xs.map(() => to),
+      z,
+      fade,
+    );
+  }
+}
+function paintRoute(data: ChunkData): Scenery {
   const mood = moods[data.id] ?? moods.awakening!;
+  // Chambers meet the route through holes in its floor and openings in its vault.
+  const holes = openings(data);
+  const vault = holes.filter((h) => h.side === 'top'),
+    floor = holes.filter((h) => h.side === 'bottom');
   const rng = random(data.seed * 7919 + 13);
   const near = new PaintedGeometry(),
     far = new PaintedGeometry(),
@@ -661,28 +778,32 @@ export function paintScenery(data: ChunkData): Scenery {
     bump = Math.max(0, Math.min(1, bump + jitter(rng, 0.25)));
     return 11.2 + bump * 1.6;
   });
-  near.band(
+  bandAround(
+    near,
     ceilingXs,
     low,
     ceilingXs.map(() => 26),
     LAYERS.ceiling,
     layerPaint(0.08),
+    vault.map((h) => ({ from: h.from - 0.8, to: h.to + 0.8 })),
   );
   for (let x = x0 + rng() * 2; x < x1; x += 1.4 + rng() * 3.2)
-    hang(
-      near,
-      rng,
-      x,
-      12,
-      LAYERS.ceiling - 0.05,
-      0.8 + rng() * 2.4,
-      0.5 + rng() * 0.7,
-      layerPaint(0.08),
-    );
+    if (!within(x, vault, 1.2))
+      hang(
+        near,
+        rng,
+        x,
+        12,
+        LAYERS.ceiling - 0.05,
+        0.8 + rng() * 2.4,
+        0.5 + rng() * 0.7,
+        layerPaint(0.08),
+      );
   // Overgrowth: vines and roots falling from the vault.
   const vines = Math.round(4 + mood.overgrowth * 12);
   for (let i = 0; i < vines; i++) {
     const x = x0 + rng() * (x1 - x0);
+    if (within(x, vault, 1)) continue;
     vine(
       near,
       rng,
@@ -805,9 +926,11 @@ export function paintScenery(data: ChunkData): Scenery {
       window(far, glow, x + jitter(rng, w * 0.25), h * 0.5, LAYERS.distant, 0.5, 1.2);
   }
   // Out-of-focus foreground: dark mounds below, roots above.
-  const ink: Paint = (x) => rgba(mixRgb(tintAt(x).near, [0, 0, 0], 0.7));
+  const ink: Paint = (x) => rgba(mixRgb(tone(x).near, [0, 0, 0], 0.7));
   for (let x = x0 + rng() * 4; x < x1; x += 7 + rng() * 8) {
     const w = 3 + rng() * 4;
+    // A shaft in the floor stays in view.
+    if (within(x, floor, w / 2 + 1.5)) continue;
     const xs = steps(x - w / 2, x + w / 2, 0.5);
     front.band(
       xs,
@@ -849,12 +972,451 @@ export function paintScenery(data: ChunkData): Scenery {
     const x = data.start + 7 + i * 13 + jitter(rng, 2);
     shafts.sprite(x, 7, 3.2 + (i % 2) * 2, 24, 4.5, glowAt(x, 1), -0.36 - (i % 2) * 0.08);
   }
-  // Anchors glow softly.
-  for (const c of checkpoints)
-    if (c.x >= data.start && c.x < data.end) {
-      glow.sprite(c.x, 1.7, 4.5, 4.5, 0.9, glowAt(c.x, 0.5));
-    }
+  // Shafts: darkness under the holes in the floor, light falling through the vault.
+  // Behind the slabs' back edge (the play band stays the fighters' own), in front of the rubble.
+  for (const hole of floor) throat(near, hole.from, hole.to, 0.05, -14, LAYERS.rear - 0.25, true);
+  for (const hole of vault) {
+    const x = (hole.from + hole.to) / 2;
+    shafts.sprite(x, 9, hole.to - hole.from + 1.6, 16, 3.5, glowAt(x, 1.1), 0);
+    throat(near, hole.from, hole.to, 11, 6, LAYERS.ceiling + 0.4, true);
+  }
+  paintAnchors(glow, data, 0);
   const memory = new PaintedGeometry();
   paintMemories(memory, rng, data);
-  return { near, far, front, glow, shafts, memory };
+  return { near, far, front, glow, shafts, memory, offset: 0 };
+}
+/** Anchors of the room glow softly. */
+function paintAnchors(glow: PaintedGeometry, data: ChunkData, offset: number): void {
+  for (const c of checkpoints)
+    if (roomAt(c.x, c.y + 0.5)?.id === data.id)
+      glow.sprite(c.x, c.y + 1.7 - offset, 4.5, 4.5, 0.9, glowAt(c.x, 0.5));
+}
+/**
+ * Cracked walls and shutters. A cracked wall is the room's own stone, its cracks a
+ * shade paler than the rest: a wall worth striking for those who look. A shutter
+ * is a grille of dark bars under a lintel; its lever stands on the far side.
+ */
+export function paintSeal(seal: Seal): PaintedGeometry {
+  const room = roomAt(seal.x, seal.y);
+  const tint = room?.kind === 'chamber' ? roomTint(room) : null;
+  if (tint) tone = () => tint;
+  try {
+    const g = new PaintedGeometry();
+    const rng = random(seal.id.length * 977 + Math.round(seal.x * 13));
+    sealShape(g, rng, seal, 0);
+    return g;
+  } finally {
+    tone = tintAt;
+  }
+}
+function sealShape(g: PaintedGeometry, rng: Rng, seal: Seal, offset: number): void {
+  const left = seal.x - seal.w / 2,
+    right = seal.x + seal.w / 2,
+    bottom = seal.y - seal.h / 2 - offset,
+    top = seal.y + seal.h / 2 - offset;
+  const xs = steps(left, right, 0.25);
+  if (seal.kind === 'cracked') {
+    const stone: Paint = (x, y) => {
+      const t = tone(x);
+      return rgba(mixRgb(t.near, t.ground, 0.45 + 0.08 * Math.sin(x * 5 + y * 3)));
+    };
+    const crack: Paint = (x) => rgba(mixRgb(tone(x).ground, tone(x).lip, 0.5));
+    g.band(
+      xs,
+      xs.map(() => bottom),
+      xs.map(() => top),
+      FACE - 0.05,
+      stone,
+    );
+    // A branching crack from top to bottom, and a few short ones.
+    let x = seal.x + jitter(rng, seal.w * 0.2);
+    const spine: Point[] = [];
+    for (let y = top; y >= bottom; y -= Math.max(0.2, seal.h / 9)) {
+      spine.push([x, y]);
+      x = Math.max(left + 0.05, Math.min(right - 0.05, x + jitter(rng, 0.18)));
+    }
+    g.ribbon(
+      spine,
+      spine.map(() => 0.05),
+      FACE - 0.08,
+      crack,
+    );
+    for (let i = 0; i < 4; i++) {
+      const [cx, cy] = spine[1 + Math.floor(rng() * Math.max(1, spine.length - 2))]!;
+      g.ribbon(
+        [
+          [cx, cy],
+          [cx + jitter(rng, 0.4), cy - 0.2 - rng() * 0.4],
+        ],
+        [0.04, 0.015],
+        FACE - 0.08,
+        crack,
+      );
+    }
+    return;
+  }
+  const iron: Paint = (x) => rgba(mixRgb(tone(x).near, [0, 0, 0], 0.35));
+  const brass: Paint = (x) => rgba(mixRgb(tone(x).ground, tone(x).lip, 0.4));
+  const horizontal = seal.w > seal.h;
+  const span = horizontal ? seal.w : seal.h;
+  const count = Math.max(3, Math.round(span / 0.32));
+  for (let i = 0; i <= count; i++) {
+    const t = i / count;
+    if (horizontal) {
+      const x = left + t * seal.w;
+      g.ribbon(
+        [
+          [x, bottom],
+          [x, top],
+        ],
+        [0.09, 0.09],
+        FACE - 0.05,
+        iron,
+      );
+    } else {
+      const y = bottom + t * seal.h;
+      g.ribbon(
+        [
+          [left, y],
+          [right, y],
+        ],
+        [0.09, 0.09],
+        FACE - 0.05,
+        iron,
+      );
+    }
+  }
+  // Frame in tarnished brass.
+  const frame = (a: Point, b: Point): void => g.ribbon([a, b], [0.14, 0.14], FACE - 0.07, brass);
+  frame([left, top], [right, top]);
+  frame([left, bottom], [right, bottom]);
+  frame([left, bottom], [left, top]);
+  frame([right, bottom], [right, top]);
+  if (seal.lever) {
+    const lx = seal.lever.x,
+      ly = seal.lever.y - offset;
+    g.ribbon(
+      [
+        [lx, ly],
+        [lx, ly + 0.9],
+      ],
+      [0.12, 0.08],
+      FACE - 0.05,
+      iron,
+    );
+    g.ribbon(
+      [
+        [lx, ly + 0.85],
+        [lx + 0.35, ly + 1.25],
+      ],
+      [0.08, 0.06],
+      FACE - 0.06,
+      brass,
+    );
+    g.triangle(
+      [lx + 0.25, ly + 1.2],
+      [lx + 0.38, ly + 1.42],
+      [lx + 0.48, ly + 1.2],
+      FACE - 0.07,
+      lightPaint(1.2),
+    );
+  }
+}
+/** Depth of a chamber's far wall: behind its pillars, in front of the sky. */
+const CHAMBER_WALL = 20;
+/** Metres the rock and the far wall reach past a chamber's box, beyond any view of it. */
+const ROCK = 14;
+/** Depth of a doorway's darkness: just behind the fighters, in front of everything else. */
+const DOORWAY = 0.6;
+/**
+ * A closed chamber: rock all around, a far wall of dressed stone, pillars and
+ * arches in two depths, the sector's own ornaments, and openings where its doors
+ * lead on. Painted with its floor at height 0, then moved into place (`offset`).
+ */
+function paintChamber(data: ChunkData): Scenery {
+  const mood = moods[data.id] ?? moods[sectorOf(data).id] ?? moods.awakening!;
+  const rng = random(data.seed * 7919 + 13);
+  const near = new PaintedGeometry(),
+    far = new PaintedGeometry(),
+    front = new PaintedGeometry(),
+    glow = new PaintedGeometry(),
+    shafts = new PaintedGeometry();
+  const base = data.bottom + SHELL;
+  const L = data.start,
+    R = data.end;
+  // Inner faces of the walls and of the vault, in painting coordinates.
+  const left = L + SHELL,
+    right = R - SHELL,
+    vaultY = data.top - SHELL - base;
+  const doors = data.doors.map((d) =>
+    d.side === 'left' || d.side === 'right' ? { ...d, from: d.from - base, to: d.to - base } : d,
+  );
+  const side = (s: string) => doors.filter((d) => d.side === s);
+  const rear = layerPaint(0.05),
+    back = layerPaint(0.2),
+    backCap = layerPaint(0.2, 0.18),
+    mid = layerPaint(0.45),
+    midCap = layerPaint(0.45, 0.12);
+  // The far wall: dressed stone in courses, mist pooling at its foot.
+  const wallXs = steps(L - ROCK, R + ROCK, 1);
+  const rows = steps(-ROCK, vaultY + ROCK, 2);
+  const stone = layerPaint(0.62);
+  for (let r = 1; r < rows.length; r++)
+    far.band(
+      wallXs,
+      wallXs.map(() => rows[r - 1]!),
+      wallXs.map(() => rows[r]!),
+      CHAMBER_WALL,
+      stone,
+    );
+  const joint = layerPaint(0.62, 0.07);
+  for (let y = 0.9; y < vaultY + 4; y += 1.1 + rng() * 0.3) {
+    for (let x = L - 2 + rng() * 2; x < R + 2; x += 2.5 + rng() * 2) {
+      const w = 1.6 + rng() * 1.6;
+      far.ribbon(
+        [
+          [x, y],
+          [x + w, y + jitter(rng, 0.05)],
+        ],
+        [0.06, 0.06],
+        CHAMBER_WALL - 0.05,
+        joint,
+      );
+    }
+  }
+  // Pillars and arches: tall ones far away, the motif of the sector nearer.
+  const pitch = mood.motif === 'gallery' ? 7 : 9;
+  for (let x = left + 2 + rng() * 3; x < right - 1; x += pitch + rng() * 3) {
+    column(far, rng, x, LAYERS.mid, -2, vaultY + 1, 1.5 + rng() * 0.4, mid, midCap);
+    const r = Math.min(pitch / 2, (vaultY - 1) / 2.4);
+    if (x + pitch < right && r > 1.2)
+      arch(far, rng, x + pitch / 2, Math.max(2, vaultY - r - 0.8), LAYERS.mid, r, 0.7, mid, true);
+  }
+  for (let x = left + 1 + rng() * 4; x < right - 1; x += 6 + rng() * 5) {
+    switch (mood.motif) {
+      case 'gallery':
+        column(near, rng, x, LAYERS.back, -1, Math.min(vaultY, 10), 0.9, back, backCap);
+        if (x + 3 < right && vaultY > 5)
+          window(near, glow, x + 3, 2.6, LAYERS.back + 0.3, 1.4, 4, back);
+        break;
+      case 'machinery':
+        gear(
+          near,
+          rng,
+          x,
+          Math.min(vaultY - 2, 3 + rng() * vaultY * 0.6),
+          LAYERS.back,
+          1 + rng(),
+          backCap,
+        );
+        break;
+      case 'abyss':
+      case 'garden':
+        hang(near, rng, x, vaultY, LAYERS.back, 2 + rng() * Math.min(8, vaultY * 0.5), 0.5, back);
+        break;
+      case 'throne':
+        banner(
+          near,
+          rng,
+          x,
+          vaultY - 0.2,
+          LAYERS.back - 0.2,
+          Math.min(5, vaultY * 0.5),
+          0.8,
+          backCap,
+        );
+        break;
+      default:
+        column(near, rng, x, LAYERS.back, -1, Math.min(vaultY, 9) - rng() * 2, 1, back, backCap);
+    }
+  }
+  // Floor of the chamber and its own slabs, dressed like the route's.
+  const floorPieces = cutRange(L, R, side('bottom')).map(([a, b]) => ({
+    x: (a + b) / 2,
+    y: -15,
+    w: b - a,
+    h: 30,
+    memory: false,
+  }));
+  const local = {
+    ...data,
+    platforms: [...floorPieces, ...data.platforms.map((p) => ({ ...p, y: p.y - base }))],
+  };
+  dressPlatforms(near, rng, local, mood);
+  rubble(near, rng, left, right, LAYERS.rear, -0.6, 1.2, rear);
+  for (let x = left + 2 + rng() * 4; x < right - 1; x += 7 + rng() * 8)
+    if (!within(x, side('bottom'), 1.5)) crystals(near, glow, rng, x, 0.2, LAYERS.rear - 0.1);
+  // Rock all around: walls and vault, open at the doors.
+  const rock: Paint = (x, y) => {
+    const t = tone(x);
+    return rgba(
+      mixRgb(mixRgb(t.near, [0, 0, 0], 0.35), t.ground, 0.12 + 0.05 * Math.sin(x * 2.1 + y * 1.3)),
+    );
+  };
+  const rim: Paint = (x) => rgba(mixRgb(tone(x).ground, tone(x).lip, 0.35));
+  /** Stone set in the rock: lighter by the room, darker deeper in. */
+  const block =
+    (depth: number): Paint =>
+    (x) => {
+      const t = tone(x);
+      const face = mixRgb(t.near, t.ground, 0.55);
+      return rgba(mixRgb(face, [0, 0, 0], Math.min(0.85, depth / 3)));
+    };
+  const wallSide = (inner: number, outer: number, doorsHere: typeof doors): void => {
+    const xs = steps(Math.min(inner, outer), Math.max(inner, outer), 0.7);
+    for (const [a, b] of cutRange(-ROCK, vaultY + ROCK, doorsHere)) {
+      near.band(
+        xs,
+        xs.map(() => a),
+        xs.map(() => b),
+        FACE - 0.02,
+        rock,
+      );
+      // Ragged inner edge, catching a little light.
+      const ys = steps(Math.max(a, -0.2), Math.min(b, vaultY + 0.2), 0.6);
+      if (ys.length > 1)
+        near.ribbon(
+          ys.map((y) => [inner + jitter(rng, 0.05), y] as Point),
+          ys.map(() => 0.1 + rng() * 0.06),
+          FACE - 0.04,
+          rim,
+        );
+      // Blocks of dressed stone in the rock near the room, fading into the dark.
+      const into = outer > inner ? 1 : -1;
+      for (let y = Math.max(a, -1) + rng() * 0.8; y < Math.min(b, vaultY + 1) - 0.4;) {
+        const h = 0.5 + rng() * 0.6,
+          depth = 0.3 + rng() * 2.2,
+          w = 0.6 + rng() * 0.9;
+        const x0 = inner + into * depth;
+        g4(near, x0, y, x0 + into * w, y + h, FACE - 0.03, block(depth));
+        y += h + 0.15 + rng() * 0.5;
+      }
+    }
+    // A dark passage runs through the rock, just behind the fighters, to its far side;
+    // its sill catches the light and a glow waits at its far end.
+    for (const door of doorsHere) {
+      const into = outer > inner ? 1 : -1;
+      const lip = steps(Math.min(inner, inner + into * 4), Math.max(inner, inner + into * 4), 0.4);
+      near.band(
+        lip,
+        lip.map(() => door.from - 0.12),
+        lip.map(() => door.from + 0.04 + rng() * 0.04),
+        FACE - 0.03,
+        (x) => {
+          const t = tone(x);
+          const pale = mixRgb(t.ground, t.lip, 0.35);
+          return rgba(mixRgb(pale, [0, 0, 0], smooth(0, 4, Math.abs(x - inner))));
+        },
+      );
+      glow.sprite(
+        inner + into * 4.5,
+        (door.from + door.to) / 2,
+        3,
+        door.to - door.from + 1,
+        DOORWAY + 0.05,
+        glowAt(inner, 0.22),
+      );
+      throat(
+        near,
+        door.from - 1,
+        door.to + 0.6,
+        inner,
+        (outer > inner ? 1 : -1) * (ROCK + SHELL),
+        DOORWAY,
+        false,
+        5,
+      );
+    }
+  };
+  wallSide(left, L - ROCK, side('left'));
+  wallSide(right, R + ROCK, side('right'));
+  const vaultXs = steps(L - ROCK, R + ROCK, 0.6);
+  let bump = rng();
+  const lows = vaultXs.map(() => {
+    bump = Math.max(0, Math.min(1, bump + jitter(rng, 0.25)));
+    return vaultY - 0.1 - bump * 0.35;
+  });
+  bandAround(
+    near,
+    vaultXs,
+    lows,
+    vaultXs.map(() => vaultY + ROCK),
+    FACE - 0.03,
+    rock,
+    side('top'),
+  );
+  for (let x = left + rng(); x < right; x += 1.2 + rng() * 2.6)
+    if (!within(x, side('top'), 0.6))
+      hang(near, rng, x, vaultY, FACE - 0.05, 0.4 + rng() * 1.3, 0.35 + rng() * 0.3, rock);
+  const vines = Math.round((2 + mood.overgrowth * 8) * ((right - left) / 30));
+  for (let i = 0; i < vines; i++) {
+    const x = left + rng() * (right - left);
+    if (!within(x, side('top'), 0.8))
+      vine(
+        near,
+        rng,
+        x,
+        vaultY,
+        LAYERS.rear - 0.2,
+        1.5 + rng() * Math.min(6, vaultY * 0.4),
+        layerPaint(0.1),
+      );
+  }
+  for (const door of side('top')) {
+    throat(near, door.from, door.to, vaultY - 1, ROCK + 1, DOORWAY, true, 6);
+    const x = (door.from + door.to) / 2;
+    shafts.sprite(x, vaultY - 5, door.to - door.from + 1.4, 12, 3, glowAt(x, 1.1), 0);
+  }
+  for (const door of side('bottom'))
+    throat(near, door.from, door.to, 0.25, -(ROCK + 0.25), DOORWAY, true, 6);
+  // Lanterns hang from the vault; a slanting shaft falls from a crack high up.
+  const lanterns = Math.max(1, Math.round((mood.lanterns * (right - left)) / 40));
+  for (let i = 0; i < lanterns; i++) {
+    const x = left + ((i + 0.5 + jitter(rng, 0.3)) / lanterns) * (right - left);
+    if (!within(x, side('top'), 1))
+      lantern(
+        near,
+        glow,
+        rng,
+        x,
+        vaultY,
+        LAYERS.back - 0.4,
+        1.5 + rng() * Math.min(4, vaultY * 0.3),
+        back,
+      );
+  }
+  const sx = left + (right - left) * (0.3 + rng() * 0.4);
+  shafts.sprite(sx, vaultY * 0.55, 2.6, vaultY * 1.3, 4.5, glowAt(sx, 0.8), -0.3);
+  // Out-of-focus roots and teeth framing the top of the view.
+  const ink: Paint = (x) => rgba(mixRgb(tone(x).near, [0, 0, 0], 0.7));
+  for (let x = left + rng() * 6; x < right; x += 8 + rng() * 9) {
+    const spine: Point[] = [];
+    const widths: number[] = [];
+    const length = 1.5 + rng() * 2;
+    for (let i = 0; i <= 6; i++) {
+      const t = i / 6;
+      spine.push([x + Math.sin(t * 3 + x) * 0.3, vaultY + 1.2 - length * t]);
+      widths.push(0.8 * (1 - t) + 0.05);
+    }
+    front.ribbon(spine, widths, LAYERS.front, ink, 0.35);
+  }
+  paintAnchors(glow, data, base);
+  const memory = new PaintedGeometry();
+  paintMemories(memory, rng, local);
+  return { near, far, front, glow, shafts, memory, offset: base };
+}
+/** Cuts door ranges out of the span [a, b]. */
+function cutRange(
+  a: number,
+  b: number,
+  doors: readonly { from: number; to: number }[],
+): [number, number][] {
+  const spans: [number, number][] = [];
+  let from = a;
+  for (const door of [...doors].sort((p, q) => p.from - q.from)) {
+    if (door.from > from) spans.push([from, Math.min(door.from, b)]);
+    from = Math.max(from, door.to);
+  }
+  if (b > from) spans.push([from, b]);
+  return spans.filter(([p, q]) => q - p > 0.01);
 }

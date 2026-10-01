@@ -8,8 +8,10 @@ import { bodyBand, clampToGates, walkableSpan } from '../../src/enemies/Terrain'
 import type { Solid } from '../../src/enemies/Terrain';
 import { makeCombatant } from '../../src/combat/CombatSystem';
 import type { Hitbox } from '../../src/combat/CombatSystem';
+import { worldSolids } from '../../src/world/Rooms';
 
-const solids: Solid[] = chunks.flatMap((chunk) => chunk.platforms.filter((p) => !p.memory));
+/** Slabs and chamber walls: what bodies stand on and bump into. */
+const solids: Solid[] = worldSolids;
 const crosses = (s: Solid, x: number, radius: number, [feet, head]: [number, number]): boolean =>
   Math.abs(s.x - x) < s.w / 2 + radius - 0.01 &&
   s.y - s.h / 2 < head - 0.06 &&

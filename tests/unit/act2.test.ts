@@ -15,7 +15,14 @@ import {
 } from '../../src/combat/Hazards';
 import { EnemySchema, enemyData } from '../../game-data/enemies/roster';
 import { moods } from '../../game-data/zones/moods';
-import { chunks, landmarks, pits, route, stages } from '../../game-data/zones/laboratory';
+import {
+  chunks,
+  landmarks,
+  pits,
+  route,
+  routeChunks,
+  stages,
+} from '../../game-data/zones/laboratory';
 const vents = chunks.flatMap((c) => c.hazards);
 /**
  * A heavy elite, as the data may describe one: a combo, a lunge and an enrage
@@ -148,9 +155,10 @@ describe('elites and Act II enemies', () => {
 });
 describe('Act II route', () => {
   it('continues the world without gaps and gives every sector a mood', () => {
-    for (let i = 1; i < chunks.length; i++) expect(chunks[i]!.start).toBe(chunks[i - 1]!.end);
-    expect(chunks).toHaveLength(10);
-    for (const chunk of chunks) expect(moods[chunk.id], chunk.id).toBeDefined();
+    for (let i = 1; i < routeChunks.length; i++)
+      expect(routeChunks[i]!.start).toBe(routeChunks[i - 1]!.end);
+    expect(routeChunks).toHaveLength(10);
+    for (const chunk of routeChunks) expect(moods[chunk.id], chunk.id).toBeDefined();
     expect(moods.brazier!.motif).toBe('cinders');
     expect(moods['denial-garden']!.motif).toBe('garden');
   });

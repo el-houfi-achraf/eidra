@@ -1,5 +1,7 @@
-import { chunks } from '../../game-data/zones/laboratory';
+import { routeChunks } from '../../game-data/zones/laboratory';
+import type { ChunkData } from '../../game-data/zones/laboratory';
 import { moods } from '../../game-data/zones/moods';
+import { sectorOf } from './Rooms';
 import type { Mood } from '../../game-data/zones/moods';
 export type RGB = [number, number, number];
 /** A mood with its colours decoded to linear 0..1 triples. */
@@ -50,13 +52,26 @@ export function mixTint(a: Tint, b: Tint, t: number): Tint {
 }
 /** Metres over which two neighbouring sectors cross-fade their colours. */
 export const BLEND = 12;
-const sectors = chunks.map((chunk) => ({
+const sectors = routeChunks.map((chunk) => ({
   start: chunk.start,
   end: chunk.end,
   tint: toTint(moods[chunk.id] ?? moods.awakening!),
 }));
 const smooth = (t: number): number => t * t * (3 - 2 * t);
-/** Colour identity at a world position, blended smoothly across sector borders. */
+const roomTints = new Map<string, Tint>();
+/**
+ * Colour identity of a chamber: its own mood if it has one, else its sector's. A
+ * chamber is one closed space, so its colours do not drift as the camera moves.
+ */
+export function roomTint(room: ChunkData): Tint {
+  let tint = roomTints.get(room.id);
+  if (!tint) {
+    tint = toTint(moods[room.id] ?? moods[sectorOf(room).id] ?? moods.awakening!);
+    roomTints.set(room.id, tint);
+  }
+  return tint;
+}
+/** Colour identity along the route, blended smoothly across sector borders. */
 export function tintAt(x: number): Tint {
   const last = sectors.length - 1;
   let i = sectors.findIndex((s) => x < s.end);

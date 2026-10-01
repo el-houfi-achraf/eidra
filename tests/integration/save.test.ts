@@ -21,6 +21,7 @@ const data: SaveData = {
   flags: [],
   settings: defaultSettings(),
   playtime: 5,
+  bestiary: { watcher: 2 },
 };
 describe('Save compatibility', () => {
   it('persists across connections with isolated slots', async () => {
@@ -40,6 +41,15 @@ describe('Save compatibility', () => {
       migrateSave({ ...data, saveVersion: 1, flags: undefined, shards: undefined }).saveVersion,
     ).toBe(2);
     expect(() => migrateSave({ ...data, saveVersion: 999 })).toThrow();
+  });
+  it('loads a save written before rooms and the bestiary, on the route where it was', () => {
+    // A journey saved by the previous version: no bestiary, a position along x.
+    const older: Partial<SaveData> = { ...data, position: { x: 136.5, y: 1 } };
+    delete older.bestiary;
+    const loaded = migrateSave(older);
+    expect(loaded.bestiary).toEqual({});
+    expect(loaded.position).toEqual({ x: 136.5, y: 1 });
+    expect(loaded.discoveredAreas).toEqual(['awakening']);
   });
   it('rejects invalid positions instead of persisting corrupt data', async () => {
     const s = new SaveManager('invalid-' + crypto.randomUUID());

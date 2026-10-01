@@ -23,6 +23,8 @@ export const SaveSchema = z.object({
   flags: z.array(z.string()),
   settings: SettingsSchema,
   playtime: z.number().nonnegative(),
+  /** Foes fallen by kind, for the journal's bestiary; older saves start empty. */
+  bestiary: z.record(z.string(), z.number().int().nonnegative()).default({}),
 });
 export type SaveData = z.infer<typeof SaveSchema>;
 export function migrateSave(raw: unknown): SaveData {
