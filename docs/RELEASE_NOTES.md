@@ -105,3 +105,11 @@ Lire README, ROADMAP et AGENT_RULES, lancer `npm ci`, puis `npm run check` et le
 - **Nouvelles apparences** : livrée bleu et or et écusson du Porteur, bannière qui quitte son dos quand elle est plantée ; éclats en orbite du Gardien ; cornes, cape de braise, suie et braises de la Sentinelle ; couronne de fleurs, mèches roses et pétales d'Ilyra.
 - **Lisibilité** : marques au sol jusqu'à l'atterrissage du bond et jusqu'à chaque geyser, œil au-dessus d'Eidra qui rougit quand il punit, reflets qui scintillent brièvement.
 - Sauvegarde inchangée : un Porteur ou une Sentinelle vaincus dans une partie existante restent vaincus.
+
+### Dixième itération : bande-son et bruitages
+
+- **Une partition originale** (D033), générée par script : un thème au titre, un par région (Lumérite, berceuse de Mira, Contrepoids, Cendres, Jardin du déni) et un par boss (marche du Porteur, orgue et chœur du Gardien, tambours de la Sentinelle, valse d'Ilyra), sur un motif d'Eidra commun ; piano, cordes, violoncelle, harpe, célesta, chœur, orgue, cor et percussions synthétisés, avec réverbération.
+- **Musique qui suit le voyage** : fondu entre les régions, thème du boss dès son réveil, silence après la victoire puis retour lent de la région, motifs de victoire, de pouvoir, de repos, de mort et d'acte, musique qui s'éteint à la mort et baisse en pause, creux sous les gros impacts. Le titre a enfin sa musique.
+- **Ambiances** : gouttes et bourdonnement des voûtes, vent et braises des failles, brise et carillons du jardin.
+- **59 bruitages en couches, avec variantes** et hauteur légèrement aléatoire : trois coups de bâton, coups qui touchent (claquement, corps, tintement), armure, mort d'ennemi, blessure, parade, dash, saut, double saut, atterrissage léger ou lourd, pas sur la pierre, la cendre ou la mousse, Recueillement qui monte puis se résout, cartes, pogo, éclats, Rémanence, Écho, mort et reconstitution ; ennemis qui repèrent, anticipent, frappent et tirent ; rugissements, télégraphes et coups des boss, étendard, Commandement, geysers, bond, reflets brisés ; colonnes de feu, portes de pierre, ancrage, dialogues et menus.
+- Sous-titres de bruitages pour les sons qui comptent ; vibrations des manettes alignées sur les nouveaux sons. Formats OGG et MP3 ; la musique est diffusée en streaming et libérée loin de sa région. Réglages et sauvegardes inchangés.

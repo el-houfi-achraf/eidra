@@ -18,6 +18,19 @@ Noms, compte de triangles, matériaux, dimensions textures, proxies de collision
 
 Uniquement assets originaux ou explicitement autorisés. Musique temporaire synthétisée localement. Inventaire de licences avant release.
 
+## Audio
+
+Tout l'audio de `public/audio` est généré par `tools/generate_audio.py` (D033) :
+
+```bash
+pip install -r tools/requirements-audio.txt
+python3 tools/generate_audio.py                 # tout (≈ 30 s sur 4 cœurs)
+python3 tools/generate_audio.py sfx stingers    # certains groupes : music, stingers, ambience, sfx
+npm run validate:assets && npm run manifest
+```
+
+Dossiers : `music/` (thèmes en boucle, 32 kHz stéréo), `stingers/` (motifs courts), `ambience/` (lits d'ambiance en boucle), `sfx/<cue>-<n>` (bruitages, 44,1 kHz mono, une variante par fichier). Chaque son existe en `.ogg` (Vorbis) et en `.mp3` (secours) ; un fichier qu'aucune source ne produit plus est supprimé à la régénération de son groupe. Ajouter un bruitage : une recette dans `tools/audio/sfx.py` (table `EFFECTS`), une entrée dans `game-data/audio/sounds.ts` (variantes, volume, dispersion de hauteur, délai, bus, creux de musique, sous-titre), puis l'appel `fx.sound('<cue>')` ; les tests échouent si un fichier manque ou reste orphelin. Ajouter un thème : une fonction dans `tools/audio/music.py`, une entrée dans `game-data/audio/music.ts` et son secteur ou son boss.
+
 ## Commandes disponibles
 
 ```sh

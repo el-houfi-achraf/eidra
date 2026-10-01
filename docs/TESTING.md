@@ -95,6 +95,12 @@ Correctifs : appui correct dès le premier pas après une téléportation, prior
 
 22 parcours E2E. Ajout : **« each boss fights with its own ability and way of moving »** — les quatre démarches, l'étendard du Porteur planté puis retiré à sa chute, les deux reflets d'Ilyra en phase 2 dissipés quand la vraie est touchée. Le parcours des arènes vise désormais le Porteur comme boss.
 
+## Dixième itération : bande-son et bruitages
+
+185 tests unitaires / intégration dans 22 fichiers. Nouveau `audio.test.ts` : chaque variante de chaque bruitage existe en OGG et en MP3 et aucun fichier n'est orphelin ; chaque thème, ambiance et motif est livré ; chaque secteur de la route a sa musique, son ambiance et son sol, chaque boss un thème qui n'appartient qu'à lui ; chaque type de pattern de boss a une voix qui existe ; les gros impacts creusent la musique, jamais les pas ; une variante n'est jamais rejouée deux fois de suite et toutes servent ; délai minimal entre deux occurrences ; dispersion de hauteur bornée ; **directeur de musique** : thème du titre dans les menus, thème et ambiance des voûtes, fondu entre régions sans battement à la frontière (hystérésis), thèmes et ambiances de l'Acte II, thème du boss puis ambiance atténuée, silence après la victoire puis retour de la région, fondu à la mort, niveau réduit en pause, creux qui retombe, sol sous les pas ; **sons de combat** : un Veilleur repère, anticipe puis frappe (dans cet ordre), le Porteur rugit, télégraphie, plante son étendard qui sonne toujours au même endroit, le Gardien ordonne puis punit un mouvement, une colonne de feu ne s'entend que près d'Eidra.
+
+23 parcours E2E. Ajout : **« the score follows the journey, and every gesture is heard »** — le premier geste réveille l'audio et le thème du titre joue au menu ; l'interface confirme ; thème et ambiance des voûtes ; pas sur la pierre, saut, atterrissage et coup de bâton entendus ; dans l'arène du Porteur la porte retombe, il rugit et son thème prend le relais ; à sa chute, le son de la victoire et son motif, puis le silence.
+
 ## Qualité restant à qualifier
 
 WebGPU réel, Firefox / Safari, manettes physiques (les profils Linux evdev et les vibrations n'ont été vérifiés qu'avec des manettes scriptées), accessibilité avec lecteurs d’écran, quotas / stockage privé, CSP sur Cloudflare et campagne complète. Le protocole de performance logiciel est décrit dans PERFORMANCE ; il ne certifie pas 60 FPS. Aucun test défaillant n’est désactivé pour rendre la CI verte.
