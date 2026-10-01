@@ -22,6 +22,8 @@ import type { DebugAPI } from '../debug/types';
 import { arenas, route } from '../../game-data/zones/laboratory';
 import { familyNames } from '../../game-data/input/controllers';
 import { rumbleCues } from '../../game-data/input/rumble';
+import { soundCues } from '../../game-data/audio/sounds';
+import type { AudioScene } from '../audio/MusicDirector';
 export class Game {
   private engine!: AbstractEngine;
   private presentation!: Presentation;
@@ -61,8 +63,32 @@ export class Game {
       capturePad: (done) => this.input.capture(done),
       cancelPadCapture: () => this.input.cancelCapture(),
       pad: () => ({ info: this.input.pad, glyph: (token) => this.input.padLabel(token) }),
-      rumbleTest: () => this.input.rumble(rumbleCues.heavy!),
+      rumbleTest: () => this.input.rumble(rumbleCues['boss-slam']!),
     });
+    // The score starts with the first gesture (browsers keep audio asleep until then),
+    // so the title theme plays in the menus.
+    const wake = (): void => {
+      void this.audio.start().catch((error: unknown) => reportError(error));
+    };
+    for (const type of ['pointerdown', 'keydown'] as const)
+      window.addEventListener(type, wake, { once: true, signal: this.lifecycle.signal });
+    // Menus answer with soft ticks: moving the focus, confirming.
+    const root = document.getElementById('interface');
+    root?.addEventListener(
+      'focusin',
+      (event) => {
+        if ((event.target as HTMLElement).matches('button, input, select'))
+          this.audio.play('ui-move');
+      },
+      { signal: this.lifecycle.signal },
+    );
+    root?.addEventListener(
+      'click',
+      (event) => {
+        if ((event.target as HTMLElement).closest('button')) this.audio.play('ui-confirm');
+      },
+      { signal: this.lifecycle.signal },
+    );
     this.input.onConnection((info, connected) => {
       this.ui.notice(
         connected
@@ -88,11 +114,11 @@ export class Game {
         this.audio.play(id, x ?? this.session.actor.x, y ?? this.session.actor.y);
         const rumble = rumbleCues[id];
         if (rumble) this.input.rumble(rumble);
-        if (this.settings.subtitles && ['memory', 'save', 'parry'].includes(id))
-          this.ui.caption(
-            id === 'parry' ? '[ La céramique résonne. ]' : '[ La Lumérite chante doucement. ]',
-          );
+        const caption = soundCues[id].caption;
+        if (this.settings.subtitles && caption) this.ui.caption(caption);
       },
+      stopSound: (id) => this.audio.stop(id),
+      stinger: (id) => this.audio.stinger(id),
       shake: (value) => this.presentation.camera.shake(value),
       save: () => this.saveNow(false),
       dialogue: () => this.startDialogue(),
@@ -257,9 +283,13 @@ export class Game {
         this.settings.reducedMotion,
       );
       this.audio.listen(this.session.actor.x, this.session.actor.y);
-      // Every guardian fight, boss or arena elite, shares the combat score.
-      const fight = this.session.bossBar !== null;
-      this.audio.update(dt, this.settings, fight, this.state.state !== 'PLAYING');
+      if (['MAIN_MENU', 'PAUSED', 'GAME_OVER'].includes(this.state.state) && this.input.menu.back)
+        this.audio.play('ui-back');
+      this.audio.update(dt, this.settings, {
+        scene: this.audioScene,
+        x: this.session.actor.x,
+        boss: this.session.activeBoss?.data.id ?? null,
+      });
       this.debug?.recordCPU(performance.now() - cpuStart);
       this.debug?.update(
         dt,
@@ -297,7 +327,19 @@ export class Game {
       reportError(error);
     }
   }
+  /** What the score should follow, from the state of the game. */
+  private get audioScene(): AudioScene {
+    const scene: Partial<Record<string, AudioScene>> = {
+      BOOT: 'menu',
+      MAIN_MENU: 'menu',
+      PAUSED: 'paused',
+      GAME_OVER: 'dead',
+      ENDING: 'ending',
+    };
+    return scene[this.state.state] ?? 'playing';
+  }
   private pause(): void {
+    this.audio.play('ui-open');
     this.mapOpen = false;
     this.state.change('PAUSED');
     this.input.reset();
@@ -342,6 +384,7 @@ export class Game {
     this.state.change('LOADING');
     this.session.respawn();
     this.presentation.reformHero(this.session.player.position.x, this.session.player.position.y);
+    this.audio.play('respawn');
     this.state.change('PLAYING');
     this.ui.playing();
     this.input.reset();
@@ -350,7 +393,9 @@ export class Game {
   }
   private die(): void {
     if (this.state.state !== 'PLAYING') return;
-    this.input.rumble(rumbleCues.death!);
+    this.input.rumble(rumbleCues['player-death']!);
+    this.audio.play('player-death');
+    this.audio.stinger('death');
     this.state.change('GAME_OVER');
     this.input.reset();
     // The mask shatters first; the death panel follows once the shards have flown.
@@ -367,6 +412,7 @@ export class Game {
     if (this.state.state === 'PLAYING') {
       this.state.change('CUTSCENE');
       this.input.reset();
+      this.audio.play('dialogue');
       this.ui.dialogue(this.session, (action) => this.input.label(action));
     }
   }
@@ -389,6 +435,7 @@ export class Game {
     if (this.state.state !== 'CUTSCENE') return;
     if (this.ui.finishLine()) return;
     if (this.session.narrative.advance()) {
+      this.audio.play('dialogue');
       this.ui.dialogue(this.session, (action) => this.input.label(action));
       this.input.reset();
       return;
@@ -509,6 +556,7 @@ export class Game {
               profile: this.input.pad.profile?.id ?? 'standard',
             }
           : null,
+        audio: this.audio.state(),
         meshes: this.presentation.scene.meshes.length,
         bodies: this.world.bodyCount,
         renderer: this.engine.isWebGPU ? 'WebGPU' : 'WebGL2',

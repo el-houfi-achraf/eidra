@@ -315,6 +315,49 @@ test('each boss fights with its own ability and way of moving', async ({ page })
   await expect.poll(async () => (await boss('ilyra')).effects.reflections).toEqual([]);
   expect(errors).toEqual([]);
 });
+test('the score follows the journey, and every gesture is heard', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/?debug=1&renderer=webgl2');
+  await expect(page.locator('body')).toHaveAttribute('data-ready', 'true');
+  const audio = async () => (await snapshot(page)).audio;
+  // The first gesture wakes the audio: the title theme plays in the menu.
+  await page.keyboard.press('ArrowDown');
+  await expect
+    .poll(async () => (await audio()).streams, { timeout: 30000 })
+    .toContain('music/title');
+  await page.getByRole('button', { name: 'Nouvelle partie' }).click();
+  await page.locator('#slot-0').click();
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'PLAYING');
+  expect((await audio()).recent).toContain('ui-confirm');
+  // The vaults: their theme and their ambience.
+  await expect
+    .poll(async () => (await audio()).mix?.music.lumerite ?? 0, { timeout: 30000 })
+    .toBeGreaterThan(0.9);
+  expect((await audio()).mix?.ambience.laboratory).toBeGreaterThan(0.9);
+  await expect.poll(async () => (await snapshot(page)).player.grounded).toBe(true);
+  await hold(page, 'KeyD', 900);
+  await page.keyboard.press('Space');
+  await expect.poll(async () => (await audio()).recent).toContain('land');
+  await page.keyboard.press('KeyJ');
+  await expect.poll(async () => (await audio()).recent).toContain('swing');
+  const heard = (await audio()).recent;
+  expect(heard).toContain('step-stone');
+  expect(heard).toContain('jump');
+  // The Keeper's arena: the door falls, the Keeper roars, its theme takes over.
+  await page.evaluate(() => window.eidra!.teleport(150.5));
+  await expect
+    .poll(async () => (await audio()).mix?.music.keeper ?? 0, { timeout: 45000 })
+    .toBeGreaterThan(0.9);
+  expect((await audio()).recent).toEqual(expect.arrayContaining(['gate-close', 'boss-roar']));
+  // Victory: the theme stops, a stinger sounds, the arena falls silent.
+  await page.evaluate(() => window.eidra!.setBossHealth(0, 'keeper'));
+  await expect
+    .poll(async () => (await audio()).recent)
+    .toEqual(expect.arrayContaining(['boss-death', 'stinger:victory']));
+  await expect.poll(async () => (await audio()).mix?.music, { timeout: 30000 }).toEqual({});
+  expect(errors).toEqual([]);
+});
 test('a sector exit stays sealed until its guardian falls, then stays open', async ({ page }) => {
   await start(page);
   // Between the Veilleur of the awakening chamber and the chamber's exit.

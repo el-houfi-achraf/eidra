@@ -36,6 +36,10 @@ import type { AbilityId } from '../../game-data/abilities/abilities';
 import type { DialogueId } from '../../game-data/dialogue/story';
 import type { BossEncounter } from '../enemies/EnemyManager';
 import { scorches } from '../combat/Hazards';
+import { CombatCues } from '../audio/CombatCues';
+import { sectorScores } from '../../game-data/audio/music';
+import type { StingerId } from '../../game-data/audio/music';
+import type { CueId } from '../../game-data/audio/sounds';
 export type BurstKind = 'gold' | 'damage' | 'memory' | 'dust' | 'heal' | 'crimson';
 /** Walls that stop thrown cards: every solid slab of the route (memories excluded). */
 const walls = chunks.flatMap((chunk) => chunk.platforms.filter((p) => !p.memory));
@@ -45,7 +49,11 @@ export type TitleKind = 'area' | 'boss' | 'victory';
 export interface SessionEffects {
   notice: (text: string) => void;
   burst: (x: number, y: number, kind: BurstKind) => void;
-  sound: (id: string, x?: number, y?: number) => void;
+  sound: (id: CueId, x?: number, y?: number) => void;
+  /** Cuts a sound short (an interrupted Recueillement). */
+  stopSound: (id: CueId) => void;
+  /** A short musical phrase: a victory, a new power, a rest, an act. */
+  stinger: (id: StingerId) => void;
   shake: (value: number) => void;
   save: () => void;
   dialogue: () => void;
@@ -93,6 +101,12 @@ export class GameSession {
   private echoHitTime = 0;
   private zone = '';
   private footstepTime = 0;
+  /** Sounds of what enemies, bosses and vents are doing. */
+  private cues = new CombatCues();
+  private wasGrounded = true;
+  /** Fastest fall since leaving the ground, for the weight of the landing. */
+  private fall = 0;
+  private wasChanneling = false;
   /** Clock of the ember vents, seconds of play. */
   hazardTime = 0;
   /** Arena guardians fought as ordinary enemies (the elites), fallen for good. */
@@ -189,6 +203,10 @@ export class GameSession {
     this.actor.maxHealth = this.inventory.maxHealth;
     this.focus.reset();
     this.introduced.clear();
+    this.cues.reset();
+    this.wasChanneling = false;
+    this.wasGrounded = true;
+    this.fall = 0;
     this.actor.health = this.actor.maxHealth;
     this.actor.invulnerable = 1;
     this.actor.stagger = 0;
@@ -237,17 +255,27 @@ export class GameSession {
         this.learn('double');
         this.fx.burst(this.actor.x, this.actor.y - 0.6, 'memory');
       }
-      this.fx.sound('jump');
+      this.fx.sound(p.motion.jumps >= 2 ? 'double-jump' : 'jump');
     }
+    // Footsteps follow the pace and the ground of the sector; landings, the height of the fall.
     this.footstepTime -= dt;
-    if (p.motion.grounded && Math.abs(p.motion.vx) > 1 && this.footstepTime <= 0) {
-      this.fx.sound('footstep');
-      this.footstepTime = 0.3;
+    const pace = Math.abs(p.motion.vx);
+    if (p.motion.grounded && pace > 1 && p.motion.dashTime === 0 && this.footstepTime <= 0) {
+      this.fx.sound(`step-${sectorScores[this.zone]?.surface ?? 'stone'}`);
+      this.footstepTime = Math.min(0.5, Math.max(0.24, 2 / pace));
     }
+    if (!p.motion.grounded) this.fall = Math.min(this.fall, p.motion.vy);
+    else if (!this.wasGrounded) {
+      this.fx.sound(this.fall < -15 ? 'land-heavy' : 'land');
+      this.fall = 0;
+      this.footstepTime = 0.15;
+    }
+    this.wasGrounded = p.motion.grounded;
     this.combat.dodge.apply(this.actor, p.motion.dashTime > 0.025);
     if (input.consume(InputAction.Parry) && this.actor.stagger <= 0 && this.combat.parry.start()) {
       this.learn('parry');
-      this.fx.sound('parry');
+      // The cards close into a shield.
+      this.fx.sound('card-throw');
     }
     // A press during recovery is remembered briefly, so combos chain without dropped inputs.
     if (input.consume(InputAction.Attack)) this.combat.attackBuffer.press();
@@ -272,7 +300,7 @@ export class GameSession {
     if (input.consume(InputAction.Remanence)) {
       if (this.abilities.toggleRemanence()) {
         if (this.abilities.remanence) this.learn('remanence');
-        this.fx.sound('memory');
+        this.fx.sound('remanence');
       } else this.fx.notice('Cette mémoire attend d’être retrouvée.');
     }
     if (!settings.memoryToggle && !input.held(InputAction.Remanence))
@@ -280,7 +308,7 @@ export class GameSession {
     if (input.consume(InputAction.Echo)) {
       if (this.abilities.createEcho()) {
         this.learn('echo');
-        this.fx.sound('memory');
+        this.fx.sound('echo');
       } else this.fx.notice('Memory Step nécessite une trace, 25 de mémoire et un temps de repos.');
     }
     this.abilities.update(dt, {
@@ -319,11 +347,15 @@ export class GameSession {
         this.chargeTime === 0,
       this.actor,
     );
+    // The Recueillement hums while it gathers; it is cut short if interrupted.
+    if (this.focus.channeling && !this.wasChanneling) this.fx.sound('focus');
+    if (this.wasChanneling && !this.focus.channeling && healed === 0) this.fx.stopSound('focus');
+    this.wasChanneling = this.focus.channeling;
     if (healed > 0) {
       this.learn('heal');
       this.events.emit('PLAYER_HEALED', { amount: healed, health: this.actor.health });
       this.fx.burst(this.actor.x, this.actor.y, 'heal');
-      this.fx.sound('save');
+      this.fx.sound('heal');
     }
     // Ember vents burst on the session clock, so visuals and damage agree.
     this.hazardTime += dt;
@@ -356,6 +388,9 @@ export class GameSession {
       // From the press, a plunge takes priority over the body it lands on (pogo).
       this.combat.attacking && this.combat.attackKind === 'down',
     );
+    const hazards = [...this.world.stream.loaded.values()].flatMap((chunk) => chunk.data.hazards);
+    for (const cue of this.cues.update(this.enemies, hazards, this.hazardTime, this.actor))
+      this.fx.sound(cue.id, cue.x, cue.y);
     if (this.combat.active) {
       const hit = this.combat.strike(this.actor, p.motion.facing);
       let bounced = false;
@@ -365,6 +400,7 @@ export class GameSession {
         if (boss && !boss.active) continue;
         if (!this.combat.hitboxes.test(hit, enemy)) continue;
         if (!boss?.director.armored) this.hurtEnemy(enemy, hit, 'melee');
+        else this.fx.sound('hit-armor', enemy.x, enemy.y);
         // Pogo: a downward strike that connects springs Eidra back into the air.
         if (this.combat.attackKind === 'down' && !bounced) {
           bounced = true;
@@ -372,7 +408,7 @@ export class GameSession {
           // The staff strikes home: a splash of red beneath her.
           this.fx.burst(this.actor.x, this.actor.y - 1.1, 'crimson');
           this.learn('down');
-          this.fx.sound('jump');
+          this.fx.sound('pogo');
         }
       }
     }
@@ -385,8 +421,10 @@ export class GameSession {
       if (boss && !boss.active) continue;
       const shot = this.cards.strike(enemy);
       if (!shot) continue;
-      if (boss?.director.armored) this.fx.burst(shot.x, shot.y, 'gold');
-      else this.hurtEnemy(enemy, this.cards.hitbox(shot), 'card');
+      if (boss?.director.armored) {
+        this.fx.burst(shot.x, shot.y, 'gold');
+        this.fx.sound('hit-armor', shot.x, shot.y);
+      } else this.hurtEnemy(enemy, this.cards.hitbox(shot), 'card');
     }
     if (echo?.attacking && this.echoHitTime === 0) {
       this.echoHitTime = 0.3;
@@ -406,6 +444,8 @@ export class GameSession {
         this.inventory.shards += entity.data.drops;
         this.combat.hitStop.trigger(0.09);
         this.fx.burst(entity.actor.x, entity.actor.y, 'gold');
+        this.fx.sound('kill', entity.actor.x, entity.actor.y);
+        if (entity.data.drops > 0) this.fx.sound('shard');
         this.events.emit('ENEMY_DEFEATED', {
           id: entity.actor.id,
           x: entity.actor.x,
@@ -430,17 +470,17 @@ export class GameSession {
         this.fx.title('boss', arena.arena.name, arena.arena.subtitle);
       this.fx.notice('Le seuil se referme derrière vous.');
       this.fx.shake(0.6);
-      this.fx.sound('heavy');
+      this.fx.sound('gate-close', arena.arena.left, 1);
     }
     if (arena?.type === 'cleared') {
       this.fx.notice('Le passage s’ouvre.');
-      this.fx.sound('save');
+      this.fx.sound('gate-open', arena.arena.right, 1);
     }
     // Stages: a sector's exit opens once its guardians have fallen, and stays open (saved).
     const down = (id: string): boolean => this.enemies.defeated.has(id);
     for (const stage of this.stages.clear(this.narrative.flags, down)) {
       this.fx.notice(`${stage.name} : le passage s’ouvre.`);
-      this.fx.sound('save');
+      this.fx.sound('gate-open', stage.gate, 1);
       this.fx.save();
     }
     for (const stage of this.stages.sealed(this.narrative.flags)) {
@@ -500,9 +540,9 @@ export class GameSession {
       this.fx.title('boss', data.name, data.subtitle);
       this.fx.shake(0.5);
     }
+    // Its roar is heard from the combat cues.
     if (director.state === 'transition' && director.timer === 0) {
       this.fx.shake(0.9);
-      this.fx.sound('heavy', actor.x, actor.y);
       this.fx.burst(actor.x, 3, 'damage');
     }
     if (actor.health <= 0 && !encounter.rewarded) {
@@ -519,7 +559,8 @@ export class GameSession {
       this.fx.burst(actor.x, 2, 'gold');
       const arena = encounter.arena;
       this.fx.title('victory', arena.victory, `${data.name} vaincu`);
-      this.fx.sound('victory');
+      this.fx.sound('boss-death', actor.x, actor.y);
+      this.fx.stinger('victory');
       this.fx.save();
     }
   }
@@ -530,7 +571,11 @@ export class GameSession {
     this.focus.interrupt();
     if (!this.combat.begin(kind)) return;
     this.learn('attack');
-    this.fx.sound(kind === 'charged' || this.combat.empowered ? 'heavy' : 'attack');
+    if (this.combat.empowered) this.fx.sound('riposte');
+    else if (kind === 'charged') {
+      this.fx.sound('swing-heavy');
+      this.fx.sound('card-burst');
+    } else this.fx.sound('swing');
   }
   /** A card from the orbit, or a fan of three during a riposte. */
   private throwCard(): void {
@@ -550,7 +595,7 @@ export class GameSession {
     this.cards.throw(x, y, m.facing, fan);
     this.learn('cast');
     this.fx.burst(x, y, 'crimson');
-    this.fx.sound(fan ? 'heavy' : 'attack');
+    this.fx.sound(fan ? 'card-burst' : 'card-throw');
   }
   private hurtEnemy(enemy: Combatant, hit: Hitbox, source: 'melee' | 'card' | 'echo'): void {
     const byPlayer = source === 'melee';
@@ -574,7 +619,8 @@ export class GameSession {
       // Cards spend resonance: they never earn it back, and barely stop time.
       if (source === 'card') this.combat.hitStop.trigger(0.03);
       this.fx.burst(enemy.x, enemy.y, 'damage');
-      this.fx.sound('hit', enemy.x, enemy.y);
+      this.fx.sound(source === 'card' ? 'card-hit' : 'hit', enemy.x, enemy.y);
+      if (source === 'card') this.fx.sound('hit', enemy.x, enemy.y);
       this.fx.shake(finisher ? 0.4 : 0.22);
     }
   }
@@ -633,7 +679,8 @@ export class GameSession {
           this.abilities.energy = 100;
           this.events.emit('CHECKPOINT_ACTIVATED', { id: point.id });
           this.fx.burst(x, y, 'memory');
-          this.fx.sound('save');
+          this.fx.sound('anchor');
+          this.fx.stinger('rest');
           this.fx.save();
           if (current) this.fx.altar();
         }
@@ -651,7 +698,7 @@ export class GameSession {
         this.events.emit('ABILITY_UNLOCKED', { id });
         this.fx.unlock(id);
         this.fx.burst(x, y, 'memory');
-        this.fx.sound('memory');
+        this.fx.stinger('ability');
         this.fx.save();
       }
       if (marker.kind === 'npc') {
@@ -680,7 +727,7 @@ export class GameSession {
       if (unlocked && input.consume(InputAction.Interact)) {
         this.world.update(passage.toX, this.abilities.remanence, this.relocate(passage.toX));
         this.player.teleport(passage.toX, passage.toY);
-        this.fx.sound('memory');
+        this.fx.sound('gate-open');
         this.fx.notice(passage.label);
         break;
       }
@@ -693,7 +740,7 @@ export class GameSession {
     else if (x > route.act2.x && flags.has('slice-complete') && !flags.has('act-2')) {
       flags.add('act-2');
       this.fx.title('victory', route.act2.title, route.act2.subtitle);
-      this.fx.sound('memory');
+      this.fx.stinger('act');
     }
     if (x > 208 && x < 240 && !flags.has('heard-nhalis')) this.dialogue('nhalis');
     if (x > 368 && x < route.finale.x && !flags.has('heard-ilyra')) this.dialogue('ilyra');
@@ -714,7 +761,7 @@ export class GameSession {
       maxHealth: this.actor.maxHealth,
     });
     this.fx.burst(this.actor.x, this.actor.y, 'heal');
-    this.fx.sound('save');
+    this.fx.sound('heal');
     this.fx.save();
     return true;
   }
