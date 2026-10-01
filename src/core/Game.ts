@@ -126,7 +126,7 @@ export class Game {
     await initializePhysics(this.presentation.scene);
     this.world = new World(this.presentation.scene, this.presentation.palette);
     this.session = new GameSession(this.presentation.scene, this.world, {
-      notice: (text) => this.ui.notice(text),
+      notice: (text, topic) => this.ui.notice(text, topic),
       burst: (x, y, kind) => this.presentation.effects.burst(x, y, kind),
       sound: (id, x, y) => {
         this.audio.play(id, x ?? this.session.actor.x, y ?? this.session.actor.y);
@@ -303,6 +303,7 @@ export class Game {
           flight.done();
         }
       }
+      this.presentation.talking = this.state.state === 'CUTSCENE';
       this.presentation.render(
         dt,
         this.session,

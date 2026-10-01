@@ -246,6 +246,11 @@ export const pits = [{ from: 88, to: 109, safe: 84 }, ...ashPits].map((pit) =>
 );
 /** Story beats tied to the route. */
 export const route = {
+  /**
+   * Where a new journey wakes: beside the first anchor but out of its reach, so the
+   * first prompt on screen is the one to move.
+   */
+  wake: 4.4,
   /** Mira's farewell once the Guardian has fallen, then Act II. */
   aftermath: 197,
   act2: {

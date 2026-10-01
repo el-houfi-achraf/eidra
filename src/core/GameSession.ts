@@ -48,7 +48,8 @@ const inWall = (x: number, y: number): boolean =>
   walls.some((w) => Math.abs(x - w.x) < w.w / 2 && Math.abs(y - w.y) < w.h / 2);
 export type TitleKind = 'area' | 'boss' | 'victory';
 export interface SessionEffects {
-  notice: (text: string) => void;
+  /** A notification; one with a `topic` replaces the previous one on that topic. */
+  notice: (text: string, topic?: string) => void;
   burst: (x: number, y: number, kind: BurstKind) => void;
   sound: (id: CueId, x?: number, y?: number) => void;
   /** Cuts a sound short (an interrupted Recueillement). */
@@ -136,6 +137,8 @@ export class GameSession {
     for (const encounter of this.enemies.bosses) encounter.defeated = false;
     this.fallen.clear();
     this.respawn();
+    this.player.teleport(route.wake, 1.2);
+    this.actor.x = route.wake;
   }
   load(save: SaveData): void {
     this.slot = save.slot;
@@ -469,18 +472,18 @@ export class GameSession {
       // Bosses announce themselves; elites get the arena's title card.
       if (!this.enemies.encounter(arena.arena.guardian))
         this.fx.title('boss', arena.arena.name, arena.arena.subtitle);
-      this.fx.notice('Le seuil se referme derrière vous.');
+      this.fx.notice('Le seuil se referme derrière vous.', `arena:${arena.arena.id}`);
       this.fx.shake(0.6);
       this.fx.sound('gate-close', arena.arena.left, 1);
     }
     if (arena?.type === 'cleared') {
-      this.fx.notice('Le passage s’ouvre.');
+      this.fx.notice('Le passage s’ouvre.', `arena:${arena.arena.id}`);
       this.fx.sound('gate-open', arena.arena.right, 1);
     }
     // Stages: a sector's exit opens once its guardians have fallen, and stays open (saved).
     const down = (id: string): boolean => this.enemies.defeated.has(id);
     for (const stage of this.stages.clear(this.narrative.flags, down)) {
-      this.fx.notice(`${stage.name} : le passage s’ouvre.`);
+      this.fx.notice(`${stage.name} : le passage s’ouvre.`, `stage:${stage.id}`);
       this.fx.sound('gate-open', stage.gate, 1);
       this.fx.save();
     }
@@ -492,20 +495,26 @@ export class GameSession {
         const left = this.stages.remaining(stage, down);
         this.fx.notice(
           `Passage scellé : ${left} gardien${left > 1 ? 's' : ''} du secteur à vaincre.`,
+          `stage:${stage.id}`,
         );
       }
       if (ahead > 6 || ahead < -1) this.warned.delete(id);
     }
     this.updateProgression(input);
-    this.hint = this.tutorial.update({
-      x: this.actor.x,
-      abilities: this.abilities.unlocked,
-      flags: this.narrative.flags,
-      wounded:
-        this.actor.health < this.actor.maxHealth * 0.6 &&
-        this.focus.resonance >= this.focus.data.cost,
-      cards: this.focus.resonance >= cardData.cost,
-    });
+    // No lesson in the middle of a boss fight or while Eidra falls.
+    this.hint =
+      this.activeBoss || this.actor.health <= 0
+        ? null
+        : this.tutorial.update({
+            x: this.actor.x,
+            abilities: this.abilities.unlocked,
+            flags: this.narrative.flags,
+            wounded:
+              this.actor.health < this.actor.maxHealth * 0.6 &&
+              this.focus.resonance >= this.focus.data.cost,
+            cards: this.focus.resonance >= cardData.cost,
+          });
+    if (this.hint && this.tutorial.linger(dt, this.narrative.flags)) this.hint = null;
     if (this.actor.y < -5) {
       this.takeHit(
         {

@@ -460,7 +460,8 @@ kbd {
 }
 .interaction {
   position: absolute;
-  bottom: 19%;
+  /* The prompt line: low on the screen, under Eidra's feet, never over her. */
+  bottom: 9%;
   left: 50%;
   transform: translate(-50%, 8px);
   display: flex;
@@ -497,7 +498,7 @@ kbd {
   position: fixed;
   left: 0;
   right: 0;
-  top: 24%;
+  top: 12%;
   text-align: center;
   pointer-events: none;
   opacity: 0;
@@ -533,6 +534,11 @@ kbd {
   height: 1px;
   margin: 0 auto 14px;
   background: linear-gradient(90deg, transparent, #c6aa7bcc, transparent);
+}
+.title-card.area h2 {
+  /* An area name is a quiet line above the scene, not a curtain over it. */
+  font-size: clamp(20px, 2.5vw, 34px);
+  margin: 6px 0 4px;
 }
 .title-card .title-ornament {
   color: var(--gold);
@@ -723,28 +729,30 @@ kbd {
   border-bottom: 55px solid #071719dd;
 }
 .dialogue {
+  /* Low and compact, over the bottom bar: the speakers stay in view above it. */
   position: absolute;
-  left: 20%;
-  right: 20%;
-  bottom: 10%;
+  left: 18%;
+  right: 18%;
+  bottom: 2.5%;
   background: linear-gradient(90deg, #081c23f2, #0c2326ef);
-  padding: 25px 35px 20px;
+  padding: 14px 28px 10px;
   border-top: 1px solid #b8c5a44d;
 }
 .dialogue .eyebrow {
-  margin: 0 0 15px;
+  margin: 0 0 8px;
 }
 .dialogue-line {
   font-family: Georgia, serif;
-  font-size: 21px;
-  line-height: 1.5;
-  min-height: 55px;
+  font-size: 19px;
+  line-height: 1.45;
+  min-height: 28px;
   color: #d8dec9;
-  margin: 0 0 12px;
+  margin: 0 0 4px;
 }
 .dialogue .text-button {
   display: block;
   margin-left: auto;
+  padding: 4px 0;
 }
 .dialogue kbd {
   margin: 0 5px;
@@ -984,7 +992,7 @@ body.reduced-motion *:before {
   .dialogue {
     left: 5%;
     right: 5%;
-    padding: 20px;
+    padding: 12px 18px 8px;
   }
   .death-panel {
     width: 85%;
@@ -1009,7 +1017,7 @@ body.reduced-motion *:before {
 .hint {
   position: absolute;
   left: 50%;
-  bottom: 27%;
+  bottom: 9%;
   transform: translate(-50%, 10px);
   display: flex;
   align-items: center;

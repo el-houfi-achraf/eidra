@@ -96,6 +96,9 @@ const sections: [Section, string][] = [
   ['settings', 'Paramètres'],
   ['extras', 'Extras'],
 ];
+/** At most this many notifications on screen, each for this long (ms). */
+const MAX_TOASTS = 2;
+const TOAST_LIFE = 4200;
 /** The preview card turns to its next slide after this long (ms). */
 const SLIDE_EVERY = 7000;
 const pad2 = (n: number): string => String(n).padStart(2, '0');
@@ -219,8 +222,13 @@ export class MenuUI {
   /** Cinematic card for a new area, a boss introduction or a victory. */
   title(kind: TitleKind, title: string, subtitle: string): void {
     const el = this.overlay('title-card', 'title-card');
-    // An area name never interrupts a boss introduction or a victory card.
-    if (kind === 'area' && el.classList.contains('show') && !el.classList.contains('area')) return;
+    // An area name never interrupts a boss introduction, a victory card or a new power.
+    const banner = document.getElementById('ability-banner')?.classList.contains('show');
+    if (
+      kind === 'area' &&
+      ((el.classList.contains('show') && !el.classList.contains('area')) || banner)
+    )
+      return;
     el.className = `title-card ${kind}`;
     el.innerHTML = `<span class="title-rule-left"></span><p class="title-eyebrow">${escape(subtitle)}</p><h2>${escape(title)}</h2><span class="title-ornament" aria-hidden="true">◇</span>`;
     // Restart the animation even when two cards follow each other.
@@ -235,6 +243,9 @@ export class MenuUI {
   /** Large banner when a memory power is recovered, with its control prompt. */
   abilityBanner(name: string, description: string, key: string): void {
     const el = this.overlay('ability-banner', 'ability-banner');
+    // A new power takes the stage: an area name showing at the same time steps aside.
+    const card = document.getElementById('title-card');
+    if (card?.classList.contains('area')) card.classList.remove('show');
     el.innerHTML = `<p class="eyebrow">NOUVEAU POUVOIR</p><h2>${escape(name)}</h2><p>${escape(description)}</p><p class="banner-key"><kbd>${escape(key)}</kbd></p>`;
     el.classList.remove('show');
     void el.offsetWidth;
@@ -625,7 +636,8 @@ export class MenuUI {
   }
   update(session: GameSession, label: Label, showHints = true): void {
     const hintEl = this.root.querySelector<HTMLElement>('#hint');
-    const hint = showHints ? session.hint : null;
+    // One prompt at a time: what Eidra can do here outranks a lesson.
+    const hint = showHints && !session.interaction ? session.hint : null;
     const keys = hint ? hintKeys(hint.action, label) : [];
     const hintKey = hint ? `${hint.id}|${keys.join()}` : '';
     if (hintEl && hintEl.dataset.key !== hintKey) {
@@ -1156,25 +1168,37 @@ export class MenuUI {
     window.clearTimeout(this.slideTimer);
     this.root.innerHTML = `<div class="modal-scrim"></div><section class="loading-screen"><div class="loading-sigil">${mark}</div><p class="eyebrow">NHALIS SE SOUVIENT</p><p class="tip"><span>CONSEIL</span>${escape(tip())}</p></section>`;
   }
-  /** Stacked, self-dismissing notifications at the top of the screen. */
-  notice(text: string): void {
+  /**
+   * Stacked, self-dismissing notifications at the top of the screen. A notification
+   * on a topic replaces the previous one on that topic (a gate sealed, then opened),
+   * and the same words are never stacked twice.
+   */
+  notice(text: string, topic?: string): void {
     const box = this.overlay('toasts', 'toasts');
+    for (const old of [...box.children] as HTMLElement[])
+      if ((topic && old.dataset.topic === topic) || old.textContent === text) this.dropToast(old);
     const toast = document.createElement('div');
     toast.className = 'toast';
     toast.textContent = text;
+    if (topic) toast.dataset.topic = topic;
     box.prepend(toast);
-    while (box.children.length > 3) box.lastElementChild?.remove();
+    while (box.children.length > MAX_TOASTS) box.lastElementChild?.remove();
     requestAnimationFrame(() => toast.classList.add('show'));
     const timer = window.setTimeout(() => {
-      toast.classList.remove('show');
-      const removal = window.setTimeout(() => {
-        toast.remove();
-        this.toastTimers.delete(removal);
-      }, 400);
-      this.toastTimers.add(removal);
       this.toastTimers.delete(timer);
-    }, 4800);
+      this.dropToast(toast);
+    }, TOAST_LIFE);
     this.toastTimers.add(timer);
+  }
+  private dropToast(toast: HTMLElement): void {
+    if (toast.dataset.leaving) return;
+    toast.dataset.leaving = 'true';
+    toast.classList.remove('show');
+    const removal = window.setTimeout(() => {
+      toast.remove();
+      this.toastTimers.delete(removal);
+    }, 400);
+    this.toastTimers.add(removal);
   }
   dispose(): void {
     this.cancelCapture();
