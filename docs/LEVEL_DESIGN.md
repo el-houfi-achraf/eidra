@@ -5,7 +5,7 @@
 1. Chambre d'éveil : espace sûr, mouvement, premier ancrage.
 2. Galerie des veilleurs : trois archétypes, esquive et télégraphie.
 3. Atrium de Mira : dialogue, Rémanence, plateformes du passé.
-4. Chambre du contrepoids : Memory Step, mécanisme et secret de Kael.
+4. Chambre du contrepoids : Écho mémoriel, mécanisme et secret de Kael.
 5. Porte de l'obéissance : mini-boss, ancrage, Gardien Sans Visage.
 
 Favoriser des boucles courtes, des vues sur les passages inaccessibles et un retour après acquisition. Chaque secteur possède ses ressources et ses proxies de collision. Ne jamais charger les neuf régions ensemble.
@@ -47,7 +47,7 @@ Le pont du souvenir comporte trois plateformes disparues séparées par de petit
 | Champs de braise      | Porte-braise, Rampant, Porteur      | 279,5      |
 | La Faille             | deux Souvenirs errants              | 320        |
 
-Chaque sortie est dans son propre secteur, sur sol plein, à plus de 2 m d'un ancrage ; l'ancrage de Mira (x = 73) récompense la galerie, la relique de Memory Step (x = 119) reste à portée devant la sortie du pont. Un secteur qui reçoit des ennemis hors arène doit déclarer une étape (test unitaire).
+Chaque sortie est dans son propre secteur, sur sol plein, à plus de 2 m d'un ancrage ; l'ancrage de Mira (x = 73) récompense la galerie, la relique de Écho mémoriel (x = 119) reste à portée devant la sortie du pont. Un secteur qui reçoit des ennemis hors arène doit déclarer une étape (test unitaire).
 
 | Arène            | Gardien                  | Portes (x)    | Seuil | Zone du gardien |
 | ---------------- | ------------------------ | ------------- | ----- | --------------- |

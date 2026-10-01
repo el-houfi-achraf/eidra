@@ -937,6 +937,26 @@ body.reduced-motion *:before {
   .setting {
     min-height: 33px;
   }
+  /* The map fits a short screen whole, its way back included. */
+  .map-panel {
+    padding: 24px 40px 18px;
+  }
+  .map-panel .eyebrow {
+    margin-bottom: 10px;
+  }
+  .map-panel h2 {
+    font-size: 30px;
+    margin-bottom: 8px;
+  }
+  .map-panel .route {
+    margin: 46px 0 12px;
+  }
+  .map-panel h3 {
+    margin: 12px 0 6px;
+  }
+  .map-panel p {
+    margin: 8px 0;
+  }
 }
 @media (max-width: 900px) {
   .settings-grid {

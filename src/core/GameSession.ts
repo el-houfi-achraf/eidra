@@ -313,7 +313,8 @@ export class GameSession {
       if (this.abilities.createEcho()) {
         this.learn('echo');
         this.fx.sound('echo');
-      } else this.fx.notice('Memory Step nécessite une trace, 25 de mémoire et un temps de repos.');
+      } else
+        this.fx.notice('L’Écho mémoriel demande une trace, 25 de mémoire et un temps de repos.');
     }
     this.abilities.update(dt, {
       x: this.actor.x,

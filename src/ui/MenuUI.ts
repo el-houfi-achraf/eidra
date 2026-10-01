@@ -154,7 +154,7 @@ const controls: [InputAction, string][] = [
   [InputAction.Dash, 'Élan'],
   [InputAction.Heal, 'Carte (toucher) · soin (maintenir)'],
   [InputAction.Remanence, 'Rémanence'],
-  [InputAction.Echo, 'Memory Step'],
+  [InputAction.Echo, 'Écho mémoriel'],
   [InputAction.Interact, 'Interagir'],
 ];
 export class MenuUI {
@@ -690,7 +690,7 @@ export class MenuUI {
       [
         InputAction.Echo,
         'memory-step',
-        'Memory Step',
+        'Écho mémoriel',
         session.abilities.unlocked.has('memory-step'),
         session.abilities.echoCooldown === 0 && session.abilities.energy >= 25,
       ],
@@ -1159,7 +1159,7 @@ export class MenuUI {
     this.focus();
   }
   ending(session: GameSession): void {
-    this.root.innerHTML = `<div class="modal-scrim"></div><section class="panel compact"><p class="eyebrow">FIN DE L’ACTE II</p><h2>Un ordre peut<br>être oublié.</h2><p>Ilyra a ouvert les yeux.<br>Au-delà du jardin, Nhalis se souvient.</p><div class="end-stats"><span>${session.narrative.memories.size}/${landmarks.filter((l) => l.kind === 'memory').length}<br><small>SOUVENIRS</small></span><span>${Math.floor(session.playtime / 60)} min<br><small>DE VOYAGE</small></span><span>◆ ${session.inventory.shards}<br><small>ÉCLATS</small></span></div><p class="muted small">Vous avez traversé les deux actes de cette version. La suite de Nhalis est en développement.</p><button id="explore" class="solid-button">Revenir explorer →</button><button id="menu" class="text-button">Menu principal</button></section>`;
+    this.root.innerHTML = `<div class="modal-scrim"></div><section class="panel compact"><p class="eyebrow">FIN DE L’ACTE II</p><h2>Un ordre peut<br>être oublié.</h2><p>Ilyra a ouvert les yeux.<br>Au-delà du jardin, Nhalis se souvient.</p><div class="end-stats"><span>${session.narrative.memories.size}/${fundamentalMemories.length}<br><small>SOUVENIRS</small></span><span>${Math.floor(session.playtime / 60)} min<br><small>DE VOYAGE</small></span><span>◆ ${session.inventory.shards}<br><small>ÉCLATS</small></span></div><p class="muted small">Vous avez traversé les deux actes de cette version : ${landmarks.filter((l) => l.kind === 'memory').length} des ${fundamentalMemories.length} fragments s’y trouvent. La suite de Nhalis est en développement.</p><button id="explore" class="solid-button">Revenir explorer →</button><button id="menu" class="text-button">Menu principal</button></section>`;
     this.bind('explore', this.actions.resume);
     this.bind('menu', this.actions.menu);
     this.focus();

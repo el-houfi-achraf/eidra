@@ -129,7 +129,7 @@ export const landmarks = [
   { id: 'dash', x: 18, y: 1.2, kind: 'ability', label: 'Élan de Lumérite' },
   { id: 'mira', x: 76, y: 1, kind: 'npc', label: 'Mira' },
   { id: 'remanence', x: 80.5, y: 1.4, kind: 'ability', label: 'Rémanence' },
-  { id: 'memory-step', x: 119, y: 1.4, kind: 'ability', label: 'Memory Step' },
+  { id: 'memory-step', x: 119, y: 1.4, kind: 'ability', label: 'Écho mémoriel' },
   { id: 'kael', x: 31, y: 6.2, kind: 'memory', label: 'Fragment de Kael' },
   { id: 'seris', x: 144.5, y: 3.2, kind: 'memory', label: 'Fragment de Seris' },
   ...ashLandmarks,
@@ -221,7 +221,7 @@ export const stages = [
   { id: 'awakening', guardians: ['watcher-1'], gate: 39, name: 'Chambre d’éveil' },
   // Before Mira's anchor: the anchor is the reward for clearing the gallery.
   { id: 'watchers', guardians: ['wisp-1', 'sentinel-1'], gate: 70, name: 'Galerie des veilleurs' },
-  // Inside the sector, within reach of Memory Step's reliquary (x = 119).
+  // Inside the sector, within reach of the Écho mémoriel's reliquary (x = 119).
   { id: 'palimpsest', guardians: ['watcher-2'], gate: 119.8, name: 'Pont du souvenir' },
   ...ashStages,
 ].map((stage) => StageSchema.parse(stage));
