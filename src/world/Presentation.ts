@@ -115,6 +115,8 @@ export class Presentation {
   private kneel = 0;
   /** Set while Eidra rests at an anchor (altar open): she kneels. */
   resting = false;
+  /** A dialogue is on screen: the camera frames the speakers above its box. */
+  talking = false;
   private stepDistance = 0;
   private lastHeroX = Number.NaN;
   private wasDashing = false;
@@ -354,6 +356,7 @@ export class Presentation {
     this.titleStage?.update(this.time, settings.reducedMotion);
     const hx = menu ? TITLE_HERO.x : p.x,
       hy = menu ? TITLE_HERO.y : p.y;
+    this.camera.talking = this.talking;
     this.camera.update(
       dt,
       p.x,

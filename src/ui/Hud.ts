@@ -40,7 +40,8 @@ function maskEmblem(): string {
   g.bezierCurveTo(2, 14, 8, 2, 22, 2);
   g.fill();
   g.stroke();
-  g.fillStyle = '#8effdb';
+  // Eidra's crimson eyes, as on her mask in the world (Palette.crimson).
+  g.fillStyle = '#ee3441';
   for (const eye of [
     [7, 22, 19, 26, 18, 30, 9, 28],
     [37, 22, 25, 26, 26, 30, 35, 28],

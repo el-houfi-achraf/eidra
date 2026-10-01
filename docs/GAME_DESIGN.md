@@ -4,7 +4,7 @@ Metroidvania solo 2.5D. Piliers : exploration, combat lisible, mémoire physique
 
 ## Deux actes jouables
 
-**Acte I — Le laboratoire oublié.** Réveil, apprentissage du mouvement, premières rencontres, Mira, acquisition de Rémanence, retour vers un passage oublié, Memory Step, Porteur du dernier ordre et Gardien Sans Visage. L'adieu de Mira ouvre la porte de Nhalis.
+**Acte I — Le laboratoire oublié.** Réveil, apprentissage du mouvement, premières rencontres, Mira, acquisition de Rémanence, retour vers un passage oublié, Écho mémoriel, Porteur du dernier ordre et Gardien Sans Visage. L'adieu de Mira ouvre la porte de Nhalis.
 
 **Acte II — Les Failles de cendre.** Rampants qui bondissent, Porte-braise qui tirent des salves, colonnes de feu à traverser en rythme, Seconde impulsion (double saut), la Faille à franchir de corniche en corniche sous les Souvenirs errants, la Sentinelle de cendre, puis Ilyra au Jardin du déni et l'épilogue. Objectif de durée : 35–50 minutes pour les deux actes, à confirmer par playtests humains. Les deux actes ne sont pas le jeu complet.
 
@@ -27,11 +27,11 @@ Ressenti des coups (référence : action-plateformes modernes) : hit-stop court 
 
 ## Apprentissage et interface
 
-Un tutoriel contextuel remplace le long texte de départ : une invite (glyphe de touche ou de bouton + verbe) apparaît dans la zone où le geste devient utile — se déplacer, sauter, frapper, l'élan après son acquisition, parer près du Porteur de cendres, la Rémanence au pont, la plongée près du Veilleur du pont, l'Écho au sceau — et disparaît dès que le joueur l'a accompli, où qu'il soit. Le Recueillement n'est suggéré que blessé et avec un segment disponible. Les menus privilégient l'information utile : sur l'écran titre (D034), dernier ancrage, temps de jeu et chapitre de la partie à reprendre, fragments retrouvés, aperçu des chapitres atteints, souvenirs et thèmes déjà rencontrés, nouveautés ; cartes de sauvegarde (lieu, durée, vitalité, éclats, souvenirs, pouvoirs), objectif et rappel des commandes en pause, carte en itinéraire avec marqueurs, conseils à la mort et au chargement.
+L'interface n'a qu'un canal (D035) : une invite à la fois, sur une ligne basse sous les pieds d'Eidra, l'action possible ici passant avant une leçon ; aucune leçon pendant un boss, et une leçon ignorée se retire d'elle-même. Un tutoriel contextuel remplace le long texte de départ : une invite (glyphe de touche ou de bouton + verbe) apparaît dans la zone où le geste devient utile — se déplacer, sauter, frapper, l'élan après son acquisition, parer près du Porteur de cendres, la Rémanence au pont, la plongée près du Veilleur du pont, l'Écho au sceau — et disparaît dès que le joueur l'a accompli, où qu'il soit. Le Recueillement n'est suggéré que blessé et avec un segment disponible. Les menus privilégient l'information utile : sur l'écran titre (D034), dernier ancrage, temps de jeu et chapitre de la partie à reprendre, fragments retrouvés, aperçu des chapitres atteints, souvenirs et thèmes déjà rencontrés, nouveautés ; cartes de sauvegarde (lieu, durée, vitalité, éclats, souvenirs, pouvoirs), objectif et rappel des commandes en pause, carte en itinéraire avec marqueurs, conseils à la mort et au chargement.
 
 ## Manettes
 
-Le jeu se joue entièrement à la manette, quel qu'en soit le modèle, comme les action-plateformes de référence. Disposition par défaut : saut en bas (A / ✕), frappe à gauche (X / □), recueillement à droite maintenu (B / ○), Rémanence en haut (Y / △), esquive sur la gâchette droite, attaque chargée sur la gauche, parade et Memory Step sur les gâchettes hautes, carte sur Select, pause sur Start, parler / s'ancrer / ouvrir un passage en poussant vers le haut, plongée avec bas + frappe. Le stick à mi-course fait marcher. Chaque action (hors déplacement, visée et pause) se réassigne à la manette seule ; la zone morte, la force des vibrations et le style des symboles se règlent. Les menus se parcourent à la manette (navigation spatiale, curseurs et listes à gauche / droite, onglets aux gâchettes hautes, retour sur B / ○). Vibrations : coup porté (léger), parade, blessure, choc lourd, victoire, mort. Débrancher la manette met le jeu en pause.
+Le jeu se joue entièrement à la manette, quel qu'en soit le modèle, comme les action-plateformes de référence. Disposition par défaut : saut en bas (A / ✕), frappe à gauche (X / □), recueillement à droite maintenu (B / ○), Rémanence en haut (Y / △), esquive sur la gâchette droite, attaque chargée sur la gauche, parade et Écho mémoriel sur les gâchettes hautes, carte sur Select, pause sur Start, parler / s'ancrer / ouvrir un passage en poussant vers le haut, plongée avec bas + frappe. Le stick à mi-course fait marcher. Chaque action (hors déplacement, visée et pause) se réassigne à la manette seule ; la zone morte, la force des vibrations et le style des symboles se règlent. Les menus se parcourent à la manette (navigation spatiale, curseurs et listes à gauche / droite, onglets aux gâchettes hautes, retour sur B / ○). Vibrations : coup porté (léger), parade, blessure, choc lourd, victoire, mort. Débrancher la manette met le jeu en pause.
 
 ## Arènes et contact
 
@@ -69,7 +69,7 @@ Colonnes de feu : une braise rougeoie au sol, s'agite 0,7 s avant l'éruption, p
 
 ## Mémoire
 
-Rémanence révèle des structures disparues ; Memory Step rejoue une trace temporelle pour maintenir un mécanisme ; la Seconde impulsion (Acte II) permet un second saut en l'air, indispensable pour franchir la Faille. Les autres capacités sont prévues plus tard.
+Rémanence révèle des structures disparues ; Écho mémoriel rejoue une trace temporelle pour maintenir un mécanisme ; la Seconde impulsion (Acte II) permet un second saut en l'air, indispensable pour franchir la Faille. Les autres capacités sont prévues plus tard.
 
 ## Critères d'acceptation
 

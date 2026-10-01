@@ -28,6 +28,11 @@ const HintSchema = z.object({
   wounded: z.boolean().default(false),
   /** Only once Eidra holds enough resonance to throw a card. */
   cards: z.boolean().default(false),
+  /**
+   * Seconds on screen before an ignored hint retires by itself: a prompt the player
+   * keeps not following must not sit on the screen for the rest of the journey.
+   */
+  linger: z.number().positive().default(18),
 });
 export type TutorialHint = z.infer<typeof HintSchema>;
 /**
@@ -44,6 +49,7 @@ export const tutorialHints = [
     from: 0,
     to: 201,
     wounded: true,
+    linger: 12,
   },
   {
     id: 'jump',
@@ -108,5 +114,6 @@ export const tutorialHints = [
     from: 40,
     to: 411,
     cards: true,
+    linger: 12,
   },
 ].map((hint) => HintSchema.parse(hint));

@@ -65,7 +65,8 @@ export const chunks = [
     seed: 31,
     platforms: [
       { x: 60, y: -1, w: 40, h: 2 },
-      { x: 50, y: 1.7, w: 5, h: 0.5 },
+      // Head-high slabs clear Eidra (1.83 m) and stay within one jump (top 2.3 m).
+      { x: 50, y: 2.15, w: 5, h: 0.3 },
       { x: 61, y: 3.5, w: 4, h: 0.5 },
     ],
     enemies: [
@@ -99,7 +100,7 @@ export const chunks = [
       { x: 140, y: -1, w: 40, h: 2 },
       // Ledge of Seris's fragment, in the antechamber before the Keeper's arena, so the
       // Keeper (2.97 m tall) never has to walk under a slab lower than its head.
-      { x: 144.5, y: 2, w: 3, h: 0.5 },
+      { x: 144.5, y: 2.15, w: 3, h: 0.3 },
     ],
     // The Porteur du dernier ordre is a boss (game-data/bosses/keeper.ts).
     enemies: [],
@@ -119,6 +120,8 @@ export type ChunkData = z.infer<typeof ChunkSchema>;
 export const checkpoints = [
   { id: 'awakening', x: 7, name: 'Ancrage de l’éveil' },
   { id: 'mira', x: 73, name: 'Ancrage de Mira' },
+  // Before the Keeper: a defeat no longer sends Eidra back across the memory bridge.
+  { id: 'counterweight', x: 136.5, name: 'Ancrage du contrepoids' },
   { id: 'threshold', x: 160, name: 'Ancrage du seuil' },
   ...ashCheckpoints,
 ];
@@ -126,7 +129,7 @@ export const landmarks = [
   { id: 'dash', x: 18, y: 1.2, kind: 'ability', label: 'Élan de Lumérite' },
   { id: 'mira', x: 76, y: 1, kind: 'npc', label: 'Mira' },
   { id: 'remanence', x: 80.5, y: 1.4, kind: 'ability', label: 'Rémanence' },
-  { id: 'memory-step', x: 119, y: 1.4, kind: 'ability', label: 'Memory Step' },
+  { id: 'memory-step', x: 119, y: 1.4, kind: 'ability', label: 'Écho mémoriel' },
   { id: 'kael', x: 31, y: 6.2, kind: 'memory', label: 'Fragment de Kael' },
   { id: 'seris', x: 144.5, y: 3.2, kind: 'memory', label: 'Fragment de Seris' },
   ...ashLandmarks,
@@ -218,7 +221,7 @@ export const stages = [
   { id: 'awakening', guardians: ['watcher-1'], gate: 39, name: 'Chambre d’éveil' },
   // Before Mira's anchor: the anchor is the reward for clearing the gallery.
   { id: 'watchers', guardians: ['wisp-1', 'sentinel-1'], gate: 70, name: 'Galerie des veilleurs' },
-  // Inside the sector, within reach of Memory Step's reliquary (x = 119).
+  // Inside the sector, within reach of the Écho mémoriel's reliquary (x = 119).
   { id: 'palimpsest', guardians: ['watcher-2'], gate: 119.8, name: 'Pont du souvenir' },
   ...ashStages,
 ].map((stage) => StageSchema.parse(stage));
@@ -243,6 +246,11 @@ export const pits = [{ from: 88, to: 109, safe: 84 }, ...ashPits].map((pit) =>
 );
 /** Story beats tied to the route. */
 export const route = {
+  /**
+   * Where a new journey wakes: beside the first anchor but out of its reach, so the
+   * first prompt on screen is the one to move.
+   */
+  wake: 4.4,
   /** Mira's farewell once the Guardian has fallen, then Act II. */
   aftermath: 197,
   act2: {

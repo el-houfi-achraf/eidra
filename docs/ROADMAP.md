@@ -9,7 +9,7 @@
 | 2 — Combat, dégâts, mort             | Jouable et testé, game feel ajouté | Animation finale et équilibrage humain                                      |
 | 3 — FSM et ennemis                   | Cinq archétypes                    | Animations finales                                                          |
 | 4 — Mini-boss / architecture boss    | Moteur de boss par données         | Identité artistique à affiner                                               |
-| 5 — Rémanence / Memory Step          | Jouable et testé                   | Playtests puzzles / lisibilité                                              |
+| 5 — Rémanence / Écho mémoriel        | Jouable et testé                   | Playtests puzzles / lisibilité                                              |
 | 6 — Sauvegardes, ancrages, respawn   | Réalisée pour le slice             | Qualification quotas / autres navigateurs                                   |
 | 7 — Streaming et transitions         | Réalisée pour le slice             | Ressources bornées, retour par conduit                                      |
 | 8 — Biome du slice                   | Prototype jouable                  | Art Blender final, durée et rythme à valider                                |

@@ -697,6 +697,41 @@ test('contextual hints teach a control and retire once it is performed', async (
   // The prompt fades out (its text stays during the fade).
   await expect(hint).not.toHaveClass(/visible/);
 });
+test('one prompt at a time, off Eidra, and a clear way under the ledges', async ({ page }) => {
+  await start(page);
+  const hint = page.locator('#hint');
+  const interaction = page.locator('#interaction');
+  // The journey wakes beside the first anchor, out of its reach: the lesson comes first.
+  await expect(hint).toHaveClass(/visible/);
+  await expect(interaction).not.toHaveClass(/visible/);
+  // On the anchor, what Eidra can do here replaces the lesson.
+  await page.evaluate(() => window.eidra!.teleport(7));
+  await expect(interaction).toHaveClass(/visible/);
+  // A new journey is already anchored there: the anchor offers its altar.
+  await expect(interaction).toContainText('Autel de l’ancrage');
+  await expect(hint).not.toHaveClass(/visible/);
+  // The prompt line sits under her feet, never over her.
+  const prompt = await interaction.boundingBox();
+  const viewport = page.viewportSize()!;
+  expect(prompt!.y).toBeGreaterThan(viewport.height * 0.8);
+  // The ledge of Seris's fragment no longer stops her: she walks under it to the Keeper.
+  await page.evaluate(() => window.eidra!.teleport(142.2));
+  await expect.poll(async () => (await snapshot(page)).player.grounded).toBe(true);
+  await page.keyboard.down('KeyD');
+  await expect.poll(async () => (await snapshot(page)).player.x).toBeGreaterThan(150);
+  await page.keyboard.up('KeyD');
+  // In the Keeper's arena, no lesson covers the fight, wounded or not.
+  await page.evaluate(() => window.eidra!.damage(60));
+  const keeper = async () => (await snapshot(page)).bosses.find((b) => b.id === 'keeper');
+  await expect.poll(async () => (await keeper())?.state).not.toBe('dormant');
+  await page.waitForTimeout(500);
+  await expect(hint).not.toHaveClass(/visible/);
+  // A defeat there now returns her to the counterweight's anchor, before the arena.
+  await page.evaluate(() => window.eidra!.teleport(136.5));
+  await page.waitForTimeout(250);
+  await page.keyboard.press('KeyE');
+  await expect.poll(async () => (await snapshot(page)).checkpoint).toBe('counterweight');
+});
 interface FakePad {
   id: string;
   index: number;

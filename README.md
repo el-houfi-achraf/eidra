@@ -37,7 +37,7 @@ Ouvrir l'adresse indiquée par Vite, généralement http://127.0.0.1:4173. Ne pa
 | Lancer une carte                  | F, appui bref                          | B / ○ / A, appui bref                   |
 | Recueillement (soin)              | F maintenu, immobile                   | B / ○ / A maintenu                      |
 | Rémanence, après acquisition      | Q                                      | Y / △ / X                               |
-| Memory Step, après acquisition    | R                                      | RB / R1 / R                             |
+| Écho mémoriel, après acquisition  | R                                      | RB / R1 / R                             |
 | Dialogue / ancrage / autel / pass | E                                      | Haut (stick ou croix)                   |
 | Carte et souvenirs                | Tab                                    | View / Create / −                       |
 | Pause                             | Échap                                  | Menu / Options / +                      |

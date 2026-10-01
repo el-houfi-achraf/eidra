@@ -20,13 +20,13 @@ export const abilityData = {
     description: 'Le passé reprend forme. Révélez les plateformes oubliées.',
   },
   'memory-step': {
-    name: 'Memory Step',
+    name: 'Écho mémoriel',
     description:
       'Un Écho rejoue vos cinq dernières secondes. Il peut tenir un sceau à votre place.',
   },
   'double-jump': { name: 'Seconde impulsion', description: 'Un souvenir porte le prochain saut.' },
-  'time-fracture': { name: 'Time Fracture', description: 'Ralentir les entités marquées.' },
-  'soul-shift': { name: 'Soul Shift', description: 'Basculer l’état d’un environnement.' },
+  'time-fracture': { name: 'Fracture du temps', description: 'Ralentir les entités marquées.' },
+  'soul-shift': { name: 'Bascule d’âme', description: 'Basculer l’état d’un environnement.' },
   transposition: { name: 'Transposition', description: 'Rejoindre la mémoire complète d’un lieu.' },
 } as const;
 const FocusSchema = z.object({

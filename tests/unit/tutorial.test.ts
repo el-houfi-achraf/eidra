@@ -46,6 +46,24 @@ describe('Contextual tutorial', () => {
     flags.add('echo-gate-open');
     expect(t.update(context(130, flags, ['memory-step']))).toBeNull();
   });
+  it('retires an ignored hint after its time on screen, for good', () => {
+    const t = new TutorialDirector();
+    const flags = new Set<string>();
+    const hint = t.update(context(5, flags))!;
+    expect(hint.id).toBe('move');
+    let retired = false;
+    for (let s = 0; s < hint.linger - 0.5; s += 1 / 60) retired ||= t.linger(1 / 60, flags);
+    expect(retired).toBe(false);
+    for (let s = 0; s < 1; s += 1 / 60) retired ||= t.linger(1 / 60, flags);
+    expect(retired).toBe(true);
+    expect(flags.has(hintFlag('move'))).toBe(true);
+    expect(t.update(context(5, flags))).toBeNull();
+    // The prompts that may follow Eidra everywhere give up sooner.
+    const cast = tutorialHints.find((h) => h.id === 'cast')!;
+    const heal = tutorialHints.find((h) => h.id === 'heal')!;
+    expect(cast.linger).toBeLessThan(hint.linger);
+    expect(heal.linger).toBeLessThan(hint.linger);
+  });
   it('validates hint data and keeps every band inside the world', () => {
     expect(new Set(tutorialHints.map((h) => h.id)).size).toBe(tutorialHints.length);
     for (const hint of tutorialHints) {

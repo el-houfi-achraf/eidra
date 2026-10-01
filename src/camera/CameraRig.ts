@@ -6,6 +6,8 @@ import { damp } from '../core/math';
 import type { Settings } from '../config/settings';
 /** Distance between the camera and the play plane (z = 0). */
 const DISTANCE = 32;
+/** Metres the view drops while a dialogue is on screen. */
+const TALK_LIFT = 1.2;
 /** A fixed framing: centre of the view and half its height on the play plane, metres. */
 export interface Frame {
   x: number;
@@ -25,6 +27,9 @@ export class CameraRig {
   private clock = 0;
   private zoom = 0;
   private halfHeight = 10;
+  /** During a dialogue the view drops a little, so the speakers stand above its box. */
+  talking = false;
+  private lift = 0;
   private target = new Vector3(10, 3, 0);
   constructor(private scene: Scene) {
     this.camera = new FreeCamera('controlled-camera', new Vector3(10, 6, -DISTANCE), scene);
@@ -72,7 +77,8 @@ export class CameraRig {
         ? (arena.left + arena.right) / 2
         : Math.max(9, x + facing * 2.3);
     this.x = damp(this.x, targetX, menu ? 2 : 4.5 * settings.cameraSensitivity, dt);
-    this.y = damp(this.y, menu ? menu.y : Math.max(3.5, y + 1.5), 3.2, dt);
+    this.lift = damp(this.lift, this.talking && !menu ? TALK_LIFT : 0, 3, dt);
+    this.y = damp(this.y, menu ? menu.y : Math.max(3.5, y + 1.5) - this.lift, 3.2, dt);
     const shake = settings.reducedMotion ? 0 : this.trauma ** 2 * settings.shake * 0.25;
     this.camera.position.set(
       this.x + Math.sin(this.clock * 81) * shake,
