@@ -233,6 +233,18 @@ export class MenuUI {
       () => el.classList.remove('show'),
       kind === 'area' ? 3200 : 3800,
     );
+    // Under a large card, a single notification stays: a second would run into it.
+    this.trimToasts();
+  }
+  /** Notifications allowed at once: one while a large card shows, else two. */
+  private get toastRoom(): number {
+    return document.getElementById('title-card')?.classList.contains('show') ? 1 : MAX_TOASTS;
+  }
+  private trimToasts(): void {
+    const box = document.getElementById('toasts');
+    if (!box) return;
+    const live = ([...box.children] as HTMLElement[]).filter((t) => !t.dataset.leaving);
+    for (const toast of live.slice(this.toastRoom)) this.dropToast(toast);
   }
   /** Large banner when a memory power is recovered, with its control prompt. */
   abilityBanner(name: string, description: string, key: string): void {
@@ -1187,6 +1199,7 @@ export class MenuUI {
     if (topic) toast.dataset.topic = topic;
     box.prepend(toast);
     while (box.children.length > MAX_TOASTS) box.lastElementChild?.remove();
+    this.trimToasts();
     requestAnimationFrame(() => toast.classList.add('show'));
     const timer = window.setTimeout(() => {
       this.toastTimers.delete(timer);

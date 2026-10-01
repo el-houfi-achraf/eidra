@@ -739,6 +739,55 @@ test('one prompt at a time, off Eidra, and a clear way under the ledges', async 
   await page.keyboard.press('KeyE');
   await expect.poll(async () => (await snapshot(page)).checkpoint).toBe('counterweight');
 });
+test('rooms: down the well, through a cracked wall, and the journal of the act', async ({
+  page,
+}) => {
+  test.setTimeout(120000);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await start(page);
+  // Past Mira the gallery's floor opens: Eidra drops into the well, through a black cut.
+  await page.evaluate(() => window.eidra!.teleport(79, 1.6));
+  await expect.poll(async () => (await snapshot(page)).room).toBe('mira-well');
+  const well = await snapshot(page);
+  expect(well.shown).toEqual(['mira-well']);
+  expect(well.chunks).toEqual(expect.arrayContaining(['watchers', 'archives', 'scriptorium']));
+  await expect.poll(async () => (await snapshot(page)).player.grounded).toBe(true);
+  expect((await snapshot(page)).player.y).toBeLessThan(-14);
+  // The remembered steps are there, but only as ghosts: she stands on the ledge below them.
+  // In the archives, a cracked wall at the top of the stair gives way under the staff.
+  await page.evaluate(() => window.eidra!.teleport(45.6, -18.2));
+  await expect.poll(async () => (await snapshot(page)).room).toBe('archives');
+  await expect.poll(async () => (await snapshot(page)).player.grounded).toBe(true);
+  await hold(page, 'KeyA', 60);
+  for (let i = 0; i < 8; i++) {
+    if ((await snapshot(page)).flags.includes('open:study-wall')) break;
+    await page.keyboard.press('KeyJ', { delay: 60 });
+    await page.waitForTimeout(420);
+  }
+  await expect.poll(async () => (await snapshot(page)).flags).toContain('open:study-wall');
+  await page.keyboard.down('KeyA');
+  await expect.poll(async () => (await snapshot(page)).room).toBe('sealed-study');
+  await page.keyboard.up('KeyA');
+  await expect(page.getByText('Passage secret découvert')).toBeVisible();
+  expect((await snapshot(page)).discovered).toContain('sealed-study');
+  // The journal maps the act room by room, then turns to its foes and its fragments.
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.journal-panel')).toBeVisible();
+  for (const room of ['awakening', 'watchers', 'mira-well', 'archives', 'sealed-study'])
+    await expect(page.locator(`.room-map [data-room="${room}"]`)).toHaveCount(1);
+  await expect(page.locator('.room-map [data-room="sealed-study"]')).toHaveClass(/current/);
+  // Not yet found: the other secrets stay off the map.
+  await expect(page.locator('.room-map [data-room="oculus"]')).toHaveCount(0);
+  await page.locator('#tab-bestiary').click();
+  await expect(page.locator('.bestiary li')).toHaveCount(14);
+  await page.locator('#tab-memories').click();
+  await expect(page.locator('.fragments-list li')).toHaveCount(7);
+  await page.locator('#back').click();
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'PLAYING');
+  expect(errors).toEqual([]);
+  await page.screenshot({ path: 'test-results/rooms.png' });
+});
 interface FakePad {
   id: string;
   index: number;
