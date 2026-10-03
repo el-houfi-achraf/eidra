@@ -574,6 +574,7 @@ export class Game {
         },
         resonance: this.session.focus.resonance,
         cards: this.session.cards.shots.map((c) => ({ x: c.x, y: c.y })),
+        shots: this.session.enemies.projectiles.map((p) => ({ x: p.x, y: p.y })),
         shards: this.session.inventory.shards,
         healthUpgrades: this.session.inventory.healthUpgrades,
         abilities: [...this.session.abilities.unlocked],

@@ -11,7 +11,9 @@ import type { Palette } from './Palette';
 import type { DisposableChunk } from './SceneManager';
 import { paintScenery } from './Scenery';
 import type { PaintedGeometry } from './PaintedGeometry';
-import { roomAt, shell } from './Rooms';
+import { roomAt, shell, solidsOf } from './Rooms';
+import { shrinePlan } from './Shrine';
+import type { ShrinePlan } from './Shrine';
 /** Opacity of remembered slabs before Rémanence: seen from the start, solid only later. */
 export const MEMORY_GHOST = 0.32;
 // TODO_ART: original procedural blockout. Replace through the validated Blender → GLB pipeline.
@@ -29,6 +31,8 @@ export class ChunkView implements DisposableChunk {
   private passages: Mesh[] = [];
   private markerMeshes = new Map<string, Mesh[]>();
   private shaftMeshes: Mesh[] = [];
+  /** Powers' shrines: their orb bobs and their rings turn. */
+  private shrines: { plan: ShrinePlan; orb: Mesh; rings: Mesh[] }[] = [];
   constructor(
     readonly data: ChunkData,
     private scene: Scene,
@@ -83,7 +87,10 @@ export class ChunkView implements DisposableChunk {
         this.crystals.push(gem);
       }
     for (const marker of landmarks)
-      if (here(marker.x, marker.y) && marker.kind !== 'npc') {
+      if (here(marker.x, marker.y) && marker.kind === 'ability') {
+        const plan = shrinePlan(marker.id, marker.x, marker.y, solidsOf(data));
+        if (plan) this.markerMeshes.set(marker.id, this.shrine(marker.id, plan, p));
+      } else if (here(marker.x, marker.y) && marker.kind !== 'npc') {
         const gem = this.crystal(
           marker.x,
           marker.y,
@@ -204,9 +211,10 @@ export class ChunkView implements DisposableChunk {
       this.memoryView.visibility = MEMORY_GHOST;
     }
     this.shaftMeshes = shafts ? [shafts] : [];
+    const moving = new Set([...this.crystals, ...this.shrines.flatMap((s) => [s.orb, ...s.rings])]);
     for (const mesh of this.meshes) {
       mesh.isPickable = false;
-      if (!this.crystals.includes(mesh)) mesh.freezeWorldMatrix();
+      if (!moving.has(mesh)) mesh.freezeWorldMatrix();
     }
   }
   private add(mesh: Mesh): Mesh {
@@ -234,6 +242,54 @@ export class ChunkView implements DisposableChunk {
     m.receiveShadows = true;
     return this.add(m);
   }
+  /**
+   * A power waits in a shrine of its own colour (D037): a rune on the ground, a column
+   * of light rising from it, an orb turning in its rings. Never an anchor's gem and slab.
+   */
+  private shrine(id: string, plan: ShrinePlan, p: Palette): Mesh[] {
+    const { core, light } = p.power(plan.color);
+    const beam = MeshBuilder.CreateCylinder(
+      `${id}-light`,
+      {
+        height: plan.beamHeight,
+        diameterTop: 0.7,
+        diameterBottom: 1.5,
+        tessellation: 20,
+        cap: Mesh.NO_CAP,
+      },
+      this.scene,
+    );
+    beam.position.set(plan.x, plan.ground + plan.beamHeight / 2, 0.3);
+    beam.material = light;
+    const rune = MeshBuilder.CreateTorus(
+      `${id}-rune`,
+      { diameter: plan.runeDiameter, thickness: 0.05, tessellation: 48 },
+      this.scene,
+    );
+    rune.position.set(plan.x, plan.ground + 0.03, 0);
+    rune.material = core;
+    const orb = MeshBuilder.CreateIcoSphere(
+      `${id}-orb`,
+      { radius: 0.24, subdivisions: 1, flat: true },
+      this.scene,
+    );
+    orb.position.set(plan.x, plan.orb, 0);
+    orb.material = core;
+    const rings = plan.rings.map((ring, i) => {
+      const mesh = MeshBuilder.CreateTorus(
+        `${id}-ring-${i}`,
+        { diameter: ring.diameter, thickness: 0.035, tessellation: 40 },
+        this.scene,
+      );
+      mesh.position.set(plan.x, plan.orb, 0);
+      mesh.material = core;
+      return mesh;
+    });
+    const meshes = [beam, rune, orb, ...rings];
+    for (const mesh of meshes) this.add(mesh);
+    this.shrines.push({ plan, orb, rings });
+    return meshes;
+  }
   private crystal(x: number, y: number, z: number, size: number, material: StandardMaterial): Mesh {
     const m = MeshBuilder.CreatePolyhedron('memory-shard', { type: 1, size }, this.scene);
     m.position.set(x, y, z);
@@ -245,6 +301,16 @@ export class ChunkView implements DisposableChunk {
     for (const passage of this.passages)
       passage.visibility = flags.has('echo-gate-open') ? 1 : 0.25;
     for (const m of this.crystals) m.rotation.y = time * 0.5;
+    for (const { plan, orb, rings } of this.shrines) {
+      const bob = Math.sin(time * 1.8 + plan.x) * 0.09;
+      orb.position.y = plan.orb + bob;
+      orb.rotation.y = time * 0.7;
+      rings.forEach((ring, i) => {
+        const turn = plan.rings[i]!;
+        ring.position.y = plan.orb + bob;
+        ring.rotation.set(turn.tilt + time * turn.speed * 0.35, time * turn.speed, turn.tilt * 0.6);
+      });
+    }
     for (const [id, meshes] of this.markerMeshes)
       for (const m of meshes) m.setEnabled(!collected.has(id));
   }

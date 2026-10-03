@@ -35,7 +35,16 @@ import {
   seals,
 } from '../../game-data/zones/laboratory';
 import type { ChunkData, Seal } from '../../game-data/zones/laboratory';
-import { chamberAt, draftAt, roomAt, roomById, sectorOf, SHELL, worldSolids } from '../world/Rooms';
+import {
+  chamberAt,
+  draftAt,
+  inside,
+  roomAt,
+  roomById,
+  sectorOf,
+  SHELL,
+  worldSolids,
+} from '../world/Rooms';
 import { cardData, focusData } from '../../game-data/abilities/abilities';
 import { CardSystem } from '../combat/Cards';
 import type { AbilityId } from '../../game-data/abilities/abilities';
@@ -457,6 +466,7 @@ export class GameSession {
     const shut = this.inRoute
       ? gates.filter((gate) => closed.has(gate.id)).map((gate) => gate.x)
       : [];
+    const shown = this.world.stream.shownRooms;
     this.enemies.update(
       dt,
       this.actor,
@@ -464,6 +474,14 @@ export class GameSession {
       shut,
       // From the press, a plunge takes priority over the body it lands on (pogo).
       this.combat.attacking && this.combat.attackKind === 'down',
+      // Shots break on walls and closed seals and gates, and never outlive their room.
+      {
+        blocked: (x, y) =>
+          inWall(x, y) ||
+          this.sealed(x, y) ||
+          shut.some((gx) => Math.abs(x - gx) < 0.3 && y < GATE_HEIGHT),
+        open: (x, y) => shown.some((room) => inside(room, x, y, 0.5)),
+      },
     );
     const hazards = this.world.stream.shownRooms.flatMap((room) => room.hazards);
     for (const cue of this.cues.update(this.enemies, hazards, this.hazardTime, this.actor))

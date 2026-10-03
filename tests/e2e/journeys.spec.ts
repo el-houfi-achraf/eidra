@@ -793,6 +793,36 @@ test('rooms: down the well, through a cracked wall, and the journal of the act',
   expect(errors).toEqual([]);
   await page.screenshot({ path: 'test-results/rooms.png' });
 });
+test('the drowned stair leads down to the sanctum, and shots stay in their room', async ({
+  page,
+}) => {
+  test.setTimeout(90000);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await start(page);
+  // The watching lantern of the trial fires at Eidra; through the door, its sparks are gone.
+  await page.evaluate(() => window.eidra!.teleport(22.5, -28.6));
+  await expect
+    .poll(async () => (await snapshot(page)).shots.length, { timeout: 20000 })
+    .toBeGreaterThan(0);
+  await page.keyboard.down('KeyD');
+  await expect.poll(async () => (await snapshot(page)).room).toBe('elans');
+  await page.keyboard.up('KeyD');
+  expect((await snapshot(page)).shots).toEqual([]);
+  // At the foot of the drowned stair, from its first step by the right wall, on foot
+  // along the floor and under the steps, through the door of the Rémanence's sanctum.
+  await page.evaluate(() => window.eidra!.unlock('dash'));
+  await page.evaluate(() => window.eidra!.teleport(118.3, -49.4));
+  await expect.poll(async () => (await snapshot(page)).room).toBe('drowned-stair');
+  await expect.poll(async () => (await snapshot(page)).player.grounded).toBe(true);
+  await page.evaluate(() => window.eidra!.defeatEnemies());
+  await page.keyboard.down('KeyA');
+  await expect
+    .poll(async () => (await snapshot(page)).room, { timeout: 20000 })
+    .toBe('remanence-sanctum');
+  await page.keyboard.up('KeyA');
+  expect(errors).toEqual([]);
+});
 interface FakePad {
   id: string;
   index: number;
