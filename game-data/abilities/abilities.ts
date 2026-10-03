@@ -29,6 +29,35 @@ export const abilityData = {
   'soul-shift': { name: 'Bascule d’âme', description: 'Basculer l’état d’un environnement.' },
   transposition: { name: 'Transposition', description: 'Rejoindre la mémoire complète d’un lieu.' },
 } as const;
+const ShrineSchema = z.object({
+  /** Its own colour: the orb, its rings, its rune and the light it casts. */
+  color: z.string().regex(/^#[0-9a-f]{6}$/),
+  /** Rings turning round the orb, one to three. */
+  rings: z.number().int().min(1).max(3),
+});
+export type ShrineLook = z.infer<typeof ShrineSchema>;
+/**
+ * How a power waits to be found, never like an anchor (a gold ring and a gem on a
+ * dark slab, to rest at): an orb of the power's own colour turning in its rings,
+ * over a rune on the ground, in a column of light. Every placed power has one.
+ */
+export const shrineLooks = z
+  .object({
+    dash: ShrineSchema,
+    remanence: ShrineSchema,
+    'memory-step': ShrineSchema,
+    'double-jump': ShrineSchema,
+  })
+  .parse({
+    // The crimson of Eidra's own dash.
+    dash: { color: '#ff4f5e', rings: 1 },
+    // The pale blue of remembered stone.
+    remanence: { color: '#9fe3ff', rings: 2 },
+    // The violet of an echo.
+    'memory-step': { color: '#c8a2ff', rings: 3 },
+    // The amber of the ember fields.
+    'double-jump': { color: '#ffb052', rings: 2 },
+  });
 const FocusSchema = z.object({
   capacity: z.number().positive(),
   cost: z.number().positive(),

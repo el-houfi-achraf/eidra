@@ -69,10 +69,16 @@ function stairs(
   base: number,
   to: number,
   last: Lane,
-  options: { memory?: boolean; first?: number; solid?: (k: number, n: number) => boolean } = {},
+  options: {
+    memory?: boolean;
+    first?: number;
+    /** How many rises, more than the fewest, to set the lane of the first step. */
+    rises?: number;
+    solid?: (k: number, n: number) => boolean;
+  } = {},
 ): Slab[] {
   const start = base + (options.first ?? 1);
-  const n = Math.max(1, Math.ceil((to - start) / RISE));
+  const n = Math.max(1, Math.ceil((to - start) / RISE), options.rises ?? 0);
   const rise = (to - start) / n;
   const end = LANES.indexOf(last);
   return Array.from({ length: n + 1 }, (_, k) => {
@@ -99,9 +105,14 @@ const wellStair = stairs([74.6, 83.4], floor(DEEP), -6.6, 'mid-right', {
   solid: (k, n) => k === Math.floor(n / 2),
 });
 const archiveStair = stairs([44.6, 53.4], floor(DEEP), -19.4, 'left');
-const drownedStair = stairs([110.6, 119.4], floor(BED), -29.4, 'left');
-/** The drowned chapel opens off the first step by the right wall. */
-const chapelSill = tops(drownedStair)[3]!;
+/**
+ * Its first step stands against the right wall, so the floor runs free under the
+ * rest to the sanctum's door: a low first step anywhere else, with the next one
+ * above it at head height, would wall that floor off.
+ */
+const drownedStair = stairs([110.6, 119.4], floor(BED), -29.4, 'left', { rises: 14 });
+/** The drowned chapel opens off the second step by the right wall. */
+const chapelSill = tops(drownedStair)[4]!;
 /**
  * The Rémanence holds ten seconds: halfway up the roots, one step is solid stone to
  * rest on while it gathers again, and so is the last, where the lever stands.
@@ -257,9 +268,9 @@ export const depthChambers = [
     doors: [side('left', -29.4), side('left', floor(BED)), side('right', chapelSill)],
     platforms: drownedStair,
     enemies: [
-      { id: 'moth-4', kind: 'moth', x: 115, y: -40 },
+      { id: 'moth-4', kind: 'moth', x: 118.2, y: -41.5 },
       { id: 'moth-5', kind: 'moth', x: 114.5, y: -24 },
-      { id: 'lantern-2', kind: 'lantern', x: 114.7, y: -45.5 },
+      { id: 'lantern-2', kind: 'lantern', x: 111.7, y: -44.4 },
     ],
   },
   {

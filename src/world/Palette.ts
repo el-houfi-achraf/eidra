@@ -1,6 +1,7 @@
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import { Constants } from '@babylonjs/core/Engines/constants';
 import { Color3 } from '@babylonjs/core/Maths/math.color';
+import type { Texture } from '@babylonjs/core/Materials/Textures/texture';
 import type { Scene } from '@babylonjs/core/scene';
 import { proceduralTexture, smooth, tileableNoise } from '../vfx/textures';
 export class Palette {
@@ -38,7 +39,10 @@ export class Palette {
   readonly card: StandardMaterial;
   /** Additive red streak behind a thrown card or a dash. */
   readonly cardTrail: StandardMaterial;
-  constructor(scene: Scene) {
+  /** Rising light of a power's shrine, tinted by each power. */
+  private beamTexture: Texture;
+  private powers = new Map<string, { core: StandardMaterial; light: StandardMaterial }>();
+  constructor(private scene: Scene) {
     const make = (id: string, color: string, emission = 0, alpha = 1): StandardMaterial => {
       const m = new StandardMaterial(id, scene);
       m.diffuseColor = Color3.FromHexString(color);
@@ -195,8 +199,49 @@ export class Palette {
     this.shaft.alpha = 0.55;
     this.shaft.alphaMode = Constants.ALPHA_ADD;
     this.shaft.disableDepthWrite = true;
+    // A power's column of light: brightest at the rune (v = 0), fading upwards and at its sides.
+    this.beamTexture = proceduralTexture(scene, 32, 64, (u, v) => {
+      const edge = Math.sin(Math.PI * u) ** 2;
+      const a = edge * (1 - v) ** 1.8;
+      return [a, a, a, 1];
+    });
+  }
+  /**
+   * A power's own colour (its shrine): a bright unlit core for the orb, rings and
+   * rune, and the additive light of its column. Made once per colour.
+   */
+  power(color: string): { core: StandardMaterial; light: StandardMaterial } {
+    const known = this.powers.get(color);
+    if (known) return known;
+    const tint = Color3.FromHexString(color);
+    const core = new StandardMaterial(`power-core-${color}`, this.scene);
+    core.diffuseColor = tint;
+    core.emissiveColor = tint.scale(0.6);
+    core.specularColor = Color3.Black();
+    core.disableLighting = true;
+    core.fogEnabled = false;
+    const light = new StandardMaterial(`power-light-${color}`, this.scene);
+    light.diffuseTexture = this.beamTexture;
+    light.diffuseColor = tint;
+    light.emissiveColor = tint.scale(0.35);
+    light.specularColor = Color3.Black();
+    light.disableLighting = true;
+    light.backFaceCulling = false;
+    light.fogEnabled = false;
+    light.alphaMode = Constants.ALPHA_ADD;
+    light.alpha = 0.55;
+    light.disableDepthWrite = true;
+    const made = { core, light };
+    this.powers.set(color, made);
+    return made;
   }
   dispose(): void {
+    for (const { core, light } of this.powers.values()) {
+      core.dispose();
+      light.dispose();
+    }
+    this.powers.clear();
+    this.beamTexture.dispose();
     for (const value of Object.values(this))
       if (value instanceof StandardMaterial) value.dispose(false, true);
   }

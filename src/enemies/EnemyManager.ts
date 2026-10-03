@@ -178,6 +178,15 @@ export interface Projectile {
   vy: number;
   life: number;
   damage: number;
+  /** It has flown in the open: from now on a wall breaks it (a shard may fall from inside a ledge). */
+  clear?: boolean;
+}
+/** Where shots may fly. */
+export interface ShotSpace {
+  /** Inside a wall, a slab, a closed seal or gate: a shot breaks there. */
+  blocked: (x: number, y: number) => boolean;
+  /** Within a room on screen: a shot that leaves the shown rooms is gone. */
+  open: (x: number, y: number) => boolean;
 }
 export class EnemyManager {
   readonly entities = new Map<string, EnemyEntity>();
@@ -229,6 +238,8 @@ export class EnemyManager {
     gates: readonly number[] = [],
     /** A downward strike is under way: bodies below Eidra are being struck, not touched. */
     plunging = false,
+    /** Walls and rooms: shots break on the one and stay within the other. */
+    space: ShotSpace | null = null,
   ): void {
     for (const entity of this.entities.values()) {
       const a = entity.actor,
@@ -319,6 +330,13 @@ export class EnemyManager {
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.life -= dt;
+      if (space) {
+        // Out of the rooms on screen a shot is gone; in a wall it breaks.
+        if (!space.open(p.x, p.y)) p.life = 0;
+        else if (!space.blocked(p.x, p.y)) p.clear = true;
+        else if (p.clear) p.life = 0;
+        if (p.life <= 0) continue;
+      }
       if (Math.abs(p.x - player.x) < 0.7 && Math.abs(p.y - player.y) < 0.9) {
         onAttack(
           {

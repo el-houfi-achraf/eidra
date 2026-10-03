@@ -7,7 +7,7 @@ import {
   seals,
 } from '../../../game-data/zones/laboratory';
 import type { ChunkData, Door } from '../../../game-data/zones/laboratory';
-import { DRAFT, passages, roomById, shell, SHELL } from '../../../src/world/Rooms';
+import { DRAFT, passages, roomById, shell, SHELL, solidsOf } from '../../../src/world/Rooms';
 /**
  * A coarse model of where Eidra can go: the tops of slabs and floors as surfaces,
  * joined by the jumps, falls and dashes her movement allows (MovementModel:
@@ -15,6 +15,11 @@ import { DRAFT, passages, roomById, shell, SHELL } from '../../../src/world/Room
  * doors between rooms, the updraft of a door overhead, the Rémanence's slabs,
  * cracked walls and shutters. Used to prove the level can be finished in order
  * and holds no dead end.
+ *
+ * Her body counts (capsule 0.66 m wide, 1.7 m tall): a slab too low to walk
+ * under cuts the floor beneath it in two, she cannot step off an edge where a
+ * slab hangs at head height just beyond it, nor pass a slab standing between two
+ * surfaces without climbing it, nor land in a gap narrower than herself.
  */
 export interface Surface {
   id: number;
@@ -31,6 +36,9 @@ const UP = 2.35;
 const APEX = 3.47;
 /** Room switch past the boundary, plus margin. */
 const THROUGH = 0.6;
+/** Head room her body needs (capsule 1.7 m), and its width (2 × 0.33 m). */
+const BODY = 1.75;
+const WIDTH = 0.66;
 /**
  * Widest gap a running jump clears between two tops `dy` apart: the time the arc
  * takes to come back down to the target's height at 6.8 m/s, plus the Élan at the
@@ -52,8 +60,39 @@ const spaceOf = (room: ChunkData): string => (room.kind === 'route' ? 'route' : 
 /** Gates of the route that need a power (the counterweight's seal). */
 const echoGate = gates.find((g) => g.id === 'echo')!.x;
 export const surfaces: Surface[] = [];
+interface Box {
+  x0: number;
+  x1: number;
+  y0: number;
+  y1: number;
+}
+/** What stands in her way in each space: solid slabs and chamber walls, not memories. */
+const obstacles = new Map<string, Box[]>();
+for (const room of chunks) {
+  const list = obstacles.get(spaceOf(room)) ?? [];
+  for (const s of solidsOf(room))
+    list.push({ x0: s.x - s.w / 2, x1: s.x + s.w / 2, y0: s.y - s.h / 2, y1: s.y + s.h / 2 });
+  obstacles.set(spaceOf(room), list);
+}
+/** The span [x0, x1] at height y less what stands on it lower than her head. */
+function standable(space: string, x0: number, x1: number, y: number): [number, number][] {
+  let spans: [number, number][] = [[x0, x1]];
+  for (const o of obstacles.get(space) ?? []) {
+    if (o.y1 <= y + 0.01 || o.y0 >= y + BODY) continue;
+    spans = spans.flatMap(([a, b]): [number, number][] =>
+      o.x1 <= a || o.x0 >= b
+        ? [[a, b]]
+        : ([
+            [a, Math.min(b, o.x0)],
+            [Math.max(a, o.x1), b],
+          ] as [number, number][]),
+    );
+  }
+  return spans.filter(([a, b]) => b - a > 0.3);
+}
 const add = (room: string, x0: number, x1: number, y: number, memory: boolean): void => {
-  surfaces.push({ id: surfaces.length, room, x0, x1, y, memory });
+  for (const [a, b] of standable(room, x0, x1, y))
+    surfaces.push({ id: surfaces.length, room, x0: a, x1: b, y, memory });
 };
 for (const room of chunks) {
   const solids = [
@@ -73,6 +112,33 @@ for (const room of chunks) {
     } else add(spaceOf(room), x0, x1, top(s), Boolean(s.memory));
   }
 }
+/**
+ * An edge she cannot step off: just beyond it, closer than her width, something
+ * solid stands between her feet and her head.
+ */
+function pinched(a: Surface, side: -1 | 1): boolean {
+  return (obstacles.get(a.room) ?? []).some(
+    (o) =>
+      o.y1 > a.y + 0.01 &&
+      o.y0 < a.y + BODY &&
+      (side < 0
+        ? o.x1 <= a.x0 + 0.01 && o.x1 > a.x0 - WIDTH - 0.04
+        : o.x0 >= a.x1 - 0.01 && o.x0 < a.x1 + WIDTH + 0.04),
+  );
+}
+/** Something solid stands in the gap between two surfaces, in the way of her body. */
+function obstructed(a: Surface, b: Surface): boolean {
+  const lo = Math.min(a.x1, b.x1),
+    hi = Math.max(a.x0, b.x0);
+  if (hi - lo <= 0.01) return false;
+  return (obstacles.get(a.room) ?? []).some(
+    (o) =>
+      o.x0 < hi - 0.01 &&
+      o.x1 > lo + 0.01 &&
+      o.y1 > Math.min(a.y, b.y) + 0.05 &&
+      o.y0 < Math.max(a.y, b.y) + BODY,
+  );
+}
 /** Slabs of the route that are floors, for its holes. */
 const roomOfSurface = (s: Surface): ChunkData =>
   s.room === 'route'
@@ -82,7 +148,25 @@ const roomOfSurface = (s: Surface): ChunkData =>
 function jumpable(a: Surface, b: Surface, dash: boolean): boolean {
   const dy = b.y - a.y;
   if (dy > UP) return false;
-  return gapBetween(a, b) <= across(dy, dash);
+  if (gapBetween(a, b) > across(dy, dash)) return false;
+  // Whatever stands between them must be climbed: its top is a surface of its own.
+  if (obstructed(a, b)) return false;
+  // Rising, the head leads (the stairs' bonk test watches it); falling, the body
+  // leaves by an edge with room beside it and lands where it fits.
+  if (dy > 0.05) return true;
+  const via = (side: -1 | 1): boolean => {
+    const edge = side < 0 ? a.x0 : a.x1;
+    if (pinched(a, side)) return false;
+    if ((side < 0 ? edge - b.x0 : b.x1 - edge) >= WIDTH) return true;
+    // A narrower landing beside the edge is reached only by falling past it deep
+    // enough to steer back under the surface left, with nothing in the way.
+    if (-dy < BODY + 0.35) return false;
+    const [c0, c1] = side < 0 ? [edge - WIDTH, edge] : [edge, edge + WIDTH];
+    return !(obstacles.get(a.room) ?? []).some(
+      (o) => o.x1 > c0 + 0.01 && o.x0 < c1 - 0.01 && o.y1 > b.y + 0.05 && o.y0 < a.y - 0.05,
+    );
+  };
+  return (b.x0 < a.x0 - 0.01 && via(-1)) || (b.x1 > a.x1 + 0.01 && via(1));
 }
 /** The surfaces next to a doorway's range on its side, on the floor or at its sill. */
 const at = (space: string, x0: number, x1: number, y: number, slack = 1.2): Surface[] =>
@@ -104,6 +188,8 @@ interface Link {
   power?: Power;
 }
 const links: Link[] = [];
+/** Each side door, with the surfaces at its sill on either side. */
+export const doorways: { name: string; here: Surface[]; there: Surface[] }[] = [];
 /** Side doors join the floors on either side at the sill; overhead doors, an updraft. */
 for (const p of passages) {
   const from = roomById(p.from)!,
@@ -122,6 +208,7 @@ for (const p of passages) {
     const wall = door.side === 'left' ? from.start : from.end;
     const here = at(spaceOf(from), wall - 1.5, wall + 1.5, door.from, 0.2);
     const there = at(spaceOf(to), wall - 1.5, wall + 1.5, door.from, 0.2);
+    doorways.push({ name: `${p.from} → ${p.to}`, here, there });
     for (const a of here)
       for (const b of there) {
         links.push({ from: a, to: b, seal });

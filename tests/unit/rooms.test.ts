@@ -29,7 +29,7 @@ import {
 import { bodyBand } from '../../src/enemies/Terrain';
 import { SceneManager } from '../../src/world/SceneManager';
 import { MovementModel } from '../../src/player/MovementModel';
-import { reach, start, surfaceNear } from './support/reach';
+import { doorways, reach, start, surfaceNear } from './support/reach';
 import type { Power, Surface } from './support/reach';
 
 const overlap = (a0: number, a1: number, b0: number, b1: number): number =>
@@ -303,6 +303,25 @@ describe('the way through Act I', () => {
     const all = reach(start, powers('dash', 'remanence', 'memory-step'));
     expect(all.has(relic('seris'))).toBe(true);
     expect(all.has(surfaceNear(route.act2.x + 3, 1)!)).toBe(true);
+  });
+  it('lets her reach every side door from both of its rooms, the body and its head room counted', () => {
+    // A low step with the next one above it at head height once walled off the drowned
+    // stair's floor, and the sanctum's door with it.
+    const all = reach(start, powers('dash', 'remanence', 'memory-step'));
+    for (const { name, here, there } of doorways) {
+      expect(here.length && there.length, name).toBeTruthy();
+      expect(
+        here.some((s) => all.has(s)),
+        name,
+      ).toBe(true);
+      expect(
+        there.some((s) => all.has(s)),
+        name,
+      ).toBe(true);
+    }
+    const sanctumDoor = doorways.find((d) => d.name === 'drowned-stair → remanence-sanctum')!;
+    const bottom = reach(start, powers('dash'));
+    expect(sanctumDoor.here.some((s) => bottom.has(s))).toBe(true);
   });
   it('holds no dead end: wherever Eidra stands, the next power is still within reach', () => {
     const steps: [Power[], string][] = [

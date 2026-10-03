@@ -130,6 +130,26 @@ Tests adaptés : `walkway` (par salle, chambres comprises), `scenery` (bandes de
 
 **Rejeu physique** (hors CI, script Playwright sur le build) : pour chaque saut que le modèle de portée juge possible dans les chambres, Eidra est posée sur la surface de départ et le saut est rejoué avec de vraies touches dans Havok. 115 sauts sur 116 atterrissent où le modèle l'annonce ; le dernier, sur un bloc de 1,2 m de large dans la salle des élans, est dépassé par le script (il n'est pas sur un chemin obligé). Ce rejeu a trouvé les marches qui cognaient la tête, les ouvertures trop basses au départ d'un saut et la montée des racines plus longue que la Rémanence, tous corrigés et désormais couverts par des tests unitaires.
 
+### Corrections après les premiers essais (D037)
+
+242 tests unitaires / intégration dans 28 fichiers.
+
+- **Modèle de portée** : il tient désormais compte du corps d'Eidra (0,66 × 1,7 m). Une dalle trop basse pour passer dessous coupe le sol, un bord dominé par une dalle à hauteur de tête ne se descend pas, un obstacle entre deux surfaces se gravit, une fente plus étroite qu'Eidra ne reçoit personne.
+- **Nouveau test `rooms`** : « chaque porte latérale est atteinte des deux côtés ». Il échoue sur l'ancien escalier noyé : la porte du sanctuaire était murée, avec la Rémanence derrière elle.
+- **`depths-enemies`** : une étincelle se brise sur le mur où elle vole, jamais au travers ; elle passe une porte, puis disparaît quand sa salle n'est plus affichée ; un éclat qui naît dans une marche en sort, puis se brise sur le sol.
+- **Nouveau `shrines.test.ts`** :
+  - chaque pouvoir placé a un sanctuaire à sa couleur, et ces couleurs sont distinctes ;
+  - chaque sanctuaire repose sur le vrai sol, sous son orbe ;
+  - ancrages, fragments et reliquaires n'en ont pas ;
+  - aucun pouvoir n'est à moins de 6 m d'un ancrage.
+
+27 parcours E2E. Ajout : **« the drowned stair leads down to the sanctum, and shots stay in their room »**. La Lanterne de l'épreuve tire sur Eidra ; dès la porte franchie vers la salle des élans, aucun tir ne reste. Depuis la première marche de l'escalier noyé, Eidra marche au sol jusqu'au sanctuaire de la Rémanence.
+
+**Vérifications dans le moteur physique** (rendu logiciel, vraies touches) :
+
+- les 16 sauts de l'escalier noyé et de la chapelle atterrissent où le modèle l'annonce ;
+- la descente se fait à pied, de la marche de la chapelle jusqu'au sol, puis à travers la porte du sanctuaire.
+
 ## Qualité restant à qualifier
 
 WebGPU réel, Firefox / Safari, manettes physiques (les profils Linux evdev et les vibrations n'ont été vérifiés qu'avec des manettes scriptées), accessibilité avec lecteurs d’écran, quotas / stockage privé, CSP sur Cloudflare et campagne complète. Le protocole de performance logiciel est décrit dans PERFORMANCE ; il ne certifie pas 60 FPS. Aucun test défaillant n’est désactivé pour rendre la CI verte.

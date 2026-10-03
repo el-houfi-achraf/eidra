@@ -39,6 +39,8 @@ export interface DebugSnapshot {
   resonance: number;
   /** Thrown cards in flight. */
   cards: { x: number; y: number }[];
+  /** Enemy shots in flight. */
+  shots: { x: number; y: number }[];
   shards: number;
   healthUpgrades: number;
   abilities: AbilityId[];
