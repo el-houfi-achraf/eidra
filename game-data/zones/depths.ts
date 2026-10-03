@@ -128,7 +128,12 @@ const sanctumShelf = sanctumSteps.at(-1)!;
 
 // ── The lofts ──────────────────────────────────────────────────────────────
 const LOFT = 11;
-const loftStair = stairs([108.6, 117.4], floor(LOFT), 27.6, 'left');
+/**
+ * Its first step stands in the lane by the right, out in the room: in the middle
+ * lane, under the next step at head height, it walled the floor by the door to the
+ * hanging archives off from the stair and the cage (D037).
+ */
+const loftStair = stairs([108.6, 117.4], floor(LOFT), 27.6, 'left', { rises: 10 });
 /** Up the cage to its last step, under the opening to the belfry. */
 const cageStair = stairs([136.6, 145.4], floor(LOFT), 28.3, 'mid-left');
 const belfryStair = stairs([128.6, 137.4], floor(33), 41.6, 'left');

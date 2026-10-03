@@ -363,11 +363,13 @@ export class GameSession {
       this.attack(
         p.motion.dashTime > 0
           ? 'dash'
-          : p.motion.grounded
-            ? 'light'
-            : input.held(InputAction.Down)
-              ? 'down'
-              : 'aerial',
+          : input.held(InputAction.Up) && !input.held(InputAction.Down)
+            ? 'up'
+            : p.motion.grounded
+              ? 'light'
+              : input.held(InputAction.Down)
+                ? 'down'
+                : 'aerial',
       );
     const chargePressed = input.consume(InputAction.Charge);
     const charging = input.held(InputAction.Charge) || chargePressed;
@@ -696,6 +698,7 @@ export class GameSession {
     this.focus.interrupt();
     if (!this.combat.begin(kind)) return;
     this.learn('attack');
+    if (kind === 'up') this.learn('up');
     if (this.combat.empowered) this.fx.sound('riposte');
     else if (kind === 'charged') {
       this.fx.sound('swing-heavy');

@@ -313,7 +313,8 @@ const mix = (a: number, b: number, t: number): number => a + (b - a) * t;
 /**
  * Eidra's key poses with her staff: a low sweep, a rising arc and a lunging thrust
  * for the combo; the staff raised overhead while a charge gathers, then brought down
- * as the cards burst; pointed straight down for the pogo; trailed back in a dash.
+ * as the cards burst; pointed straight down for the pogo, swept overhead from behind
+ * to the front for a strike upwards; trailed back in a dash.
  */
 export function heroPose(h: HeroPoseInput): Pose {
   if (h.dashing) return { lean: 0.32, squash: 0.12, swing: 1.2 };
@@ -336,6 +337,14 @@ export function heroPose(h: HeroPoseInput): Pose {
   switch (h.attackKind) {
     case 'down':
       return { lean: 0.55 * arc, squash: -0.08 * arc, swing: Math.PI, reach: -0.12 };
+    case 'up':
+      // Overhead: she leans back and the staff sweeps over her crown.
+      return {
+        lean: -0.2 * arc,
+        lift: 0.08 * arc,
+        squash: -0.05 * arc,
+        swing: mix(1.5, -0.7, strike),
+      };
     case 'charged':
       return {
         lean: 0.3 * arc,

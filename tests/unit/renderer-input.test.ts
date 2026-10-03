@@ -106,6 +106,20 @@ describe('Input buffering', () => {
     expect(input.label(InputAction.Interact)).toBe('E');
     expect(input.label(InputAction.Dash)).toBe('Shift');
     win.dispatchEvent(Object.assign(new Event('keyup'), { code: 'ArrowDown' }));
+    // Up aims overhead as well as jumping, on either key.
+    for (const code of ['ArrowUp', 'KeyW']) {
+      win.dispatchEvent(Object.assign(new Event('keydown'), { code }));
+      input.poll();
+      expect(input.held(InputAction.Up), code).toBe(true);
+      expect(input.held(InputAction.Jump), code).toBe(true);
+      win.dispatchEvent(Object.assign(new Event('keyup'), { code }));
+      input.poll();
+    }
+    // Pushed up, the stick aims the staff overhead and talks to whoever stands there.
+    pad.axes[1] = -0.9;
+    input.poll();
+    expect(input.held(InputAction.Up)).toBe(true);
+    expect(input.held(InputAction.Interact)).toBe(true);
     pad.axes[1] = 0.9;
     buttons[1]!.pressed = true;
     input.poll();

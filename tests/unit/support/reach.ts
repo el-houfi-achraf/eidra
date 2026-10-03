@@ -126,6 +126,26 @@ function pinched(a: Surface, side: -1 | 1): boolean {
         : o.x0 >= a.x1 - 0.01 && o.x0 < a.x1 + WIDTH + 0.04),
   );
 }
+/**
+ * A leap from `a` up onto `b` over its edge on side `side`: from the nearest
+ * take-off beside that edge, nothing solid but `b` itself stands between her feet
+ * on `a` and her head once she is up on `b`.
+ */
+function rises(a: Surface, b: Surface, side: -1 | 1): boolean {
+  const edge = side < 0 ? b.x0 : b.x1;
+  const from = side < 0 ? Math.min(a.x1, edge - WIDTH / 2) : Math.max(a.x0, edge + WIDTH / 2);
+  if (side < 0 ? from < a.x0 - 0.01 : from > a.x1 + 0.01) return false;
+  const c0 = Math.min(from, edge) - WIDTH / 2,
+    c1 = Math.max(from, edge) + WIDTH / 2;
+  return !(obstacles.get(a.room) ?? []).some(
+    (o) =>
+      !(Math.abs(o.y1 - b.y) < 0.01 && o.x0 <= b.x0 + 0.01 && o.x1 >= b.x1 - 0.01) &&
+      o.x1 > c0 + 0.01 &&
+      o.x0 < c1 - 0.01 &&
+      o.y1 > a.y + 0.05 &&
+      o.y0 < b.y + BODY,
+  );
+}
 /** Something solid stands in the gap between two surfaces, in the way of her body. */
 function obstructed(a: Surface, b: Surface): boolean {
   const lo = Math.min(a.x1, b.x1),
@@ -151,9 +171,10 @@ function jumpable(a: Surface, b: Surface, dash: boolean): boolean {
   if (gapBetween(a, b) > across(dy, dash)) return false;
   // Whatever stands between them must be climbed: its top is a surface of its own.
   if (obstructed(a, b)) return false;
-  // Rising, the head leads (the stairs' bonk test watches it); falling, the body
-  // leaves by an edge with room beside it and lands where it fits.
-  if (dy > 0.05) return true;
+  // Rising, she leaves from beside the higher surface with head room all the way
+  // up and over its edge; falling, she leaves by an edge with room beside it and
+  // lands where she fits.
+  if (dy > 0.05) return rises(a, b, -1) || rises(a, b, 1);
   const via = (side: -1 | 1): boolean => {
     const edge = side < 0 ? a.x0 : a.x1;
     if (pinched(a, side)) return false;
@@ -189,7 +210,7 @@ interface Link {
 }
 const links: Link[] = [];
 /** Each side door, with the surfaces at its sill on either side. */
-export const doorways: { name: string; here: Surface[]; there: Surface[] }[] = [];
+export const doorways: { room: string; name: string; here: Surface[]; there: Surface[] }[] = [];
 /** Side doors join the floors on either side at the sill; overhead doors, an updraft. */
 for (const p of passages) {
   const from = roomById(p.from)!,
@@ -208,7 +229,7 @@ for (const p of passages) {
     const wall = door.side === 'left' ? from.start : from.end;
     const here = at(spaceOf(from), wall - 1.5, wall + 1.5, door.from, 0.2);
     const there = at(spaceOf(to), wall - 1.5, wall + 1.5, door.from, 0.2);
-    doorways.push({ name: `${p.from} → ${p.to}`, here, there });
+    doorways.push({ room: p.from, name: `${p.from} → ${p.to}`, here, there });
     for (const a of here)
       for (const b of there) {
         links.push({ from: a, to: b, seal });
@@ -296,5 +317,19 @@ export function reach(from: Surface, powers: ReadonlySet<Power>): Set<Surface> {
       }
     if (!changed) return seen;
   }
+}
+/** Every surface of the same room reachable from `from` without leaving it, every power in hand. */
+export function reachWithin(from: Surface): Set<Surface> {
+  const seen = new Set([from]);
+  const queue = [from];
+  while (queue.length) {
+    const a = queue.shift()!;
+    for (const b of surfaces)
+      if (b.room === a.room && !seen.has(b) && jumpable(a, b, true)) {
+        seen.add(b);
+        queue.push(b);
+      }
+  }
+  return seen;
 }
 export { roomOfSurface };

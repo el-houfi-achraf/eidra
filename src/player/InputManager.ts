@@ -187,6 +187,7 @@ export class InputManager {
     if (this.keys.has('ArrowLeft')) this.current.add(InputAction.Left);
     if (this.keys.has('ArrowRight')) this.current.add(InputAction.Right);
     if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) this.current.add(InputAction.Jump);
+    if (this.keys.has('ArrowUp')) this.current.add(InputAction.Up);
     if (this.keys.has('ArrowDown')) this.current.add(InputAction.Down);
     const pad = this.readPads();
     this.menu = idleMenu();
