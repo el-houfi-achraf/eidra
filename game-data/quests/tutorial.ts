@@ -9,6 +9,7 @@ export const HintActionSchema = z.enum([
   'remanence',
   'echo',
   'down',
+  'up',
   'double',
   'cast',
 ]);
@@ -89,6 +90,13 @@ export const tutorialHints = [
     text: 'Rémanence — rappeler les marches oubliées',
     room: 'roots',
     requires: ['remanence'],
+  },
+  // The first flyers within reach: wax moths hovering over the drowned archives.
+  {
+    id: 'up',
+    action: 'up',
+    text: 'Haut + attaque : frapper au-dessus de soi',
+    room: 'archives',
   },
   {
     id: 'down',

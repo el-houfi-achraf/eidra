@@ -140,6 +140,7 @@ const hintKeys = (action: string, label: Label): string[] =>
     remanence: [label(InputAction.Remanence)],
     echo: [label(InputAction.Echo)],
     down: [label(InputAction.Down), label(InputAction.Attack)],
+    up: [label(InputAction.Up), label(InputAction.Attack)],
   })[action] ?? [];
 const controls: [InputAction, string][] = [
   [InputAction.Jump, 'Sauter'],
@@ -649,7 +650,7 @@ export class MenuUI {
     if (hintEl && hintEl.dataset.key !== hintKey) {
       hintEl.dataset.key = hintKey;
       if (hint)
-        hintEl.innerHTML = `${keys.map((k) => `<kbd>${escape(k)}</kbd>`).join(hint.action === 'down' ? '<em>+</em>' : '')}<span>${escape(hint.text)}</span>`;
+        hintEl.innerHTML = `${keys.map((k) => `<kbd>${escape(k)}</kbd>`).join(hint.action === 'down' || hint.action === 'up' ? '<em>+</em>' : '')}<span>${escape(hint.text)}</span>`;
       hintEl.classList.toggle('visible', Boolean(hint));
     }
     const act = this.root.querySelector('#act-name');

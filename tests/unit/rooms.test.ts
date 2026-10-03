@@ -29,7 +29,7 @@ import {
 import { bodyBand } from '../../src/enemies/Terrain';
 import { SceneManager } from '../../src/world/SceneManager';
 import { MovementModel } from '../../src/player/MovementModel';
-import { doorways, reach, start, surfaceNear } from './support/reach';
+import { doorways, reach, reachWithin, start, surfaceNear } from './support/reach';
 import type { Power, Surface } from './support/reach';
 
 const overlap = (a0: number, a1: number, b0: number, b1: number): number =>
@@ -322,6 +322,19 @@ describe('the way through Act I', () => {
     const sanctumDoor = doorways.find((d) => d.name === 'drowned-stair → remanence-sanctum')!;
     const bottom = reach(start, powers('dash'));
     expect(sanctumDoor.here.some((s) => bottom.has(s))).toBe(true);
+  });
+  it('joins the side doors of a room to one another, both ways, without leaving it', () => {
+    // A low first step under a second at head height once cut the counterweight's loft
+    // in two: in from the hanging archives, the stair and the cage were out of reach.
+    const cut: string[] = [];
+    for (const room of chambers) {
+      const doors = doorways.filter((d) => d.room === room.id);
+      for (const a of doors)
+        for (const b of doors)
+          if (a !== b && !a.here.some((s) => b.here.some((t) => reachWithin(s).has(t))))
+            cut.push(`${a.name} ↛ ${b.name}`);
+    }
+    expect(cut).toEqual([]);
   });
   it('holds no dead end: wherever Eidra stands, the next power is still within reach', () => {
     const steps: [Power[], string][] = [

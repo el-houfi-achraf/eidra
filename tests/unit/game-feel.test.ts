@@ -78,6 +78,30 @@ describe('Riposte and downward strike', () => {
     expect(c.hitboxes.test(hit, makeCombatant('watcher', 30, 10, 2.2))).toBe(true);
     expect(c.hitboxes.test(hit, makeCombatant('wisp', 30, 12.5, 2.2))).toBe(false);
   });
+  it('places the upward hitbox over Eidra, out of the combo: a flyer overhead is struck', () => {
+    const c = new CombatSystem();
+    const eidra = makeCombatant('eidra', 100, 10, 4);
+    // Two swings of the combo, then a strike overhead within its window.
+    c.begin('light');
+    c.update(0.35, []);
+    c.begin('light');
+    c.update(0.35, []);
+    c.begin('up');
+    expect(c.comboIndex).toBe(2);
+    expect(c.finisher).toBe(false);
+    const hit = c.strike(eidra, 1);
+    expect(hit.y).toBeGreaterThan(eidra.y + 1);
+    // A wax moth hovering two metres over her head: the staff reaches it overhead...
+    const moth = makeCombatant('moth', 20, 10.3, 6.3, 0.35, 0.9);
+    expect(c.hitboxes.test(hit, moth)).toBe(true);
+    // ...where a blow in front would miss it, and a foe ahead is left alone.
+    c.update(1, []);
+    c.begin('light');
+    expect(c.hitboxes.test(c.strike(eidra, 1), moth)).toBe(false);
+    c.update(1, []);
+    c.begin('up');
+    expect(c.hitboxes.test(c.strike(eidra, 1), makeCombatant('watcher', 30, 12.4, 4))).toBe(false);
+  });
   it('a pogo bounce has a fixed height and refreshes the dash', () => {
     const m = new MovementModel();
     m.step(1 / 60, { ...idle, dash: true }, false);

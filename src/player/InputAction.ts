@@ -1,6 +1,7 @@
 export enum InputAction {
   Left = 'left',
   Right = 'right',
+  Up = 'up',
   Down = 'down',
   Walk = 'walk',
   Jump = 'jump',
@@ -18,6 +19,8 @@ export enum InputAction {
 export const defaultBindings: Record<InputAction, string> = {
   left: 'KeyA',
   right: 'KeyD',
+  // W also jumps: with the attack, a leap that strikes overhead.
+  up: 'KeyW',
   down: 'KeyS',
   walk: 'ControlLeft',
   jump: 'Space',
@@ -35,6 +38,7 @@ export const defaultBindings: Record<InputAction, string> = {
 export const actionLabels: Record<InputAction, string> = {
   left: 'Aller à gauche',
   right: 'Aller à droite',
+  up: 'Viser vers le haut',
   down: 'Viser vers le bas',
   walk: 'Marcher',
   jump: 'Sauter',
@@ -53,6 +57,7 @@ export const actionLabels: Record<InputAction, string> = {
 export const gamepadLabels: Record<InputAction, string> = {
   left: '◀',
   right: '▶',
+  up: '▲',
   down: '▼',
   walk: 'Stick',
   jump: 'A',

@@ -119,6 +119,8 @@ export const defaultPadBindings = {
   map: 'b8',
   pause: 'b9',
   interact: 'up',
+  // Pushed up with the strike, the staff swings overhead.
+  up: 'up',
   down: 'down',
   left: 'left',
   right: 'right',

@@ -178,7 +178,11 @@ describe('controller defaults and settings', () => {
   it('binds every action a pad needs, each to its own input', () => {
     for (const action of Object.values(InputAction))
       if (action !== InputAction.Walk) expect(defaultPadBindings, action).toHaveProperty(action);
-    const tokens = Object.values(defaultPadBindings);
+    // One input does two things, as in the action-platformers of reference: pushed up,
+    // the stick aims the staff overhead and talks, rests or opens a passage.
+    const { up, interact, ...others } = defaultPadBindings;
+    expect([up, interact]).toEqual(['up', 'up']);
+    const tokens = [...Object.values(others), up];
     expect(new Set(tokens).size).toBe(tokens.length);
     // Jump on the south button, strike on the west, dash on the right trigger.
     expect(defaultPadBindings).toMatchObject({ jump: 'b0', attack: 'b2', dash: 'b7' });

@@ -191,4 +191,13 @@ describe('hero key poses', () => {
     const down = heroPose({ attackTime: 0.16, attackKind: 'down', dashing: false });
     expect(down.lean!).toBeGreaterThan(mid.lean!);
   });
+  it('sweeps the staff overhead for a strike upwards, leaning back', () => {
+    const start = heroPose({ attackTime: 0.32, attackKind: 'up', dashing: false });
+    const blow = heroPose({ attackTime: 0.2, attackKind: 'up', dashing: false });
+    // From behind her shoulder, over the crown (0 is upright), forward.
+    expect(start.swing!).toBeGreaterThan(1);
+    expect(Math.abs(blow.swing!)).toBeLessThan(0.6);
+    expect(blow.lean!).toBeLessThan(0);
+    expect(blow.lift!).toBeGreaterThan(0);
+  });
 });

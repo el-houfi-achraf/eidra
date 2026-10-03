@@ -144,4 +144,7 @@ Lire README, ROADMAP et AGENT_RULES, lancer `npm ci`, puis `npm run check` et le
   - au pied de l'escalier noyé, Eidra restait coincée entre deux marches et ne pouvait plus rejoindre la porte du sanctuaire de la Rémanence : la première marche est désormais contre le mur de droite et le sol mène librement à la porte ;
   - les tirs ennemis se brisent contre les murs et disparaissent quand on quitte la salle de l'ennemi : plus d'étincelle qui flotte dans le noir derrière une porte ;
   - un pouvoir ne ressemble plus à un ancrage : il attend dans un sanctuaire à sa couleur (colonne de lumière, rune au sol, orbe dans ses anneaux), tandis que l'ancrage garde son anneau d'or et sa gemme.
+- **Deuxièmes essais** (D038) :
+  - **frappe vers le haut** : haut + attaque abat les ennemis qui planent au-dessus d'Eidra (manette : haut + X ; clavier : W ou flèche haut + J, qui fait aussi sauter) ;
+  - dans les combles du contrepoids, le sol près de la porte des archives suspendues n'est plus coupé de l'escalier et de la cage.
 - **Limites** : les durées sont des estimations (45 à 55 min pour un premier passage de l'Acte I) ; seuls des playtests humains les confirmeront, comme la difficulté des nouvelles salles. L'Acte II garde sa route.

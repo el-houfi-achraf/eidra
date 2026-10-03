@@ -150,6 +150,23 @@ Tests adaptés : `walkway` (par salle, chambres comprises), `scenery` (bandes de
 - les 16 sauts de l'escalier noyé et de la chapelle atterrissent où le modèle l'annonce ;
 - la descente se fait à pied, de la marche de la chapelle jusqu'au sol, puis à travers la porte du sanctuaire.
 
+### Frappe vers le haut et combles du contrepoids (D038)
+
+245 tests unitaires / intégration dans 28 fichiers.
+
+- **`rooms`** : le modèle de portée exige de la hauteur libre pour un saut vers le haut. Nouveau test : dans chaque salle, les portes latérales communiquent entre elles dans les deux sens sans quitter la salle. Il signalait les combles du contrepoids, coupées en deux.
+- **`game-feel`** : la frappe vers le haut touche une Phalène deux mètres au-dessus d'Eidra, qu'un coup droit manque ; elle épargne un ennemi devant ; elle n'avance pas le combo et n'en est jamais le coup final.
+- **`poses`** : le bâton passe de derrière l'épaule au-dessus de la couronne, Eidra penchée en arrière.
+- **`renderer-input`** : W et la flèche haut visent vers le haut et font sauter ; le stick poussé vers le haut vise et interagit.
+- **`gamepad`** : chaque action a sa propre entrée, sauf le haut, partagé par « Viser vers le haut » et « Interagir ».
+
+28 parcours E2E. Ajout : **« up and strike on a controller fell a foe hovering overhead »**. Avec une manette Xbox simulée, sous la Lanterne de l'escalier noyé, un coup droit la manque ; haut + X l'abat.
+
+**Dans le moteur physique** (vraies touches) :
+
+- les 12 sauts du nouvel escalier des combles atterrissent où le modèle l'annonce ;
+- Eidra traverse les combles de la porte des archives suspendues jusqu'à la cage, puis revient, avec un seul saut sur la première marche dans chaque sens.
+
 ## Qualité restant à qualifier
 
 WebGPU réel, Firefox / Safari, manettes physiques (les profils Linux evdev et les vibrations n'ont été vérifiés qu'avec des manettes scriptées), accessibilité avec lecteurs d’écran, quotas / stockage privé, CSP sur Cloudflare et campagne complète. Le protocole de performance logiciel est décrit dans PERFORMANCE ; il ne certifie pas 60 FPS. Aucun test défaillant n’est désactivé pour rendre la CI verte.

@@ -171,7 +171,7 @@ export class ActionBuffer {
     this.remaining = 0;
   }
 }
-export type AttackKind = 'light' | 'charged' | 'aerial' | 'dash' | 'down';
+export type AttackKind = 'light' | 'charged' | 'aerial' | 'dash' | 'down' | 'up';
 export class CombatSystem {
   readonly damage = new DamageSystem();
   readonly hitboxes = new HitboxSystem();
@@ -195,7 +195,8 @@ export class CombatSystem {
     this.attackKind = kind;
     this.empowered = this.parry.riposte > 0;
     this.parry.riposte = 0;
-    this.comboIndex = kind === 'down' ? this.comboIndex : this.combo.next();
+    // Strikes aimed up or down stand outside the three-hit combo.
+    this.comboIndex = kind === 'down' || kind === 'up' ? this.comboIndex : this.combo.next();
     this.duration = kind === 'charged' ? 0.58 : 0.32;
     this.attackTime = this.duration;
     this.cooldown = this.duration;
@@ -230,7 +231,7 @@ export class CombatSystem {
     return (
       this.attackKind === 'charged' ||
       this.empowered ||
-      (this.comboIndex === 3 && this.attackKind !== 'down')
+      (this.comboIndex === 3 && this.attackKind !== 'down' && this.attackKind !== 'up')
     );
   }
   strike(player: Combatant, facing: number): Hitbox {
@@ -242,6 +243,18 @@ export class CombatSystem {
         y: player.y - 1.25,
         width: 1.7,
         height: 1.8,
+        damage: 12 * multiplier,
+        stagger: 0.15 + (this.empowered ? 0.4 : 0),
+        force: 0,
+        direction: facing,
+      };
+    // Overhead: the staff sweeps the air above her head, at a flyer within reach.
+    if (this.attackKind === 'up')
+      return {
+        x: player.x + facing * 0.15,
+        y: player.y + 1.55,
+        width: 1.9,
+        height: 2.3,
         damage: 12 * multiplier,
         stagger: 0.15 + (this.empowered ? 0.4 : 0),
         force: 0,

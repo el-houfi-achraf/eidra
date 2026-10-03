@@ -939,6 +939,37 @@ test('a PlayStation controller drives the menus, the game and its own glyphs', a
   await padTap(page, 1);
   await expect(page.locator('body')).toHaveAttribute('data-state', 'PLAYING');
 });
+test('up and strike on a controller fell a foe hovering overhead', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await start(page);
+  // On the drowned stair, under the watching lantern that hangs above a step.
+  await page.evaluate(() => window.eidra!.teleport(111.7, -46.3));
+  await expect.poll(async () => (await snapshot(page)).room).toBe('drowned-stair');
+  await expect.poll(async () => (await snapshot(page)).player.grounded).toBe(true);
+  const lantern = async (): Promise<number> =>
+    (await snapshot(page)).enemies.find((e) => e.id === 'lantern-2')?.health ?? 0;
+  await expect.poll(lantern).toBeGreaterThan(0);
+  await page.evaluate(() => window.eidra!.setEnemyHealth('lantern-2', 1));
+  await plugPad(
+    page,
+    'Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)',
+    'standard',
+    [0, 0, 0, 0],
+  );
+  await frames(page);
+  // A level blow passes under it...
+  await padTap(page, 2);
+  await page.waitForTimeout(500);
+  expect(await lantern()).toBeGreaterThan(0);
+  // ...the stick pushed up with the same button sweeps the staff overhead.
+  await padAxis(page, 1, -1);
+  await frames(page);
+  await padTap(page, 2);
+  await expect.poll(lantern).toBe(0);
+  await padAxis(page, 1, 0);
+  expect(errors).toEqual([]);
+});
 test('an unmapped controller plays through its hat and is remapped with the pad alone', async ({
   page,
 }) => {
